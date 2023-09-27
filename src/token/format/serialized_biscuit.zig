@@ -45,15 +45,13 @@ pub const SerializedBiscuit = struct {
 
     fn verify(self: *SerializedBiscuit, public_key: std.crypto.sign.Ed25519.PublicKey) !void {
         var current_public_key = public_key;
-        var algo: [4]u8 = undefined;
 
         // Verify the authority block's signature
         {
-            std.mem.writeIntNative(u32, algo[0..], @as(u32, @bitCast(@intFromEnum(self.authority.algorithm))));
-
             var verifier = try self.authority.signature.verifier(current_public_key);
+
             verifier.update(self.authority.block);
-            verifier.update(&algo);
+            verifier.update(&self.authority.algorithmBuf());
             verifier.update(&self.authority.public_key.bytes);
 
             try verifier.verify();
@@ -62,12 +60,11 @@ pub const SerializedBiscuit = struct {
         }
 
         // Verify the other blocks
-        for (self.blocks.items) |block| {
-            std.mem.writeIntNative(u32, algo[0..], @as(u32, @bitCast(@intFromEnum(block.algorithm))));
+        for (self.blocks.items) |*block| {
+            var verifier = try block.signature.verifier(current_public_key);
 
-            var verifier = try self.authority.signature.verifier(current_public_key);
             verifier.update(block.block);
-            verifier.update(&algo);
+            verifier.update(&block.algorithmBuf());
             verifier.update(&block.public_key.bytes);
 
             try verifier.verify();

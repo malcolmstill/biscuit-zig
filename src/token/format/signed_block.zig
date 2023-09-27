@@ -37,4 +37,10 @@ pub const SignedBlock = struct {
             .public_key = public_key,
         };
     }
+
+    pub fn algorithmBuf(self: *SignedBlock) [4]u8 {
+        var buf: [4]u8 = undefined;
+        std.mem.writeIntNative(u32, buf[0..], @as(u32, @bitCast(@intFromEnum(self.algorithm))));
+        return buf;
+    }
 };
