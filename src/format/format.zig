@@ -11,10 +11,10 @@ fn verify_authority_block(biscuit: schema.Biscuit, public_key: std.crypto.sign.E
     // Error if we don't have a signature of the correct length (e.g. 64 bytes for ed25519)
     if (block_signature.len != expected_signature_length) return error.IncorrectBlockSignatureLength;
 
-    // Copy our signature into a fixed-length buffer
+    // Copy our signature into a fixed-length buffer and build Ed25519 signature object
     var block_signature_buf: [64]u8 = undefined;
     @memcpy(&block_signature_buf, block_signature);
-    const ed25519_signature = std.crypto.sign.Ed25519.Signature.fromBytes(block_signature_buf);
+    const signature = std.crypto.sign.Ed25519.Signature.fromBytes(block_signature_buf);
 
     // Algorithm buffer
     // FIXME: handle not-null assertion
@@ -26,7 +26,7 @@ fn verify_authority_block(biscuit: schema.Biscuit, public_key: std.crypto.sign.E
     var next_key = authority.nextKey.?.key.getSlice();
 
     // Verify the authority block's signature
-    var verifier = try ed25519_signature.verifier(public_key);
+    var verifier = try signature.verifier(public_key);
     verifier.update(authority.block.getSlice());
     verifier.update(&algo);
     verifier.update(next_key);
