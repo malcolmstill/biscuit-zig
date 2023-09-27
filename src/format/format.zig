@@ -4,6 +4,42 @@ const schema = @import("schema.pb.zig");
 
 const expected_signature_length = 64;
 
+fn decode_authority_block(allocator: std.mem.Allocator, biscuit: schema.Biscuit, public_key: std.crypto.sign.Ed25519.PublicKey) !void {
+    try verify_authority_block(biscuit, public_key);
+
+    const authority = biscuit.authority orelse return error.ExpectedAuthority;
+
+    const block = try pb.pb_decode(schema.Block, authority.block.getSlice(), allocator);
+    defer pb.pb_deinit(block);
+
+    // Print symbols
+    for (block.symbols.items, 0..) |symbol, i| {
+        std.debug.print("symbol[{}] = \"{s}\"\n", .{ i, symbol.getSlice() });
+    }
+
+    // Print facts
+    for (block.facts_v2.items) |fact| {
+        var predicate: schema.PredicateV2 = fact.predicate orelse continue;
+
+        std.debug.print("predicate = {any}\n", .{predicate});
+
+        for (predicate.terms.items) |term| {
+            var content = term.Content orelse continue;
+            std.debug.print("content = {any}\n", .{content});
+            switch (content) {
+                .string => |s| std.debug.print("string = {any}\n", .{s}),
+                .variable,
+                .integer,
+                .date,
+                .bytes,
+                .bool,
+                .set,
+                => @panic("not implemented"),
+            }
+        }
+    }
+}
+
 fn verify_authority_block(biscuit: schema.Biscuit, public_key: std.crypto.sign.Ed25519.PublicKey) !void {
     const authority = biscuit.authority orelse return error.ExpectedAuthority;
     const block_signature = authority.signature.getSlice();
@@ -59,4 +95,7 @@ test {
 
     // Verify the authority block
     try verify_authority_block(biscuit, public_key);
+
+    //
+    try decode_authority_block(testing.allocator, biscuit, public_key);
 }
