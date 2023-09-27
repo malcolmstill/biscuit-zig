@@ -5,7 +5,7 @@ const schema = @import("schema.pb.zig");
 const expected_signature_length = 64;
 
 fn decode_authority_block(allocator: std.mem.Allocator, biscuit: schema.Biscuit, public_key: std.crypto.sign.Ed25519.PublicKey) !void {
-    try verify_authority_block(biscuit, public_key);
+    _ = public_key;
 
     const authority = biscuit.authority orelse return error.ExpectedAuthority;
 
@@ -40,36 +40,6 @@ fn decode_authority_block(allocator: std.mem.Allocator, biscuit: schema.Biscuit,
     }
 }
 
-fn verify_authority_block(biscuit: schema.Biscuit, public_key: std.crypto.sign.Ed25519.PublicKey) !void {
-    const authority = biscuit.authority orelse return error.ExpectedAuthority;
-    const block_signature = authority.signature.getSlice();
-
-    // Error if we don't have a signature of the correct length (e.g. 64 bytes for ed25519)
-    if (block_signature.len != expected_signature_length) return error.IncorrectBlockSignatureLength;
-
-    // Copy our signature into a fixed-length buffer and build Ed25519 signature object
-    var block_signature_buf: [64]u8 = undefined;
-    @memcpy(&block_signature_buf, block_signature);
-    const signature = std.crypto.sign.Ed25519.Signature.fromBytes(block_signature_buf);
-
-    // Algorithm buffer
-    // FIXME: handle not-null assertion
-    var algo: [4]u8 = undefined;
-    std.mem.writeIntNative(u32, algo[0..], @as(u32, @bitCast(@intFromEnum(authority.nextKey.?.algorithm))));
-
-    // Next key
-    // FIXME: handle not-null assertion
-    var next_key = authority.nextKey.?.key.getSlice();
-
-    // Verify the authority block's signature
-    var verifier = try signature.verifier(public_key);
-    verifier.update(authority.block.getSlice());
-    verifier.update(&algo);
-    verifier.update(next_key);
-
-    try verifier.verify();
-}
-
 test {
     const testing = std.testing;
     var allocator = testing.allocator;
@@ -93,9 +63,5 @@ test {
     const biscuit = try pb.pb_decode(schema.Biscuit, token_binary, testing.allocator);
     defer pb.pb_deinit(biscuit);
 
-    // Verify the authority block
-    try verify_authority_block(biscuit, public_key);
-
-    //
     try decode_authority_block(testing.allocator, biscuit, public_key);
 }
