@@ -1,7 +1,7 @@
 const std = @import("std");
-const Fact = @import("./datalog/fact.zig").Fact;
-const Rule = @import("./datalog/rule.zig").Rule;
-const Check = @import("./datalog/check.zig").Check;
+const Fact = @import("../datalog/fact.zig").Fact;
+const Rule = @import("../datalog/rule.zig").Rule;
+const Check = @import("../datalog/check.zig").Check;
 
 pub const Block = struct {
     version: u64,
