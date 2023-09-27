@@ -17,10 +17,12 @@ fn verify_authority_block(biscuit: schema.Biscuit, public_key: std.crypto.sign.E
     const ed25519_signature = std.crypto.sign.Ed25519.Signature.fromBytes(block_signature_buf);
 
     // Algorithm buffer
+    // FIXME: handle not-null assertion
     var algo: [4]u8 = undefined;
     std.mem.writeIntNative(u32, algo[0..], @as(u32, @bitCast(@intFromEnum(authority.nextKey.?.algorithm))));
 
     // Next key
+    // FIXME: handle not-null assertion
     var next_key = authority.nextKey.?.key.getSlice();
 
     // Verify the authority block's signature
