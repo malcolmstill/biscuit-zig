@@ -15,10 +15,12 @@ pub const SerializedBiscuit = struct {
 
     pub fn from_bytes(allocator: std.mem.Allocator, bytes: []const u8, public_key: std.crypto.sign.Ed25519.PublicKey) !SerializedBiscuit {
         const ds_biscuit = try pb.pb_decode(schema.Biscuit, bytes, allocator);
+        errdefer ds_biscuit.deinit();
 
         const authority = try SignedBlock.fromDeserializedBlock(ds_biscuit.authority orelse return error.ExpectedAuthorityBlock);
 
         var blocks = std.ArrayList(SignedBlock).init(allocator);
+        errdefer blocks.deinit();
         for (ds_biscuit.blocks.items) |blk| {
             const sb = try SignedBlock.fromDeserializedBlock(blk);
             try blocks.append(sb);
@@ -42,16 +44,36 @@ pub const SerializedBiscuit = struct {
     }
 
     fn verify(self: *SerializedBiscuit, public_key: std.crypto.sign.Ed25519.PublicKey) !void {
-        // Verify the authority block's signature
+        var current_public_key = public_key;
         var algo: [4]u8 = undefined;
-        std.mem.writeIntNative(u32, algo[0..], @as(u32, @bitCast(@intFromEnum(self.authority.algorithm))));
 
-        var verifier = try self.authority.signature.verifier(public_key);
-        verifier.update(self.authority.block);
-        verifier.update(&algo);
-        verifier.update(&self.authority.public_key.bytes);
+        // Verify the authority block's signature
+        {
+            std.mem.writeIntNative(u32, algo[0..], @as(u32, @bitCast(@intFromEnum(self.authority.algorithm))));
 
-        try verifier.verify();
+            var verifier = try self.authority.signature.verifier(current_public_key);
+            verifier.update(self.authority.block);
+            verifier.update(&algo);
+            verifier.update(&self.authority.public_key.bytes);
+
+            try verifier.verify();
+
+            current_public_key = self.authority.public_key;
+        }
+
+        // Verify the other blocks
+        for (self.blocks.items) |block| {
+            std.mem.writeIntNative(u32, algo[0..], @as(u32, @bitCast(@intFromEnum(block.algorithm))));
+
+            var verifier = try self.authority.signature.verifier(current_public_key);
+            verifier.update(block.block);
+            verifier.update(&algo);
+            verifier.update(&block.public_key.bytes);
+
+            try verifier.verify();
+
+            current_public_key = block.public_key;
+        }
     }
 };
 
@@ -74,4 +96,24 @@ test {
 
     var ser_biscuit = try SerializedBiscuit.from_bytes(testing.allocator, bytes, public_key);
     defer ser_biscuit.deinit();
+}
+
+test {
+    const testing = std.testing;
+    var allocator = testing.allocator;
+    const token = "En0KEwoEMTIzNBgDIgkKBwgKEgMYgAgSJAgAEiDW02RI9CsYXicvETSF32Etr7W7VLvLTAN2KswJjQkFuhpAGP-0v0-TJdxULAWaiavnB8U_64K9MmCwesF76UGhmdX11T2qQ9WBwnFtv81Ia08eDNOImYeSYKiyxMSnEK60Bhp9ChMKBGFiY2QYAyIJCgcIAhIDGIEIEiQIABIgy4xk7vKUd11pYvA2twQHwqPqKfLpEauEgHcgaz2Z5j4aQKv8ahaCHkf_pOSV3Av7lBE_Nv-DCPfoV39_z2uxhdAC3L5L-ihTrItOrwfE0R5dT2I9RxvVLbtfaDCO4BjMFgYiIgogkJw2WY0o09not6ypjw2PR2VTJfA5s40W8BxgdwtAX0A=";
+
+    // Public key
+    var public_key_mem: [32]u8 = undefined;
+    _ = try std.fmt.hexToBytes(&public_key_mem, "1b28c5b773c4e14737769505002e033a3fc49d3597609bb4e6547d2f45379064");
+    const public_key = try std.crypto.sign.Ed25519.PublicKey.fromBytes(public_key_mem);
+
+    // Base64 decode token
+    const size = try std.base64.url_safe.Decoder.calcSizeForSlice(token);
+    var bytes = try allocator.alloc(u8, size);
+    defer allocator.free(bytes);
+    try std.base64.url_safe.Decoder.decode(bytes, token);
+
+    var b = try SerializedBiscuit.from_bytes(testing.allocator, bytes, public_key);
+    defer b.deinit();
 }
