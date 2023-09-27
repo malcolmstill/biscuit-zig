@@ -7,17 +7,19 @@ pub const SerializedBiscuit = struct {
 
     const expected_signature_length = 64;
 
-    pub fn from_bytes(allocator: std.mem.Allocator, bytes: []const u8) !SerializedBiscuit {
-        const biscuit = try pb.pb_decode(schema.Biscuit, bytes, allocator);
+    pub fn from_bytes(allocator: std.mem.Allocator, bytes: []const u8, public_key: std.crypto.sign.Ed25519.PublicKey) !SerializedBiscuit {
+        var biscuit: SerializedBiscuit = .{ .biscuit = try pb.pb_decode(schema.Biscuit, bytes, allocator) };
 
-        return .{ .biscuit = biscuit };
+        try biscuit.verify(public_key);
+
+        return biscuit;
     }
 
     pub fn deinit(self: *SerializedBiscuit) void {
         self.biscuit.deinit();
     }
 
-    pub fn verify(self: *SerializedBiscuit, public_key: std.crypto.sign.Ed25519.PublicKey) !void {
+    fn verify(self: *SerializedBiscuit, public_key: std.crypto.sign.Ed25519.PublicKey) !void {
         const authority = self.biscuit.authority orelse return error.ExpectedAuthority;
         const block_signature = authority.signature.getSlice();
 
@@ -65,7 +67,6 @@ test {
     defer allocator.free(bytes);
     try std.base64.url_safe.Decoder.decode(bytes, token);
 
-    var ser_biscuit = try SerializedBiscuit.from_bytes(testing.allocator, bytes);
+    var ser_biscuit = try SerializedBiscuit.from_bytes(testing.allocator, bytes, public_key);
     defer ser_biscuit.deinit();
-    try ser_biscuit.verify(public_key);
 }
