@@ -1,14 +1,35 @@
 const std = @import("std");
 const pb = @import("protobuf");
 const schema = @import("schema.pb.zig");
+const SignedBlock = @import("signed_block.zig").SignedBlock;
 
 pub const SerializedBiscuit = struct {
     biscuit: schema.Biscuit,
+    allocator: std.mem.Allocator,
+    authority: SignedBlock,
+    blocks: std.ArrayList(SignedBlock),
+    // proof: Proof,
+    // root_key_id: ?u64,
 
     const expected_signature_length = 64;
 
     pub fn from_bytes(allocator: std.mem.Allocator, bytes: []const u8, public_key: std.crypto.sign.Ed25519.PublicKey) !SerializedBiscuit {
-        var biscuit: SerializedBiscuit = .{ .biscuit = try pb.pb_decode(schema.Biscuit, bytes, allocator) };
+        const ds_biscuit = try pb.pb_decode(schema.Biscuit, bytes, allocator);
+
+        const authority = try SignedBlock.fromDeserializedBlock(ds_biscuit.authority orelse return error.ExpectedAuthorityBlock);
+
+        var blocks = std.ArrayList(SignedBlock).init(allocator);
+        for (ds_biscuit.blocks.items) |blk| {
+            const sb = try SignedBlock.fromDeserializedBlock(blk);
+            try blocks.append(sb);
+        }
+
+        var biscuit = SerializedBiscuit{
+            .biscuit = ds_biscuit,
+            .allocator = allocator,
+            .authority = authority,
+            .blocks = blocks,
+        };
 
         try biscuit.verify(public_key);
 
@@ -16,35 +37,19 @@ pub const SerializedBiscuit = struct {
     }
 
     pub fn deinit(self: *SerializedBiscuit) void {
+        self.blocks.deinit();
         self.biscuit.deinit();
     }
 
     fn verify(self: *SerializedBiscuit, public_key: std.crypto.sign.Ed25519.PublicKey) !void {
-        const authority = self.biscuit.authority orelse return error.ExpectedAuthority;
-        const block_signature = authority.signature.getSlice();
-
-        // Error if we don't have a signature of the correct length (e.g. 64 bytes for ed25519)
-        if (block_signature.len != expected_signature_length) return error.IncorrectBlockSignatureLength;
-
-        // Copy our signature into a fixed-length buffer and build Ed25519 signature object
-        var block_signature_buf: [64]u8 = undefined;
-        @memcpy(&block_signature_buf, block_signature);
-        const signature = std.crypto.sign.Ed25519.Signature.fromBytes(block_signature_buf);
-
-        // Algorithm buffer
-        // FIXME: handle not-null assertion
-        var algo: [4]u8 = undefined;
-        std.mem.writeIntNative(u32, algo[0..], @as(u32, @bitCast(@intFromEnum(authority.nextKey.?.algorithm))));
-
-        // Next key
-        // FIXME: handle not-null assertion
-        var next_key = authority.nextKey.?.key.getSlice();
-
         // Verify the authority block's signature
-        var verifier = try signature.verifier(public_key);
-        verifier.update(authority.block.getSlice());
+        var algo: [4]u8 = undefined;
+        std.mem.writeIntNative(u32, algo[0..], @as(u32, @bitCast(@intFromEnum(self.authority.algorithm))));
+
+        var verifier = try self.authority.signature.verifier(public_key);
+        verifier.update(self.authority.block);
         verifier.update(&algo);
-        verifier.update(next_key);
+        verifier.update(&self.authority.public_key.bytes);
 
         try verifier.verify();
     }
