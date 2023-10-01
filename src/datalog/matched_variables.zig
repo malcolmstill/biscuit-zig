@@ -3,6 +3,8 @@ const mem = std.mem;
 const Rule = @import("rule.zig").Rule;
 const Term = @import("term.zig").Term;
 
+/// MatchedVariables provides a map from variables to initially null
+/// terms.
 pub const MatchedVariables = struct {
     variables: std.AutoHashMap(u64, ?Term),
 
