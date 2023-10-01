@@ -76,26 +76,32 @@ test {
 
     var terms_1 = std.ArrayList(Term).init(allocator);
     defer terms_1.deinit();
-    try terms_1.insertSlice(0, &[_]Term{ .{ .string = 10 }, .{ .variable = 20 } });
+    try terms_1.insertSlice(0, &[_]Term{ .{ .string = 10 }, .{ .integer = 20 } });
 
     var terms_2 = std.ArrayList(Term).init(allocator);
     defer terms_2.deinit();
-    try terms_2.insertSlice(0, &[_]Term{ .{ .string = 10 }, .{ .variable = 20 } });
+    try terms_2.insertSlice(0, &[_]Term{ .{ .string = 10 }, .{ .integer = 20 } });
 
     var terms_3 = std.ArrayList(Term).init(allocator);
     defer terms_3.deinit();
-    try terms_3.insertSlice(0, &[_]Term{ .{ .string = 10 }, .{ .variable = 21 } });
+    try terms_3.insertSlice(0, &[_]Term{ .{ .string = 10 }, .{ .integer = 21 } });
 
     var terms_4 = std.ArrayList(Term).init(allocator);
     defer terms_4.deinit();
-    try terms_4.insertSlice(0, &[_]Term{ .{ .string = 10 }, .{ .variable = 20 } });
+    try terms_4.insertSlice(0, &[_]Term{ .{ .string = 10 }, .{ .integer = 20 } });
+
+    var terms_5 = std.ArrayList(Term).init(allocator);
+    defer terms_5.deinit();
+    try terms_5.insertSlice(0, &[_]Term{ .{ .variable = 105 }, .{ .integer = 20 } });
 
     const p1: Predicate = .{ .name = 99, .terms = terms_1 };
     const p2: Predicate = .{ .name = 99, .terms = terms_2 };
     const p3: Predicate = .{ .name = 99, .terms = terms_3 };
     const p4: Predicate = .{ .name = 98, .terms = terms_4 };
+    const p5: Predicate = .{ .name = 99, .terms = terms_5 };
 
-    try testing.expect(p1.eql(p2));
-    try testing.expect(!p1.eql(p3));
-    try testing.expect(!p1.eql(p4));
+    try testing.expect(p1.match(p2));
+    try testing.expect(!p1.match(p3));
+    try testing.expect(!p1.match(p4));
+    try testing.expect(p1.match(p5));
 }

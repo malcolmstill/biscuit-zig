@@ -38,12 +38,18 @@ pub const Term = union(TermKind) {
 
     /// Match terms
     ///
-    /// Note that this function isn't called `eql` because it isn't a pure test.
+    /// Note that this function isn't called `match` because it isn't a pure test.
     /// We test for equality for most term types, but for variable terms we
     /// _always_ match.
     pub fn match(self: Term, term: Term) bool {
+        // If either term is a variable, we match
+        if (std.meta.activeTag(self) == .variable) return true;
+        if (std.meta.activeTag(term) == .variable) return true;
+
+        // Otherwise we need variables of the same type
         if (std.meta.activeTag(self) != std.meta.activeTag(term)) return false;
 
+        // ...and the values need to match
         return switch (self) {
             .variable => true,
             .integer => |v| v == term.integer,
@@ -82,11 +88,16 @@ test {
     const t1: Term = .{ .string = 22 };
     const t2: Term = .{ .string = 22 };
 
-    try testing.expect(t1.eql(t2));
+    try testing.expect(t1.match(t2));
 
     const t3: Term = .{ .integer = 22 };
-    try testing.expect(!t1.eql(t3));
+    try testing.expect(!t1.match(t3));
 
     const t4: Term = .{ .string = 25 };
-    try testing.expect(!t1.eql(t4));
+    try testing.expect(!t1.match(t4));
+
+    // Variables always match
+    const t5: Term = .{ .variable = 100 };
+    try testing.expect(t1.match(t5));
+    try testing.expect(t5.match(t1));
 }
