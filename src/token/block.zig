@@ -55,8 +55,7 @@ pub const Block = struct {
         }
 
         for (decoded_block.checks_v2.items) |check| {
-            _ = check;
-            // try block.checks.append(try Check.fromSchema(allocator, check));
+            try block.checks.append(try Check.fromSchema(allocator, check));
         }
 
         return block;
