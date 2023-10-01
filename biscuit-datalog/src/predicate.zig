@@ -38,8 +38,10 @@ pub const Predicate = struct {
     /// The predicates must have the same name and each term in the
     /// predicates must match.
     ///
-    /// Note again that "matching" terms is not exactly equality...
-    /// in the case of variable terms they always match.
+    /// Note: whilst "match" is very close to equality, it's not
+    /// exactly equality, because variable terms can match any
+    /// other term. See also the definition of `fn match` in
+    /// `term.zig`.
     pub fn match(self: Predicate, predicate: Predicate) bool {
         if (self.name != predicate.name) return false;
         if (self.terms.items.len != predicate.terms.items.len) return false;
