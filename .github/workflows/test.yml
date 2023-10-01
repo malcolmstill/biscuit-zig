@@ -1,8 +1,8 @@
-name: biscuit tests
+name: biscuit
 on: push
 
 jobs:
-  unit-tests:
+  tests:
     strategy:
       matrix:
         os: [ubuntu-latest]
@@ -21,7 +21,7 @@ jobs:
         with:
           version: master
       - run: zig fmt --check .
-  build-compiler:
+  build-biscuit-library:
     strategy:
       matrix:
         os: [ubuntu-latest]
