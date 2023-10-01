@@ -1,7 +1,7 @@
 const std = @import("std");
 const Authorizer = @import("authorizer.zig").Authorizer;
 const Block = @import("block.zig").Block;
-const World = @import("../datalog/world.zig").World;
+const World = @import("biscuit-datalog").world.World;
 const SerializedBiscuit = @import("biscuit-format").serialized_biscuit.SerializedBiscuit;
 
 pub const Biscuit = struct {

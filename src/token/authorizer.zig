@@ -1,8 +1,8 @@
 const std = @import("std");
 const mem = std.mem;
 const Biscuit = @import("biscuit.zig").Biscuit;
-const World = @import("../datalog/world.zig").World;
-const SymbolTable = @import("../datalog/symbol_table.zig").SymbolTable;
+const World = @import("biscuit-datalog").world.World;
+const SymbolTable = @import("biscuit-datalog").symbol_table.SymbolTable;
 
 pub const Authorizer = struct {
     biscuit: ?Biscuit,

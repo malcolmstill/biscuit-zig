@@ -1,7 +1,7 @@
 const std = @import("std");
-const Fact = @import("../datalog/fact.zig").Fact;
-const Rule = @import("../datalog/rule.zig").Rule;
-const Check = @import("../datalog/check.zig").Check;
+const Fact = @import("biscuit-datalog").fact.Fact;
+const Rule = @import("biscuit-datalog").rule.Rule;
+const Check = @import("biscuit-datalog").check.Check;
 
 // Should we depend on the protobuf stuff here
 const pb = @import("protobuf");

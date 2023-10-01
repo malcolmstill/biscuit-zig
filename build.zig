@@ -36,7 +36,19 @@ pub fn build(b: *std.Build) void {
             .module = protobuf.module("protobuf"),
         }},
     });
-    lib.addModule("biscuit-format", format_module);
+
+    // Define our datalog module
+    var datalog_module = b.createModule(.{
+        .source_file = .{ .path = "biscuit-datalog/src/main.zig" },
+        .dependencies = &[_]std.Build.ModuleDependency{.{
+            .name = "biscuit-format",
+            .module = format_module,
+        }},
+    });
+
+    // Add modules to root
+    // lib.addModule("biscuit-format", format_module);
+    // lib.addModule("biscuit-datalog", datalog_module);
 
     // This declares intent for the library to be installed into the standard
     // location when the user invokes the "install" step (the default step when
@@ -52,6 +64,7 @@ pub fn build(b: *std.Build) void {
     });
     main_tests.addModule("protobuf", protobuf.module("protobuf"));
     main_tests.addModule("biscuit-format", format_module);
+    main_tests.addModule("biscuit-datalog", datalog_module);
 
     const run_main_tests = b.addRunArtifact(main_tests);
 
