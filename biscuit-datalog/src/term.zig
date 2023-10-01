@@ -36,6 +36,16 @@ pub const Term = union(TermKind) {
         };
     }
 
+    pub fn eql(self: Term, term: Term) bool {
+        if (std.meta.activeTag(self) != std.meta.activeTag(term)) return false;
+
+        return switch (self) {
+            .variable => |v| v == term.variable,
+            .integer => |v| v == term.integer,
+            .string => |v| v == term.string,
+        };
+    }
+
     pub fn format(self: Term, comptime _: []const u8, _: std.fmt.FormatOptions, writer: anytype) std.os.WriteError!void {
         return switch (self) {
             .variable => |v| writer.print("$sym:{any}", .{v}),
@@ -60,3 +70,18 @@ pub const TermSet = struct {
         return .{ .set = std.ArrayList(Term).init(allocator) };
     }
 };
+
+test {
+    const testing = std.testing;
+
+    const t1: Term = .{ .string = 22 };
+    const t2: Term = .{ .string = 22 };
+
+    try testing.expect(t1.eql(t2));
+
+    const t3: Term = .{ .integer = 22 };
+    try testing.expect(!t1.eql(t3));
+
+    const t4: Term = .{ .string = 25 };
+    try testing.expect(!t1.eql(t4));
+}

@@ -33,6 +33,21 @@ pub const Predicate = struct {
         self.terms.deinit();
     }
 
+    /// Check if two predicates match
+    ///
+    /// The predicates must have the same name and each term in the
+    /// predicates must match.
+    pub fn eql(self: Predicate, predicate: Predicate) bool {
+        if (self.name != predicate.name) return false;
+        if (self.terms.items.len != predicate.terms.items.len) return false;
+
+        for (self.terms.items, predicate.terms.items) |term_a, term_b| {
+            if (!term_a.eql(term_b)) return false;
+        }
+
+        return true;
+    }
+
     /// Clone the predicate
     ///
     /// Reuses the allocator that allocated the original predicate's
@@ -50,4 +65,34 @@ pub fn hash(hasher: anytype, predicate: Predicate) void {
     for (predicate.terms.items) |term| {
         trm.hash(hasher, term);
     }
+}
+
+test {
+    const testing = std.testing;
+    var allocator = testing.allocator;
+
+    var terms_1 = std.ArrayList(Term).init(allocator);
+    defer terms_1.deinit();
+    try terms_1.insertSlice(0, &[_]Term{ .{ .string = 10 }, .{ .variable = 20 } });
+
+    var terms_2 = std.ArrayList(Term).init(allocator);
+    defer terms_2.deinit();
+    try terms_2.insertSlice(0, &[_]Term{ .{ .string = 10 }, .{ .variable = 20 } });
+
+    var terms_3 = std.ArrayList(Term).init(allocator);
+    defer terms_3.deinit();
+    try terms_3.insertSlice(0, &[_]Term{ .{ .string = 10 }, .{ .variable = 21 } });
+
+    var terms_4 = std.ArrayList(Term).init(allocator);
+    defer terms_4.deinit();
+    try terms_4.insertSlice(0, &[_]Term{ .{ .string = 10 }, .{ .variable = 20 } });
+
+    const p1: Predicate = .{ .name = 99, .terms = terms_1 };
+    const p2: Predicate = .{ .name = 99, .terms = terms_2 };
+    const p3: Predicate = .{ .name = 99, .terms = terms_3 };
+    const p4: Predicate = .{ .name = 98, .terms = terms_4 };
+
+    try testing.expect(p1.eql(p2));
+    try testing.expect(!p1.eql(p3));
+    try testing.expect(!p1.eql(p4));
 }
