@@ -31,15 +31,6 @@ pub const Rule = struct {
         }
         self.body.deinit();
     }
-
-    pub fn format(self: Rule, comptime _: []const u8, _: std.fmt.FormatOptions, writer: anytype) std.os.WriteError!void {
-        try writer.print("{any} <- ", .{self.head});
-        for (self.body.items, 0..) |*predicate, i| {
-            try writer.print("{any}", .{predicate.*});
-            if (i < self.body.items.len - 1) try writer.print(", ", .{});
-        }
-    }
-
     /// ### Generate new facts from this rule and the existing facts
     ///
     /// We do this roughly by:
@@ -96,6 +87,7 @@ pub const Rule = struct {
     ///
     /// ...and we add it to the set of facts (the set will take care of deduplication)
     pub fn apply(self: *Rule, allocator: mem.Allocator, facts: *const Set(Fact), new_facts: *Set(Fact), symbols: SymbolTable) !void {
+        std.debug.print("rule = {any}\n", .{self});
         var matched_variables = try MatchedVariables.init(allocator, self);
         defer matched_variables.deinit();
 
@@ -124,6 +116,14 @@ pub const Rule = struct {
             if (!unbound) {
                 try new_facts.add(Fact.init(new_predicate));
             }
+        }
+    }
+
+    pub fn format(self: Rule, comptime _: []const u8, _: std.fmt.FormatOptions, writer: anytype) std.os.WriteError!void {
+        try writer.print("{any} <- ", .{self.head});
+        for (self.body.items, 0..) |*predicate, i| {
+            try writer.print("{any}", .{predicate.*});
+            if (i < self.body.items.len - 1) try writer.print(", ", .{});
         }
     }
 };

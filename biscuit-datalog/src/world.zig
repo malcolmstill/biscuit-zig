@@ -33,6 +33,7 @@ pub const World = struct {
     }
 
     pub fn runWithLimits(self: *World, allocator: mem.Allocator, symbols: SymbolTable, limits: RunLimits) !void {
+        std.debug.print("runWithLimits\n", .{});
         for (0..limits.max_iterations) |_| {
             const starting_fact_count = self.facts.count();
 
