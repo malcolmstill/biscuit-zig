@@ -1,6 +1,6 @@
 const std = @import("std");
 const mem = std.mem;
-const schema = @import("../token/format/schema.pb.zig");
+const schema = @import("biscuit-format").schema;
 const Set = @import("set.zig").Set;
 const fct = @import("fact.zig");
 const Fact = fct.Fact;

@@ -26,7 +26,17 @@ pub fn build(b: *std.Build) void {
 
     //
     const protobuf = b.dependency("zig_protobuf", .{ .target = target, .optimize = optimize });
-    lib.addModule("protobuf", protobuf.module("protobuf"));
+    // lib.addModule("protobuf", protobuf.module("protobuf"));
+
+    // Define our biscuit-format module. This module depends on the external protobuf library
+    var format_module = b.createModule(.{
+        .source_file = .{ .path = "biscuit-format/src/main.zig" },
+        .dependencies = &[_]std.Build.ModuleDependency{.{
+            .name = "protobuf",
+            .module = protobuf.module("protobuf"),
+        }},
+    });
+    lib.addModule("biscuit-format", format_module);
 
     // This declares intent for the library to be installed into the standard
     // location when the user invokes the "install" step (the default step when
@@ -41,6 +51,7 @@ pub fn build(b: *std.Build) void {
         .optimize = optimize,
     });
     main_tests.addModule("protobuf", protobuf.module("protobuf"));
+    main_tests.addModule("biscuit-format", format_module);
 
     const run_main_tests = b.addRunArtifact(main_tests);
 

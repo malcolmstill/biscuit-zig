@@ -1,5 +1,5 @@
 const std = @import("std");
-const schema = @import("../token/format/schema.pb.zig");
+const schema = @import("biscuit-format").schema;
 const Predicate = @import("predicate.zig").Predicate;
 
 const TermKind = enum(u8) {

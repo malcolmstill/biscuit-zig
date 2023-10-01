@@ -5,9 +5,10 @@ const Check = @import("../datalog/check.zig").Check;
 
 // Should we depend on the protobuf stuff here
 const pb = @import("protobuf");
-const schema = @import("format/schema.pb.zig");
-const MIN_SCHEMA_VERSION = @import("format/serialized_biscuit.zig").MIN_SCHEMA_VERSION;
-const MAX_SCHEMA_VERSION = @import("format/serialized_biscuit.zig").MAX_SCHEMA_VERSION;
+const format = @import("biscuit-format");
+const schema = format.schema;
+const MIN_SCHEMA_VERSION = format.serialized_biscuit.MIN_SCHEMA_VERSION;
+const MAX_SCHEMA_VERSION = format.serialized_biscuit.MAX_SCHEMA_VERSION;
 
 pub const Block = struct {
     decoded_block: ?schema.Block = null,
