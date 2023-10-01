@@ -37,12 +37,15 @@ pub const Predicate = struct {
     ///
     /// The predicates must have the same name and each term in the
     /// predicates must match.
-    pub fn eql(self: Predicate, predicate: Predicate) bool {
+    ///
+    /// Note again that "matching" terms is not exactly equality...
+    /// in the case of variable terms they always match.
+    pub fn match(self: Predicate, predicate: Predicate) bool {
         if (self.name != predicate.name) return false;
         if (self.terms.items.len != predicate.terms.items.len) return false;
 
         for (self.terms.items, predicate.terms.items) |term_a, term_b| {
-            if (!term_a.eql(term_b)) return false;
+            if (!term_a.match(term_b)) return false;
         }
 
         return true;

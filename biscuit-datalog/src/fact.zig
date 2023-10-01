@@ -20,8 +20,8 @@ pub const Fact = struct {
         self.predicate.deinit();
     }
 
-    pub fn predicateEql(self: Fact, predicate: Predicate) bool {
-        return self.predicate.eql(predicate);
+    pub fn matchPredicate(self: Fact, predicate: Predicate) bool {
+        return self.predicate.match(predicate);
     }
 
     pub fn format(self: Fact, comptime _: []const u8, _: std.fmt.FormatOptions, writer: anytype) std.os.WriteError!void {

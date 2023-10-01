@@ -36,11 +36,16 @@ pub const Term = union(TermKind) {
         };
     }
 
-    pub fn eql(self: Term, term: Term) bool {
+    /// Match terms
+    ///
+    /// Note that this function isn't called `eql` because it isn't a pure test.
+    /// We test for equality for most term types, but for variable terms we
+    /// _always_ match.
+    pub fn match(self: Term, term: Term) bool {
         if (std.meta.activeTag(self) != std.meta.activeTag(term)) return false;
 
         return switch (self) {
-            .variable => |v| v == term.variable,
+            .variable => true,
             .integer => |v| v == term.integer,
             .string => |v| v == term.string,
         };
