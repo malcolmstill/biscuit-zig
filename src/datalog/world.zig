@@ -1,4 +1,5 @@
 const std = @import("std");
+const mem = std.mem;
 const fct = @import("fact.zig");
 const Fact = fct.Fact;
 const Rule = @import("rule.zig").Rule;
@@ -28,11 +29,11 @@ pub const World = struct {
         self.facts.deinit();
     }
 
-    pub fn run(self: *World, symbols: SymbolTable) !void {
-        try self.runWithLimits(symbols, RunLimits{});
+    pub fn run(self: *World, allocator: mem.Allocator, symbols: SymbolTable) !void {
+        try self.runWithLimits(allocator, symbols, RunLimits{});
     }
 
-    pub fn runWithLimits(self: *World, symbols: SymbolTable, limits: RunLimits) !void {
+    pub fn runWithLimits(self: *World, allocator: mem.Allocator, symbols: SymbolTable, limits: RunLimits) !void {
         for (0..limits.max_iterations) |_| {
             const starting_fact_count = self.facts.count();
 
@@ -40,7 +41,7 @@ pub const World = struct {
             defer new_facts.deinit();
 
             for (self.rules.items) |*rule| {
-                try rule.apply(&self.facts, &new_facts, symbols);
+                try rule.apply(allocator, &self.facts, &new_facts, symbols);
             }
 
             var it = new_facts.iterator();

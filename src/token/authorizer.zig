@@ -1,4 +1,5 @@
 const std = @import("std");
+const mem = std.mem;
 const Biscuit = @import("biscuit.zig").Biscuit;
 const World = @import("../datalog/world.zig").World;
 const SymbolTable = @import("../datalog/symbol_table.zig").SymbolTable;
@@ -20,7 +21,7 @@ pub const Authorizer = struct {
         self.world.deinit();
     }
 
-    pub fn authorize(self: *Authorizer) !void {
+    pub fn authorize(self: *Authorizer, allocator: mem.Allocator) !void {
         std.debug.print("authorizing biscuit:\n", .{});
         // Load facts and rules from authority block into world. Our block's facts
         // will have a particular symbol table that we map into the symvol table
@@ -42,6 +43,6 @@ pub const Authorizer = struct {
             }
         }
 
-        try self.world.run(self.symbols);
+        try self.world.run(allocator, self.symbols);
     }
 };

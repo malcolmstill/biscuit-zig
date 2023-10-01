@@ -72,6 +72,6 @@ test {
         var a = b.authorizer(allocator);
         defer a.deinit();
 
-        try a.authorize();
+        try a.authorize(allocator);
     }
 }
