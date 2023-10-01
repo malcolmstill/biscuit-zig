@@ -1,6 +1,6 @@
 const std = @import("std");
 
-const schema = @import("biscuit-format").schema;
+const schema = @import("biscuit-schema");
 
 pub const Check = struct {
     pub fn fromSchema(allocator: std.mem.Allocator, check: schema.CheckV2) !Check {

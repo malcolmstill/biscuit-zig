@@ -1,5 +1,5 @@
 const std = @import("std");
-const schema = @import("biscuit-format").schema;
+const schema = @import("biscuit-schema");
 const trm = @import("term.zig");
 const Term = trm.Term;
 

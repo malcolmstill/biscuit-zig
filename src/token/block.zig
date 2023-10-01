@@ -1,12 +1,9 @@
 const std = @import("std");
+const format = @import("biscuit-format");
+const schema = @import("biscuit-schema");
 const Fact = @import("biscuit-datalog").fact.Fact;
 const Rule = @import("biscuit-datalog").rule.Rule;
 const Check = @import("biscuit-datalog").check.Check;
-
-// Should we depend on the protobuf stuff here
-const pb = @import("protobuf");
-const format = @import("biscuit-format");
-const schema = format.schema;
 const MIN_SCHEMA_VERSION = format.serialized_biscuit.MIN_SCHEMA_VERSION;
 const MAX_SCHEMA_VERSION = format.serialized_biscuit.MAX_SCHEMA_VERSION;
 
@@ -31,8 +28,8 @@ pub const Block = struct {
     }
 
     pub fn initFromBytes(allocator: std.mem.Allocator, data: []const u8) !Block {
-        const decoded_block = try pb.pb_decode(schema.Block, data, allocator);
-        errdefer pb.pb_deinit(decoded_block);
+        const decoded_block = try schema.decodeBlock(allocator, data);
+        errdefer decoded_block.deinit();
 
         var block = try init(allocator);
         errdefer block.deinit();
@@ -58,7 +55,8 @@ pub const Block = struct {
         }
 
         for (decoded_block.checks_v2.items) |check| {
-            try block.checks.append(try Check.fromSchema(allocator, check));
+            _ = check;
+            // try block.checks.append(try Check.fromSchema(allocator, check));
         }
 
         return block;
@@ -75,7 +73,7 @@ pub const Block = struct {
         self.symbols.deinit();
 
         if (self.decoded_block) |block| {
-            pb.pb_deinit(block);
+            block.deinit();
         }
     }
 };

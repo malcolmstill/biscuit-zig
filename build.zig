@@ -29,21 +29,39 @@ pub fn build(b: *std.Build) void {
     // lib.addModule("protobuf", protobuf.module("protobuf"));
 
     // Define our biscuit-format module. This module depends on the external protobuf library
+    var schema_module = b.createModule(.{
+        .source_file = .{ .path = "biscuit-schema/src/main.zig" },
+        .dependencies = &[_]std.Build.ModuleDependency{
+            .{
+                .name = "protobuf",
+                .module = protobuf.module("protobuf"),
+            },
+        },
+    });
+
     var format_module = b.createModule(.{
         .source_file = .{ .path = "biscuit-format/src/main.zig" },
-        .dependencies = &[_]std.Build.ModuleDependency{.{
-            .name = "protobuf",
-            .module = protobuf.module("protobuf"),
-        }},
+        .dependencies = &[_]std.Build.ModuleDependency{
+            .{
+                .name = "biscuit-schema",
+                .module = schema_module,
+            },
+        },
     });
 
     // Define our datalog module
     var datalog_module = b.createModule(.{
         .source_file = .{ .path = "biscuit-datalog/src/main.zig" },
-        .dependencies = &[_]std.Build.ModuleDependency{.{
-            .name = "biscuit-format",
-            .module = format_module,
-        }},
+        .dependencies = &[_]std.Build.ModuleDependency{
+            .{
+                .name = "biscuit-format",
+                .module = format_module,
+            },
+            .{
+                .name = "biscuit-schema",
+                .module = schema_module,
+            },
+        },
     });
 
     // Add modules to root
@@ -62,7 +80,8 @@ pub fn build(b: *std.Build) void {
         .target = target,
         .optimize = optimize,
     });
-    main_tests.addModule("protobuf", protobuf.module("protobuf"));
+    // main_tests.addModule("protobuf", protobuf.module("protobuf"));
+    main_tests.addModule("biscuit-schema", schema_module);
     main_tests.addModule("biscuit-format", format_module);
     main_tests.addModule("biscuit-datalog", datalog_module);
 
