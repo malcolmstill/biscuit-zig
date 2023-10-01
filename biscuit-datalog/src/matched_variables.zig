@@ -3,8 +3,31 @@ const mem = std.mem;
 const Rule = @import("rule.zig").Rule;
 const Term = @import("term.zig").Term;
 
-/// MatchedVariables provides a map from variables to initially null
-/// terms.
+// Is a better name for this VariableBinding?
+
+/// MatchedVariables provides a map from variable -> (initially null) terms
+/// for all the variables in the rule body.
+///
+/// For example, if we have the following rule:
+///
+/// ```
+/// right($0, "read") <- resource($0), owner($1, $0);
+/// ```
+///
+/// Our body is:
+///
+/// ```
+/// resource($0), owner($1, $0)
+/// ```
+///
+/// Our matched variables will initially look like (rendered as JSON):
+///
+/// ```json
+/// {
+///     "$0": null,
+///     "$1": null
+/// }
+/// ```
 pub const MatchedVariables = struct {
     variables: std.AutoHashMap(u64, ?Term),
 
