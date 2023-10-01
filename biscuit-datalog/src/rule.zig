@@ -40,6 +40,61 @@ pub const Rule = struct {
         }
     }
 
+    /// ### Generate new facts from this rule and the existing facts
+    ///
+    /// We do this roughly by:
+    ///
+    /// 1. Generate a map from rule body variables -> initially null terms
+    /// 2. Iteratively generate variable bindings from the body definition that match existing facts
+    /// 3. Check that the binding defines a complete fact; add it to our set of facts if so.
+    ///
+    /// #### 1. Generate a map from rule body variables -> initially null terms
+    ///
+    /// We simply create a new MatchedVariables that builds the map from the rule's body
+    ///
+    /// #### 2. Iteratively generate variable bindings
+    ///
+    /// See Combinator for details.
+    ///
+    /// #### 3. Check that the binding defines a complete fact
+    ///
+    /// Iterate over the terms in this rule's head (having made a copy as we'll mutate it).
+    /// If we have a term bound to each variable that is present in the head we have a complete
+    /// fact; we add the fact to the set.
+    ///
+    /// For example, if we have the following rule:
+    ///
+    /// ```
+    /// right($0, "read") <- resource($0), owner($1, $0);
+    /// ```
+    ///
+    /// And bindings looks like:
+    ///
+    /// ```json
+    /// {
+    ///      "$0": null,
+    ///      "$1": "abcd"
+    /// }
+    /// ```
+    ///
+    /// `"$0"` remains unbound and so we don't have a complete fact.
+    ///
+    /// Instead, if we had:
+    ///
+    /// ```json
+    /// {
+    ///      "$0": "file/1",
+    ///      "$1": "abcd"
+    /// }
+    /// ```
+    ///
+    /// Then `"$0"` = "file/1" and we'd get the following fact:
+    ///
+    /// ```
+    /// right("file/1", "read")
+    /// ```
+    ///
+    /// ...and we add it to the set of facts (the set will take care of deduplication)
     pub fn apply(self: *Rule, allocator: mem.Allocator, facts: *const Set(Fact), new_facts: *Set(Fact), symbols: SymbolTable) !void {
         var matched_variables = try MatchedVariables.init(allocator, self);
         defer matched_variables.deinit();
@@ -50,8 +105,6 @@ pub const Rule = struct {
         while (it.next()) |*bindings| {
             var unbound = false;
 
-            // Iterate over the terms in this rule's head. We make a copy
-            // first
             var new_predicate: Predicate = try self.head.clone();
             for (new_predicate.terms.items, 0..) |head_term, i| {
                 switch (head_term) {
