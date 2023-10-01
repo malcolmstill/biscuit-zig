@@ -1,4 +1,5 @@
 const std = @import("std");
+const mem = std.mem;
 const schema = @import("biscuit-schema");
 const trm = @import("term.zig");
 const Term = trm.Term;
@@ -7,7 +8,7 @@ pub const Predicate = struct {
     name: u64,
     terms: std.ArrayList(Term),
 
-    pub fn fromSchema(allocator: std.mem.Allocator, predicate: schema.PredicateV2) !Predicate {
+    pub fn fromSchema(allocator: mem.Allocator, predicate: schema.PredicateV2) !Predicate {
         var terms = std.ArrayList(Term).init(allocator);
         for (predicate.terms.items) |term| {
             try terms.append(try Term.fromSchema(term));
@@ -30,6 +31,17 @@ pub const Predicate = struct {
             term.deinit();
         }
         self.terms.deinit();
+    }
+
+    /// Clone the predicate
+    ///
+    /// Reuses the allocator that allocated the original predicate's
+    /// terms.
+    pub fn clone(self: *const Predicate) !Predicate {
+        return .{
+            .name = self.name,
+            .terms = try self.terms.clone(),
+        };
     }
 };
 

@@ -1,9 +1,8 @@
 const std = @import("std");
-const fct = @import("fact.zig");
 const meta = std.meta;
 const trait = std.meta.trait;
 const Wyhash = std.hash.Wyhash;
-const Fact = fct.Fact;
+const Fact = @import("fact.zig").Fact;
 
 /// Set wraps the std.HashMap and uses a hash function defined
 /// by a method assumed to exist on type K with name "hash".

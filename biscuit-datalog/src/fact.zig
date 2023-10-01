@@ -12,6 +12,10 @@ pub const Fact = struct {
         return .{ .predicate = try Predicate.fromSchema(allocator, predicate) };
     }
 
+    pub fn init(predicate: Predicate) Fact {
+        return .{ .predicate = predicate };
+    }
+
     pub fn deinit(self: *Fact) void {
         self.predicate.deinit();
     }

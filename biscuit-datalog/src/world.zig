@@ -1,7 +1,6 @@
 const std = @import("std");
 const mem = std.mem;
-const fct = @import("fact.zig");
-const Fact = fct.Fact;
+const Fact = @import("fact.zig").Fact;
 const Rule = @import("rule.zig").Rule;
 
 const Set = @import("set.zig").Set;
