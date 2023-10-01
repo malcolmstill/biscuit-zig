@@ -6,7 +6,7 @@ export fn add(a: i32, b: i32) i32 {
 }
 
 test {
-    _ = @import("token/biscuit.zig");
+    _ = @import("biscuit.zig");
     _ = @import("biscuit-format");
     _ = @import("biscuit-schema");
     _ = @import("biscuit-datalog");
