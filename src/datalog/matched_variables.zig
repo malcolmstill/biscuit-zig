@@ -23,7 +23,7 @@ pub const MatchedVariables = struct {
     }
 
     pub fn deinit(self: *MatchedVariables) void {
-        self.deinit();
+        self.variables.deinit();
     }
 
     /// Attempt to bind a variable to a term. If we have already bound

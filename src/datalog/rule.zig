@@ -41,14 +41,12 @@ pub const Rule = struct {
     }
 
     pub fn apply(self: *Rule, allocator: mem.Allocator, facts: *const Set(Fact), new_facts: *Set(Fact), symbols: SymbolTable) !void {
-        _ = allocator;
-        _ = self;
         _ = facts;
         _ = symbols;
         _ = new_facts;
 
-        // var matched_variables = try MatchedVariables.init(allocator, self);
-        // defer matched_variables.deinit();
+        var matched_variables = try MatchedVariables.init(allocator, self);
+        defer matched_variables.deinit();
 
         // TODO: if body is empty stuff
     }
