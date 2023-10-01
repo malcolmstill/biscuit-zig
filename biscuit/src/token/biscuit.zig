@@ -1,8 +1,8 @@
 const std = @import("std");
 const Authorizer = @import("authorizer.zig").Authorizer;
 const Block = @import("block.zig").Block;
-const World = @import("../datalog/world.zig").World;
-const SerializedBiscuit = @import("format/serialized_biscuit.zig").SerializedBiscuit;
+const World = @import("biscuit-datalog").world.World;
+const SerializedBiscuit = @import("biscuit-format").serialized_biscuit.SerializedBiscuit;
 
 pub const Biscuit = struct {
     serialized: SerializedBiscuit,
@@ -44,7 +44,7 @@ pub const Biscuit = struct {
 };
 
 test {
-    const decode = @import("format/decode.zig");
+    const decode = @import("biscuit-format").decode;
     const testing = std.testing;
     var allocator = testing.allocator;
 
@@ -72,6 +72,6 @@ test {
         var a = b.authorizer(allocator);
         defer a.deinit();
 
-        try a.authorize();
+        try a.authorize(allocator);
     }
 }

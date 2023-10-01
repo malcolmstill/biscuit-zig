@@ -1,5 +1,5 @@
 const std = @import("std");
-const schema = @import("schema.pb.zig");
+const schema = @import("biscuit-schema");
 const l = @import("lengths.zig");
 
 pub const SignedBlock = struct {

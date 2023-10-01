@@ -1,10 +1,13 @@
 const std = @import("std");
-const schema = @import("../token/format/schema.pb.zig");
+const mem = std.mem;
+const schema = @import("biscuit-schema");
 const Set = @import("set.zig").Set;
 const fct = @import("fact.zig");
 const Fact = fct.Fact;
 const Predicate = @import("predicate.zig").Predicate;
+const Term = @import("term.zig").Term;
 const SymbolTable = @import("symbol_table.zig").SymbolTable;
+const MatchedVariables = @import("matched_variables.zig").MatchedVariables;
 
 pub const Rule = struct {
     head: Predicate,
@@ -37,13 +40,14 @@ pub const Rule = struct {
         }
     }
 
-    pub fn apply(self: *Rule, facts: *const Set(Fact), new_facts: *Set(Fact), symbols: SymbolTable) !void {
-        _ = self;
+    pub fn apply(self: *Rule, allocator: mem.Allocator, facts: *const Set(Fact), new_facts: *Set(Fact), symbols: SymbolTable) !void {
+        _ = facts;
         _ = symbols;
         _ = new_facts;
-        var it = facts.iterator();
-        while (it.next()) |fact| {
-            _ = fact;
-        }
+
+        var matched_variables = try MatchedVariables.init(allocator, self);
+        defer matched_variables.deinit();
+
+        // TODO: if body is empty stuff
     }
 };

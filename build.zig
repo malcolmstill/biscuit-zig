@@ -19,14 +19,54 @@ pub fn build(b: *std.Build) void {
         .name = "biscuit",
         // In this case the main source file is merely a path, however, in more
         // complicated build scripts, this could be a generated file.
-        .root_source_file = .{ .path = "src/main.zig" },
+        .root_source_file = .{ .path = "biscuit/src/main.zig" },
         .target = target,
         .optimize = optimize,
     });
 
     //
     const protobuf = b.dependency("zig_protobuf", .{ .target = target, .optimize = optimize });
-    lib.addModule("protobuf", protobuf.module("protobuf"));
+    // lib.addModule("protobuf", protobuf.module("protobuf"));
+
+    // Define our biscuit-format module. This module depends on the external protobuf library
+    var schema_module = b.createModule(.{
+        .source_file = .{ .path = "biscuit-schema/src/main.zig" },
+        .dependencies = &[_]std.Build.ModuleDependency{
+            .{
+                .name = "protobuf",
+                .module = protobuf.module("protobuf"),
+            },
+        },
+    });
+
+    var format_module = b.createModule(.{
+        .source_file = .{ .path = "biscuit-format/src/main.zig" },
+        .dependencies = &[_]std.Build.ModuleDependency{
+            .{
+                .name = "biscuit-schema",
+                .module = schema_module,
+            },
+        },
+    });
+
+    // Define our datalog module
+    var datalog_module = b.createModule(.{
+        .source_file = .{ .path = "biscuit-datalog/src/main.zig" },
+        .dependencies = &[_]std.Build.ModuleDependency{
+            .{
+                .name = "biscuit-format",
+                .module = format_module,
+            },
+            .{
+                .name = "biscuit-schema",
+                .module = schema_module,
+            },
+        },
+    });
+
+    // Add modules to root
+    // lib.addModule("biscuit-format", format_module);
+    // lib.addModule("biscuit-datalog", datalog_module);
 
     // This declares intent for the library to be installed into the standard
     // location when the user invokes the "install" step (the default step when
@@ -36,11 +76,14 @@ pub fn build(b: *std.Build) void {
     // Creates a step for unit testing. This only builds the test executable
     // but does not run it.
     const main_tests = b.addTest(.{
-        .root_source_file = .{ .path = "src/main.zig" },
+        .root_source_file = .{ .path = "biscuit/src/main.zig" },
         .target = target,
         .optimize = optimize,
     });
-    main_tests.addModule("protobuf", protobuf.module("protobuf"));
+    // main_tests.addModule("protobuf", protobuf.module("protobuf"));
+    main_tests.addModule("biscuit-schema", schema_module);
+    main_tests.addModule("biscuit-format", format_module);
+    main_tests.addModule("biscuit-datalog", datalog_module);
 
     const run_main_tests = b.addRunArtifact(main_tests);
 

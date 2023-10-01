@@ -1,6 +1,5 @@
 const std = @import("std");
-const pb = @import("protobuf");
-const schema = @import("schema.pb.zig");
+const schema = @import("biscuit-schema");
 const SignedBlock = @import("signed_block.zig").SignedBlock;
 const Proof = @import("proof.zig").Proof;
 
@@ -19,7 +18,7 @@ pub const SerializedBiscuit = struct {
     /// This decodes the toplevel-level biscuit format from protobuf and verifies
     /// the token.
     pub fn initFromBytes(allocator: std.mem.Allocator, bytes: []const u8, public_key: std.crypto.sign.Ed25519.PublicKey) !SerializedBiscuit {
-        const b = try pb.pb_decode(schema.Biscuit, bytes, allocator);
+        const b = try schema.decodeBiscuit(allocator, bytes);
         errdefer b.deinit();
 
         const authority = try SignedBlock.fromDecodedBlock(b.authority orelse return error.ExpectedAuthorityBlock);
