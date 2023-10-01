@@ -47,4 +47,14 @@ pub const MatchedVariables = struct {
             return true;
         }
     }
+
+    /// Are all the variables in our map bound?
+    pub fn isComplete(self: *MatchedVariables) bool {
+        var it = self.variables.valueIterator();
+        while (it.next()) |term| {
+            if (term == null) return false;
+        }
+
+        return true;
+    }
 };
