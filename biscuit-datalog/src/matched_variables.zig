@@ -82,4 +82,23 @@ pub const MatchedVariables = struct {
 
         return true;
     }
+
+    /// If every variable in MatchedVariables has been assigned a term return a map
+    /// from variable -> non-null term, otherwise return null.
+    pub fn complete(self: *const MatchedVariables, allocator: mem.Allocator) !?std.AutoHashMap(u64, Term) {
+        if (!self.isComplete()) return null;
+
+        var completed_variables = std.AutoHashMap(u64, Term).init(allocator);
+        errdefer completed_variables.deinit();
+
+        var it = self.variables.iterator();
+        while (it.next()) |kv| {
+            const key: u64 = kv.key_ptr.*;
+            const value: ?Term = kv.value_ptr.*;
+
+            try completed_variables.put(key, value.?);
+        }
+
+        return completed_variables;
+    }
 };
