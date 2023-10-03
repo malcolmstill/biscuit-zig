@@ -64,7 +64,7 @@ pub const MatchedVariables = struct {
             // The variable is already set to an existing term.
             // We don't reinsert but we check that the new term
             // is equal to the existing term
-            return term.equal(existing_term);
+            return term.eql(existing_term); // FIXME: we need need to implement equal (or eql)
         } else {
             // The variable is unset. Bind term to the variable
             // and return true.

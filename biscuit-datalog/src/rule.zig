@@ -93,8 +93,8 @@ pub const Rule = struct {
 
         // TODO: if body is empty stuff
 
-        var it = Combinator.init(allocator, matched_variables, self.body, facts, symbols);
-        while (it.next()) |*bindings| {
+        var it = Combinator.init(allocator, matched_variables, self.body.items, facts, symbols);
+        while (try it.next()) |*bindings| {
             var unbound = false;
 
             var new_predicate: Predicate = try self.head.clone();
