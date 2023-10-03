@@ -51,6 +51,11 @@ pub const MatchedVariables = struct {
         self.variables.deinit();
     }
 
+    pub fn clone(self: *const MatchedVariables) !MatchedVariables {
+        const variables = try self.variables.clone();
+        return .{ .variables = variables };
+    }
+
     /// Attempt to bind a variable to a term. If we have already bound
     /// the variable, we return true only if the existing and new term
     /// match.
@@ -74,10 +79,10 @@ pub const MatchedVariables = struct {
     }
 
     /// Are all the variables in our map bound?
-    pub fn isComplete(self: *MatchedVariables) bool {
+    pub fn isComplete(self: *const MatchedVariables) bool {
         var it = self.variables.valueIterator();
         while (it.next()) |term| {
-            if (term == null) return false;
+            if (term.* == null) return false;
         }
 
         return true;

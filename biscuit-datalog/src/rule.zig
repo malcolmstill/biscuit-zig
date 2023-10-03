@@ -1,5 +1,6 @@
 const std = @import("std");
 const mem = std.mem;
+const meta = std.meta;
 const schema = @import("biscuit-schema");
 const Set = @import("set.zig").Set;
 const Fact = @import("fact.zig").Fact;
@@ -94,28 +95,19 @@ pub const Rule = struct {
         // TODO: if body is empty stuff
 
         var it = Combinator.init(allocator, matched_variables, self.body.items, facts, symbols);
-        while (try it.next()) |*bindings| {
-            var unbound = false;
+        blk: while (try it.next()) |*bindings| {
+            defer bindings.deinit();
 
-            var new_predicate: Predicate = try self.head.clone();
-            for (new_predicate.terms.items, 0..) |head_term, i| {
-                switch (head_term) {
-                    .variable => |id| {
-                        // Get the term bound to this variable (where it exists)
-                        // in the potential new fact.
-                        if (bindings.get(id)) |value| {
-                            new_predicate.terms.items[i] = value;
-                        } else {
-                            unbound = true;
-                        }
-                    },
-                    else => continue,
-                }
+            var predicate = try self.head.clone();
+            for (predicate.terms.items, 0..) |head_term, i| {
+                const sym = if (meta.activeTag(head_term) == .variable) head_term.variable else continue;
+
+                const value = bindings.get(sym) orelse continue :blk;
+
+                predicate.terms.items[i] = value;
             }
 
-            if (!unbound) {
-                try new_facts.add(Fact.init(new_predicate));
-            }
+            try new_facts.add(Fact.init(predicate));
         }
     }
 

@@ -68,7 +68,11 @@ pub const Combinator = struct {
     }
 
     pub fn next(self: *Combinator) !?std.AutoHashMap(u64, Term) {
-        blk: while (true) {
+        var it = self.facts.iterator();
+        blk: while (it.next()) |fact| {
+            // Only consider facts that match the current predicate
+            if (!fact.matchPredicate(self.predicates[0])) continue :blk;
+
             if (self.current_bindings) |*current_bindings| {
                 current_bindings.deinit();
             }
@@ -78,31 +82,31 @@ pub const Combinator = struct {
                 // todo
             }
 
-            // FIXME: var it = self.facts.matchedIterator(self.predicates[0]); ?
-            var it = self.facts.iterator();
-            while (it.next()) |fact| {
-                // Only consider facts that match the current predicate
-                if (!fact.matchPredicate(self.predicates[0])) continue;
+            // FIXME: clone variables?
+            var vars: MatchedVariables = try self.variables.clone();
 
-                // FIXME: clone variables?
+            // Set variables from predicate to match values
+            for (self.predicates[0].terms.items, 0..) |term, i| {
+                const sym = if (meta.activeTag(term) == .variable) term.variable else continue;
 
-                // Set variables from predicate to match values
-                for (self.predicates[0].terms.items, 0..) |term, i| {
-                    const id = if (meta.activeTag(term) == .variable) term.variable else continue;
-
-                    // Since we are pulling terms out of a fact, we know
-                    // ahead of time that none of the terms will be variables.
-                    const fact_term = fact.predicate.terms.items[i];
-                    if (!(try self.variables.insert(id, fact_term))) {
-                        // We have already bound this variable to a different
-                        // term, the current fact does work with previous
-                        // predicates and we move onto the next fact.
-                        continue :blk;
-                    }
+                // Since we are pulling terms out of a fact, we know
+                // ahead of time that none of the terms will be variables.
+                const fact_term = fact.predicate.terms.items[i];
+                if (!(try vars.insert(sym, fact_term))) {
+                    // We have already bound this variable to a different
+                    // term, the current fact does work with previous
+                    // predicates and we move onto the next fact.
+                    continue :blk;
                 }
             }
 
-            return null;
+            if (self.predicates[1..].len == 0) {
+                return try vars.complete(self.allocator);
+            } else {
+                return null; // FIXME: create Combinator for next predicate
+            }
         }
+
+        return null;
     }
 };
