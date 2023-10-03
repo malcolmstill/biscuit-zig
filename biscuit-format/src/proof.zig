@@ -1,6 +1,6 @@
 const std = @import("std");
+const Ed25519 = std.crypto.sign.Ed25519;
 const schema = @import("biscuit-schema");
-const l = @import("lengths.zig");
 
 const ProofKind = enum(u8) {
     next_secret,
@@ -8,8 +8,8 @@ const ProofKind = enum(u8) {
 };
 
 pub const Proof = union(ProofKind) {
-    next_secret: std.crypto.sign.Ed25519.SecretKey,
-    final_signature: std.crypto.sign.Ed25519.Signature,
+    next_secret: Ed25519.SecretKey,
+    final_signature: Ed25519.Signature,
 
     pub fn fromDecodedProof(proof: schema.Proof) !Proof {
         const content = proof.Content orelse return error.ExpectedProofContent;
@@ -17,24 +17,24 @@ pub const Proof = union(ProofKind) {
         switch (content) {
             .nextSecret => |s| {
                 const secret = s.getSlice();
-                if (secret.len != l.SECRET_KEY_LENGTH) return error.IncorrectProofSecretLength;
+                if (secret.len != Ed25519.KeyPair.seed_length) return error.IncorrectProofSecretLength;
 
-                var buf: [l.SECRET_KEY_LENGTH]u8 = undefined;
+                var buf: [Ed25519.KeyPair.seed_length]u8 = undefined;
                 @memcpy(&buf, secret);
 
-                const keypair = try std.crypto.sign.Ed25519.KeyPair.create(buf);
+                const keypair = try Ed25519.KeyPair.create(buf);
 
                 return .{ .next_secret = keypair.secret_key };
             },
             .finalSignature => |s| {
                 const signature = s.getSlice();
 
-                if (signature.len != l.SIGNATURE_LENGTH) return error.IncorrectProofSignatureLength;
+                if (signature.len != Ed25519.Signature.encoded_length) return error.IncorrectProofSignatureLength;
 
-                var buf: [l.SIGNATURE_LENGTH]u8 = undefined;
+                var buf: [Ed25519.Signature.encoded_length]u8 = undefined;
                 @memcpy(&buf, signature);
 
-                return .{ .final_signature = std.crypto.sign.Ed25519.Signature.fromBytes(buf) };
+                return .{ .final_signature = Ed25519.Signature.fromBytes(buf) };
             },
         }
     }

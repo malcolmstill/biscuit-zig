@@ -1,4 +1,6 @@
 const std = @import("std");
+const mem = std.mem;
+const Ed25519 = std.crypto.sign.Ed25519;
 const Authorizer = @import("authorizer.zig").Authorizer;
 const Block = @import("block.zig").Block;
 const World = @import("biscuit-datalog").world.World;
@@ -10,7 +12,7 @@ pub const Biscuit = struct {
     blocks: std.ArrayList(Block),
     symbols: std.ArrayList([]const u8),
 
-    pub fn initFromBytes(allocator: std.mem.Allocator, bytes: []const u8, public_key: std.crypto.sign.Ed25519.PublicKey) !Biscuit {
+    pub fn initFromBytes(allocator: mem.Allocator, bytes: []const u8, public_key: Ed25519.PublicKey) !Biscuit {
         std.debug.print("\ninitialising biscuit:\n", .{});
         const serialized = try SerializedBiscuit.initFromBytes(allocator, bytes, public_key);
 
@@ -60,7 +62,7 @@ test {
 
     var public_key_mem: [32]u8 = undefined;
     _ = try std.fmt.hexToBytes(&public_key_mem, "49fe7ec1972952c8c92119def96235ad622d0d024f3042a49c7317f7d5baf3da");
-    const public_key = try std.crypto.sign.Ed25519.PublicKey.fromBytes(public_key_mem);
+    const public_key = try Ed25519.PublicKey.fromBytes(public_key_mem);
 
     for (tokens) |token| {
         const bytes = try decode.urlSafeBase64ToBytes(allocator, token);
