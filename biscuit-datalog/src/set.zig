@@ -13,6 +13,8 @@ pub fn Set(comptime K: type) type {
         const InnerSet = std.HashMap(K, void, Context, 80);
         const Self = @This();
 
+        pub const Iterator = InnerSet.KeyIterator;
+
         const Context = struct {
             pub fn hash(ctx: Context, key: K) u64 {
                 _ = ctx;
@@ -25,7 +27,7 @@ pub fn Set(comptime K: type) type {
 
             pub fn eql(ctx: Context, a: K, b: K) bool {
                 _ = ctx;
-                return meta.eql(a, b);
+                return a.eql(b);
             }
         };
 

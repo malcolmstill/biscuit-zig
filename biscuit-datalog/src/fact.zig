@@ -20,6 +20,10 @@ pub const Fact = struct {
         self.predicate.deinit();
     }
 
+    pub fn eql(self: Fact, fact: Fact) bool {
+        return self.predicate.eql(fact.predicate);
+    }
+
     pub fn matchPredicate(self: Fact, predicate: Predicate) bool {
         return self.predicate.match(predicate);
     }

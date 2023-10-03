@@ -33,6 +33,17 @@ pub const Predicate = struct {
         self.terms.deinit();
     }
 
+    pub fn eql(self: Predicate, predicate: Predicate) bool {
+        if (self.name != predicate.name) return false;
+        if (self.terms.items.len != predicate.terms.items.len) return false;
+
+        for (self.terms.items, predicate.terms.items) |term_a, term_b| {
+            if (!term_a.eql(term_b)) return false;
+        }
+
+        return true;
+    }
+
     /// Check if two predicates match
     ///
     /// The predicates must have the same name and each term in the
