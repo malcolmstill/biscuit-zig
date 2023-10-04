@@ -48,41 +48,57 @@ const SymbolTable = @import("symbol_table.zig").SymbolTable;
 /// For each matched fact for that predicate, we'll create a fresh Combinator
 /// for the next predicate, and so forth.
 pub const Combinator = struct {
+    id: usize,
     allocator: mem.Allocator,
     variables: MatchedVariables,
     next_combinator: ?*Combinator, // Current combinator for the next predicate
     predicates: []Predicate, // List of the predicates so we can generate new Combinators
     current_bindings: ?std.AutoHashMap(u64, Term) = null,
     facts: *const Set(Fact),
+    fact_iterator: Set(Fact).Iterator,
+    symbols: SymbolTable,
 
-    pub fn init(allocator: mem.Allocator, variables: MatchedVariables, rule_body: []Predicate, all_facts: *const Set(Fact), symbols: SymbolTable) Combinator {
-        _ = symbols;
+    pub fn init(id: usize, allocator: mem.Allocator, variables: MatchedVariables, predicates: []Predicate, all_facts: *const Set(Fact), symbols: SymbolTable) !*Combinator {
+        std.debug.print("Init combinator[{}]: predicates = {any}\n", .{ id, predicates });
+        var c = try allocator.create(Combinator);
 
-        return .{
+        c.* = .{
+            .id = id,
             .allocator = allocator,
             .next_combinator = null,
             .facts = all_facts,
-            .predicates = rule_body,
+            .predicates = predicates,
             .variables = variables,
+            .symbols = symbols,
+            .fact_iterator = all_facts.iterator(),
         };
+
+        return c;
     }
 
-    pub fn next(self: *Combinator) !?std.AutoHashMap(u64, Term) {
-        var it = self.facts.iterator();
-        blk: while (it.next()) |fact| {
+    pub fn deinit(self: *Combinator) void {
+        self.variables.deinit();
+        self.allocator.destroy(self);
+    }
+
+    pub fn next(self: *Combinator) !?MatchedVariables {
+        blk: while (true) {
+            // Return from next combinator until expended
+            if (self.next_combinator) |c| {
+                if (try c.next()) |vars| {
+                    return vars;
+                } else {
+                    c.deinit();
+                    self.next_combinator = null;
+                    continue;
+                }
+            }
+
+            const fact = self.fact_iterator.next() orelse return null;
             // Only consider facts that match the current predicate
-            if (!fact.matchPredicate(self.predicates[0])) continue :blk;
+            if (!fact.matchPredicate(self.predicates[0])) continue;
+            std.debug.print("combinator[{}]: fact = {any}\n", .{ self.id, fact });
 
-            if (self.current_bindings) |*current_bindings| {
-                current_bindings.deinit();
-            }
-
-            if (self.next_combinator) |next_combinator| {
-                _ = next_combinator;
-                // todo
-            }
-
-            // FIXME: clone variables?
             var vars: MatchedVariables = try self.variables.clone();
 
             // Set variables from predicate to match values
@@ -96,14 +112,19 @@ pub const Combinator = struct {
                     // We have already bound this variable to a different
                     // term, the current fact does work with previous
                     // predicates and we move onto the next fact.
+                    vars.deinit();
                     continue :blk;
                 }
             }
 
-            if (self.predicates[1..].len == 0) {
-                return try vars.complete(self.allocator);
+            // std.debug.print("len = {}\n", .{self.predicates[1..].len});
+            const next_predicates = self.predicates[1..];
+            if (next_predicates.len == 0) {
+                return vars;
             } else {
-                return null; // FIXME: create Combinator for next predicate
+                if (self.next_combinator) |c| c.deinit();
+
+                self.next_combinator = try Combinator.init(self.id + 1, self.allocator, vars, next_predicates, self.facts, self.symbols);
             }
         }
 

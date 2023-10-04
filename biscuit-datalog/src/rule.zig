@@ -90,14 +90,15 @@ pub const Rule = struct {
     pub fn apply(self: *Rule, allocator: mem.Allocator, facts: *const Set(Fact), new_facts: *Set(Fact), symbols: SymbolTable) !void {
         std.debug.print("rule = {any}\n", .{self});
         var matched_variables = try MatchedVariables.init(allocator, self);
-        defer matched_variables.deinit();
+        // defer matched_variables.deinit();
 
         // TODO: if body is empty stuff
 
-        var it = Combinator.init(allocator, matched_variables, self.body.items, facts, symbols);
-        blk: while (try it.next()) |*bindings| {
-            defer bindings.deinit();
+        var it = try Combinator.init(0, allocator, matched_variables, self.body.items, facts, symbols);
+        defer it.deinit();
 
+        blk: while (try it.next()) |*bindings| {
+            // std.debug.print("bindings\n", .{});
             var predicate = try self.head.clone();
             for (predicate.terms.items, 0..) |head_term, i| {
                 const sym = if (meta.activeTag(head_term) == .variable) head_term.variable else continue;
@@ -106,8 +107,10 @@ pub const Rule = struct {
 
                 predicate.terms.items[i] = value;
             }
+            const fact = Fact.init(predicate);
+            std.debug.print("adding new fact = {any}\n", .{fact});
 
-            try new_facts.add(Fact.init(predicate));
+            try new_facts.add(fact);
         }
     }
 

@@ -49,8 +49,12 @@ pub const World = struct {
                 try self.facts.add(fact.*);
             }
 
+            std.debug.print("starting_fact_count = {}, self.facts.count() = {}\n", .{ starting_fact_count, self.facts.count() });
             // If we haven't generated any new facts, we're done.
-            if (starting_fact_count == self.facts.count()) return;
+            if (starting_fact_count == self.facts.count()) {
+                std.debug.print("No new facts!\n", .{});
+                return;
+            }
 
             if (self.facts.count() > limits.max_facts) return error.TooManyFacts;
         }

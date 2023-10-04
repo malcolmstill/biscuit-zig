@@ -56,6 +56,10 @@ pub const MatchedVariables = struct {
         return .{ .variables = variables };
     }
 
+    pub fn get(self: *const MatchedVariables, key: u64) ?Term {
+        return self.variables.get(key) orelse return null;
+    }
+
     /// Attempt to bind a variable to a term. If we have already bound
     /// the variable, we return true only if the existing and new term
     /// match.
