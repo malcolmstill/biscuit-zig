@@ -23,6 +23,10 @@ pub const World = struct {
     }
 
     pub fn deinit(self: *World) void {
+        var it = self.facts.iterator();
+        while (it.next()) |fact| {
+            fact.deinit();
+        }
         self.symbols.deinit();
         self.rules.deinit();
         self.facts.deinit();
@@ -64,7 +68,7 @@ pub const World = struct {
 
     pub fn addFact(self: *World, fact: Fact) !void {
         std.debug.print("world: adding fact = {any}\n", .{fact});
-        try self.facts.add(fact);
+        try self.facts.add(try fact.clone());
     }
 
     pub fn addRule(self: *World, rule: Rule) !void {

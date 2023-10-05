@@ -20,6 +20,10 @@ pub const Fact = struct {
         self.predicate.deinit();
     }
 
+    pub fn clone(self: Fact) !Fact {
+        return .{ .predicate = try self.predicate.clone() };
+    }
+
     pub fn eql(self: Fact, fact: Fact) bool {
         return self.predicate.eql(fact.predicate);
     }

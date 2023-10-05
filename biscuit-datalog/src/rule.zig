@@ -88,7 +88,7 @@ pub const Rule = struct {
     ///
     /// ...and we add it to the set of facts (the set will take care of deduplication)
     pub fn apply(self: *Rule, allocator: mem.Allocator, facts: *const Set(Fact), new_facts: *Set(Fact), symbols: SymbolTable) !void {
-        std.debug.print("rule = {any}\n", .{self});
+        std.debug.print("\n\nrule = {any}\n", .{self});
         var matched_variables = try MatchedVariables.init(allocator, self);
         // defer matched_variables.deinit();
 
@@ -98,19 +98,23 @@ pub const Rule = struct {
         defer it.deinit();
 
         blk: while (try it.next()) |*bindings| {
+            defer @constCast(bindings).deinit();
             // std.debug.print("bindings\n", .{});
             var predicate = try self.head.clone();
             for (predicate.terms.items, 0..) |head_term, i| {
                 const sym = if (meta.activeTag(head_term) == .variable) head_term.variable else continue;
 
-                const value = bindings.get(sym) orelse continue :blk;
+                const value = bindings.get(sym) orelse {
+                    // predicate.deinit();
+                    continue :blk;
+                };
 
                 predicate.terms.items[i] = value;
             }
             const fact = Fact.init(predicate);
             std.debug.print("adding new fact = {any}\n", .{fact});
 
-            try new_facts.add(fact);
+            try new_facts.add(try fact.clone());
         }
     }
 
