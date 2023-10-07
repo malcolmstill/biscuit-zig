@@ -42,25 +42,30 @@ pub const World = struct {
         self.facts.deinit();
     }
 
-    pub fn run(self: *World, arena_allocator: mem.Allocator, symbols: SymbolTable) !void {
-        try self.runWithLimits(arena_allocator, symbols, RunLimits{});
+    pub fn run(self: *World, symbols: SymbolTable) !void {
+        try self.runWithLimits(symbols, RunLimits{});
     }
 
-    pub fn runWithLimits(self: *World, arena_allocator: mem.Allocator, symbols: SymbolTable, limits: RunLimits) !void {
+    pub fn runWithLimits(self: *World, symbols: SymbolTable, limits: RunLimits) !void {
         std.debug.print("runWithLimits\n", .{});
         for (0..limits.max_iterations) |_| {
             const starting_fact_count = self.facts.count();
 
             var new_facts = Set(Fact).init(self.allocator);
-            defer new_facts.deinit();
+            defer {
+                var it = new_facts.iterator();
+                while (it.next()) |fact| fact.deinit();
+                new_facts.deinit();
+            }
 
             for (self.rules.items) |*rule| {
-                try rule.apply(arena_allocator, &self.facts, &new_facts, symbols);
+                try rule.apply(self.allocator, &self.facts, &new_facts, symbols);
             }
 
             var it = new_facts.iterator();
             while (it.next()) |fact| {
-                try self.facts.add(fact.*);
+                if (self.facts.contains(fact.*)) continue;
+                try self.facts.add(try fact.cloneWithAllocator(self.allocator));
             }
 
             std.debug.print("starting_fact_count = {}, self.facts.count() = {}\n", .{ starting_fact_count, self.facts.count() });
@@ -76,9 +81,9 @@ pub const World = struct {
         return error.TooManyIterations;
     }
 
-    pub fn addFact(self: *World, arena_allocator: mem.Allocator, fact: Fact) !void {
+    pub fn addFact(self: *World, fact: Fact) !void {
         std.debug.print("world: adding fact = {any}\n", .{fact});
-        try self.facts.add(try fact.cloneWithAllocator(arena_allocator));
+        try self.facts.add(try fact.clone());
     }
 
     pub fn addRule(self: *World, rule: Rule) !void {

@@ -49,6 +49,10 @@ pub fn Set(comptime K: type) type {
             try self.inner.put(value, {});
         }
 
+        pub fn contains(self: *Self, value: K) bool {
+            return self.inner.contains(value);
+        }
+
         pub fn count(self: *Self) u32 {
             return self.inner.count();
         }

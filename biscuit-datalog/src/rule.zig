@@ -88,18 +88,22 @@ pub const Rule = struct {
     /// ```
     ///
     /// ...and we add it to the set of facts (the set will take care of deduplication)
-    pub fn apply(self: *Rule, arena: mem.Allocator, facts: *const Set(Fact), new_facts: *Set(Fact), symbols: SymbolTable) !void {
+    pub fn apply(self: *Rule, allocator: mem.Allocator, facts: *const Set(Fact), new_facts: *Set(Fact), symbols: SymbolTable) !void {
+        var arena = std.heap.ArenaAllocator.init(allocator);
+        defer arena.deinit();
+
         std.debug.print("\n\nrule = {any}\n", .{self});
-        var matched_variables = try MatchedVariables.init(arena, self);
+        var matched_variables = try MatchedVariables.init(arena.allocator(), self);
 
         // TODO: if body is empty stuff
 
-        var it = try Combinator.init(0, arena, matched_variables, self.body.items, facts, symbols);
-        // defer it.deinit();
+        var it = try Combinator.init(0, allocator, matched_variables, self.body.items, facts, symbols);
+        defer it.deinit();
 
         blk: while (try it.next()) |*bindings| {
-            // std.debug.print("bindings\n", .{});
-            var predicate = try self.head.cloneWithAllocator(arena);
+            var predicate = try self.head.cloneWithAllocator(allocator);
+            defer predicate.deinit();
+
             for (predicate.terms.items, 0..) |head_term, i| {
                 const sym = if (meta.activeTag(head_term) == .variable) head_term.variable else continue;
 
@@ -107,10 +111,18 @@ pub const Rule = struct {
 
                 predicate.terms.items[i] = value;
             }
+
             const fact = Fact.init(predicate);
             std.debug.print("adding new fact = {any}\n", .{fact});
 
-            try new_facts.add(fact);
+            // Skip adding fact if we already have generated it. Because the
+            // Set will clobber duplicate facts we'll lose a reference when
+            // inserting a duplicate and then when we loop over the set to
+            // deinit the facts we'll miss some. This ensures that the facts
+            // can be freed purely from the Set.
+            if (new_facts.contains(fact)) continue;
+
+            try new_facts.add(try fact.clone());
         }
     }
 

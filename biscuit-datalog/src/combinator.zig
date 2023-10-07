@@ -88,6 +88,7 @@ pub const Combinator = struct {
                 if (try c.next()) |vars| {
                     return vars;
                 } else {
+                    c.deinit();
                     self.next_combinator = null;
                     continue;
                 }
