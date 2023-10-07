@@ -21,6 +21,19 @@ pub const Authorizer = struct {
         self.world.deinit();
     }
 
+    /// authorize
+    ///
+    /// authorize the Authorizer
+    ///
+    /// The following high level steps take place during authorization:
+    /// - If we have a biscuit load the biscuit's authority block's facts and
+    ///   and rules into the Authorizer's world
+    /// - Run the world to generate new facts
+    /// - Loop over and apply all of checks _of the authorizer_
+    /// - Again, if we have a biscuit, loop over and apply the biscuit's authority block's checks
+    /// - Loop over the policies _of the authorizer_ (we won't have policies anywhere else)
+    /// - Finally, again if we have a biscuit, loop over all of the biscuits non-authority
+    ///   blocks and apply the checks therein.
     pub fn authorize(self: *Authorizer) !void {
         std.debug.print("authorizing biscuit:\n", .{});
         // Load facts and rules from authority block into world. Our block's facts
@@ -44,5 +57,17 @@ pub const Authorizer = struct {
         }
 
         try self.world.run(self.symbols);
+        // TODO: clear rules
+
+        // TODO: Run checks that have been added to this authorizer
+
+        // Run checks in the biscuit
+        if (self.biscuit) |biscuit| {
+            var b: Biscuit = biscuit;
+
+            for (b.authority.checks.items) |check| {
+                _ = check;
+            }
+        }
     }
 };
