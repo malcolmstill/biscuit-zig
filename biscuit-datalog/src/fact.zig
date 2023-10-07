@@ -1,4 +1,5 @@
 const std = @import("std");
+const mem = std.mem;
 const schema = @import("biscuit-schema");
 const prd = @import("predicate.zig");
 const Predicate = prd.Predicate;
@@ -22,6 +23,10 @@ pub const Fact = struct {
 
     pub fn clone(self: Fact) !Fact {
         return .{ .predicate = try self.predicate.clone() };
+    }
+
+    pub fn cloneWithAllocator(self: Fact, allocator: mem.Allocator) !Fact {
+        return .{ .predicate = try self.predicate.cloneWithAllocator(allocator) };
     }
 
     pub fn eql(self: Fact, fact: Fact) bool {

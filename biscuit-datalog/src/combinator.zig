@@ -88,7 +88,6 @@ pub const Combinator = struct {
                 if (try c.next()) |vars| {
                     return vars;
                 } else {
-                    c.deinit();
                     self.next_combinator = null;
                     continue;
                 }
@@ -109,8 +108,6 @@ pub const Combinator = struct {
                 // ahead of time that none of the terms will be variables.
                 const fact_term = fact.predicate.terms.items[i];
                 if (!(try vars.insert(sym, fact_term))) {
-                    defer vars.deinit();
-
                     // We have already bound this variable to a different
                     // term, the current fact does work with previous
                     // predicates and we move onto the next fact.

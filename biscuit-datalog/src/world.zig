@@ -8,12 +8,22 @@ const RunLimits = @import("run_limits.zig").RunLimits;
 const SymbolTable = @import("symbol_table.zig").SymbolTable;
 
 pub const World = struct {
-    allocator: std.mem.Allocator,
+    allocator: mem.Allocator,
     facts: Set(Fact),
     rules: std.ArrayList(Rule),
     symbols: std.ArrayList([]const u8),
 
-    pub fn init(allocator: std.mem.Allocator) World {
+    /// init world
+    ///
+    /// Note: the allocator we pass in can be any allocator. This allocator
+    /// is used purely for the toplevel Set and ArrayLists. Any facts allocated
+    /// during world run will be allocated with a provided allocator that is
+    /// specifically an arena. The world and rule code will reflect that by
+    /// not doing explicit deallocation on the fact / predicate / term level.
+    ///
+    /// If we ever want to change away from that arena model, we'll have to
+    /// fix up some code internally to allow that.
+    pub fn init(allocator: mem.Allocator) World {
         return .{
             .allocator = allocator,
             .facts = Set(Fact).init(allocator),
@@ -32,11 +42,11 @@ pub const World = struct {
         self.facts.deinit();
     }
 
-    pub fn run(self: *World, allocator: mem.Allocator, symbols: SymbolTable) !void {
-        try self.runWithLimits(allocator, symbols, RunLimits{});
+    pub fn run(self: *World, arena_allocator: mem.Allocator, symbols: SymbolTable) !void {
+        try self.runWithLimits(arena_allocator, symbols, RunLimits{});
     }
 
-    pub fn runWithLimits(self: *World, allocator: mem.Allocator, symbols: SymbolTable, limits: RunLimits) !void {
+    pub fn runWithLimits(self: *World, arena_allocator: mem.Allocator, symbols: SymbolTable, limits: RunLimits) !void {
         std.debug.print("runWithLimits\n", .{});
         for (0..limits.max_iterations) |_| {
             const starting_fact_count = self.facts.count();
@@ -45,7 +55,7 @@ pub const World = struct {
             defer new_facts.deinit();
 
             for (self.rules.items) |*rule| {
-                try rule.apply(allocator, &self.facts, &new_facts, symbols);
+                try rule.apply(arena_allocator, &self.facts, &new_facts, symbols);
             }
 
             var it = new_facts.iterator();
@@ -66,9 +76,9 @@ pub const World = struct {
         return error.TooManyIterations;
     }
 
-    pub fn addFact(self: *World, fact: Fact) !void {
+    pub fn addFact(self: *World, arena_allocator: mem.Allocator, fact: Fact) !void {
         std.debug.print("world: adding fact = {any}\n", .{fact});
-        try self.facts.add(try fact.clone());
+        try self.facts.add(try fact.cloneWithAllocator(arena_allocator));
     }
 
     pub fn addRule(self: *World, rule: Rule) !void {

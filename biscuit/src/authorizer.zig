@@ -5,12 +5,14 @@ const World = @import("biscuit-datalog").world.World;
 const SymbolTable = @import("biscuit-datalog").symbol_table.SymbolTable;
 
 pub const Authorizer = struct {
+    arena: std.heap.ArenaAllocator,
     biscuit: ?Biscuit,
     world: World,
     symbols: SymbolTable,
 
     pub fn init(allocator: std.mem.Allocator, biscuit: Biscuit) Authorizer {
         return .{
+            .arena = std.heap.ArenaAllocator.init(allocator),
             .biscuit = biscuit,
             .world = World.init(allocator),
             .symbols = SymbolTable{},
@@ -19,9 +21,11 @@ pub const Authorizer = struct {
 
     pub fn deinit(self: *Authorizer) void {
         self.world.deinit();
+        self.arena.deinit();
     }
 
-    pub fn authorize(self: *Authorizer, allocator: mem.Allocator) !void {
+    pub fn authorize(self: *Authorizer) !void {
+        var arena = self.arena.allocator();
         std.debug.print("authorizing biscuit:\n", .{});
         // Load facts and rules from authority block into world. Our block's facts
         // will have a particular symbol table that we map into the symvol table
@@ -34,7 +38,7 @@ pub const Authorizer = struct {
 
             for (b.authority.facts.items) |fact| {
                 // FIXME: remap fact
-                try self.world.addFact(fact);
+                try self.world.addFact(arena, fact);
             }
 
             for (b.authority.rules.items) |rule| {
@@ -43,6 +47,6 @@ pub const Authorizer = struct {
             }
         }
 
-        try self.world.run(allocator, self.symbols);
+        try self.world.run(arena, self.symbols);
     }
 };

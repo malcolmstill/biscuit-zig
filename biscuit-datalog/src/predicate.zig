@@ -74,6 +74,22 @@ pub const Predicate = struct {
             .terms = try self.terms.clone(),
         };
     }
+
+    /// Clone the predicate (using supplied allocator)
+    ///
+    /// Reuses the allocator that allocated the original predicate's
+    /// terms.
+    pub fn cloneWithAllocator(self: *const Predicate, allocator: mem.Allocator) !Predicate {
+        var terms = std.ArrayList(Term).init(allocator);
+        for (self.terms.items) |term| {
+            try terms.append(term);
+        }
+
+        return .{
+            .name = self.name,
+            .terms = terms,
+        };
+    }
 };
 
 pub fn hash(hasher: anytype, predicate: Predicate) void {
