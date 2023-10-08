@@ -6,12 +6,14 @@ const Check = @import("biscuit-datalog").check.Check;
 const SymbolTable = @import("biscuit-datalog").symbol_table.SymbolTable;
 
 pub const Authorizer = struct {
+    allocator: mem.Allocator,
     biscuit: ?Biscuit,
     world: World,
     symbols: SymbolTable,
 
     pub fn init(allocator: std.mem.Allocator, biscuit: Biscuit) Authorizer {
         return .{
+            .allocator = allocator,
             .biscuit = biscuit,
             .world = World.init(allocator),
             .symbols = SymbolTable{},
@@ -36,6 +38,9 @@ pub const Authorizer = struct {
     /// - Finally, again if we have a biscuit, loop over all of the biscuits non-authority
     ///   blocks and apply the checks therein.
     pub fn authorize(self: *Authorizer) !void {
+        var errors = std.ArrayList(AuthorizerError).init(self.allocator);
+        defer errors.deinit();
+
         std.debug.print("authorizing biscuit:\n", .{});
         // Load facts and rules from authority block into world. Our block's facts
         // will have a particular symbol table that we map into the symvol table
@@ -72,9 +77,25 @@ pub const Authorizer = struct {
                 for (check.queries.items) |*query| {
                     const is_match = try self.world.queryMatch(query, self.symbols);
 
+                    if (!is_match) try errors.append(.{ .failed_check = 0 });
                     std.debug.print("match {any} = {}\n", .{ query, is_match });
                 }
             }
         }
+
+        // TODO: run policies
+
+        // TODO: run other block checks
+
+        // FIXME: return logic
+        if (errors.items.len > 0) return error.AuthorizationFailed;
     }
+};
+
+const AuthorizerErrorKind = enum(u8) {
+    failed_check,
+};
+
+const AuthorizerError = union(AuthorizerErrorKind) {
+    failed_check: u32,
 };
