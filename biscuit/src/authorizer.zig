@@ -16,12 +16,13 @@ pub const Authorizer = struct {
             .allocator = allocator,
             .biscuit = biscuit,
             .world = World.init(allocator),
-            .symbols = SymbolTable{},
+            .symbols = SymbolTable.init(allocator),
         };
     }
 
     pub fn deinit(self: *Authorizer) void {
         self.world.deinit();
+        self.symbols.deinit();
     }
 
     /// authorize

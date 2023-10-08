@@ -11,6 +11,7 @@ test {
     _ = @import("fact.zig");
     _ = @import("predicate.zig");
     _ = @import("rule.zig");
+    _ = @import("symbol_table.zig");
     _ = @import("term.zig");
     _ = @import("world.zig");
 }
