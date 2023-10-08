@@ -108,9 +108,6 @@ test "Tokens that should fail to validate" {
         var a = b.authorizer(allocator);
         defer a.deinit();
 
-        a.authorize() catch |err| switch (err) {
-            error.AuthorizationFailed => {},
-            else => return error.ExpectedAuthorizationFailed,
-        };
+        try testing.expectError(error.AuthorizationFailed, a.authorize());
     }
 }
