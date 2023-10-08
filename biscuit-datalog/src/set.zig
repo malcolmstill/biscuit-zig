@@ -1,9 +1,8 @@
 const std = @import("std");
-const fct = @import("fact.zig");
 const meta = std.meta;
 const trait = std.meta.trait;
 const Wyhash = std.hash.Wyhash;
-const Fact = fct.Fact;
+const Fact = @import("fact.zig").Fact;
 
 /// Set wraps the std.HashMap and uses a hash function defined
 /// by a method assumed to exist on type K with name "hash".
@@ -13,6 +12,8 @@ pub fn Set(comptime K: type) type {
 
         const InnerSet = std.HashMap(K, void, Context, 80);
         const Self = @This();
+
+        pub const Iterator = InnerSet.KeyIterator;
 
         const Context = struct {
             pub fn hash(ctx: Context, key: K) u64 {
@@ -26,7 +27,7 @@ pub fn Set(comptime K: type) type {
 
             pub fn eql(ctx: Context, a: K, b: K) bool {
                 _ = ctx;
-                return meta.eql(a, b);
+                return a.eql(b);
             }
         };
 
@@ -46,6 +47,10 @@ pub fn Set(comptime K: type) type {
 
         pub fn add(self: *Self, value: K) !void {
             try self.inner.put(value, {});
+        }
+
+        pub fn contains(self: *Self, value: K) bool {
+            return self.inner.contains(value);
         }
 
         pub fn count(self: *Self) u32 {

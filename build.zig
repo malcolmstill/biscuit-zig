@@ -87,9 +87,33 @@ pub fn build(b: *std.Build) void {
 
     const run_main_tests = b.addRunArtifact(main_tests);
 
+    const datalog_tests = b.addTest(.{
+        .root_source_file = .{ .path = "biscuit-datalog/src/main.zig" },
+        .target = target,
+        .optimize = optimize,
+    });
+    const run_datalog_tests = b.addRunArtifact(datalog_tests);
+
+    const format_tests = b.addTest(.{
+        .root_source_file = .{ .path = "biscuit-format/src/main.zig" },
+        .target = target,
+        .optimize = optimize,
+    });
+    const run_format_tests = b.addRunArtifact(format_tests);
+
+    const schema_tests = b.addTest(.{
+        .root_source_file = .{ .path = "biscuit-schema/src/main.zig" },
+        .target = target,
+        .optimize = optimize,
+    });
+    const run_schema_tests = b.addRunArtifact(schema_tests);
+
     // This creates a build step. It will be visible in the `zig build --help` menu,
     // and can be selected like this: `zig build test`
     // This will evaluate the `test` step rather than the default, which is "install".
     const test_step = b.step("test", "Run library tests");
     test_step.dependOn(&run_main_tests.step);
+    test_step.dependOn(&run_datalog_tests.step);
+    test_step.dependOn(&run_format_tests.step);
+    test_step.dependOn(&run_schema_tests.step);
 }

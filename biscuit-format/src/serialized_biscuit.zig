@@ -1,4 +1,6 @@
 const std = @import("std");
+const mem = std.mem;
+const Ed25519 = std.crypto.sign.Ed25519;
 const schema = @import("biscuit-schema");
 const SignedBlock = @import("signed_block.zig").SignedBlock;
 const Proof = @import("proof.zig").Proof;
@@ -17,7 +19,7 @@ pub const SerializedBiscuit = struct {
     ///
     /// This decodes the toplevel-level biscuit format from protobuf and verifies
     /// the token.
-    pub fn initFromBytes(allocator: std.mem.Allocator, bytes: []const u8, public_key: std.crypto.sign.Ed25519.PublicKey) !SerializedBiscuit {
+    pub fn initFromBytes(allocator: mem.Allocator, bytes: []const u8, public_key: Ed25519.PublicKey) !SerializedBiscuit {
         const b = try schema.decodeBiscuit(allocator, bytes);
         errdefer b.deinit();
 
@@ -64,7 +66,7 @@ pub const SerializedBiscuit = struct {
     ///    b) If the token is not sealed we check the last block's
     ///       public key is the public key of the private key in the
     ///       the proof.
-    fn verify(self: *SerializedBiscuit, root_public_key: std.crypto.sign.Ed25519.PublicKey) !void {
+    fn verify(self: *SerializedBiscuit, root_public_key: Ed25519.PublicKey) !void {
         var pk = root_public_key;
 
         // Verify the authority block's signature
@@ -131,7 +133,7 @@ test {
 
     var public_key_mem: [32]u8 = undefined;
     _ = try std.fmt.hexToBytes(&public_key_mem, "49fe7ec1972952c8c92119def96235ad622d0d024f3042a49c7317f7d5baf3da");
-    const public_key = try std.crypto.sign.Ed25519.PublicKey.fromBytes(public_key_mem);
+    const public_key = try Ed25519.PublicKey.fromBytes(public_key_mem);
 
     for (tokens) |token| {
         const bytes = try decode.urlSafeBase64ToBytes(allocator, token);
