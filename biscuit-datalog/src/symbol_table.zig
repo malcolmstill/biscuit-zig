@@ -47,6 +47,52 @@ pub const SymbolTable = struct {
 
         return null;
     }
+
+    pub fn getString(self: *const SymbolTable, sym_index: u64) ![]const u8 {
+        if (indexToDefault(sym_index)) |str| {
+            return str;
+        }
+
+        if (sym_index >= NON_DEFAULT_SYMBOLS_OFFSET and sym_index < NON_DEFAULT_SYMBOLS_OFFSET + self.symbols.items.len) {
+            return self.symbols.items[sym_index - NON_DEFAULT_SYMBOLS_OFFSET];
+        }
+
+        return error.SymbolNotFound;
+    }
+
+    fn indexToDefault(sym_index: u64) ?[]const u8 {
+        return switch (sym_index) {
+            0 => "read",
+            1 => "write",
+            2 => "resource",
+            3 => "operation",
+            4 => "right",
+            5 => "time",
+            6 => "role",
+            7 => "owner",
+            8 => "tenant",
+            9 => "namespace",
+            10 => "user",
+            11 => "team",
+            12 => "service",
+            13 => "admin",
+            14 => "email",
+            15 => "group",
+            16 => "member",
+            17 => "ip_address",
+            18 => "client",
+            19 => "client_ip",
+            20 => "domain",
+            21 => "path",
+            22 => "version",
+            23 => "cluster",
+            24 => "node",
+            25 => "hostname",
+            26 => "nonce",
+            27 => "query",
+            else => null,
+        };
+    }
 };
 
 const NON_DEFAULT_SYMBOLS_OFFSET = 1024;
@@ -94,4 +140,9 @@ test {
 
     const index = try st.insert("shibboleth");
     try testing.expectEqual(@as(?u64, 1024), index);
+
+    try testing.expectEqualStrings("read", try st.getString(0));
+    try testing.expectEqualStrings("query", try st.getString(27));
+    try testing.expectEqualStrings("shibboleth", try st.getString(1024));
+    try testing.expectError(error.SymbolNotFound, st.getString(1025));
 }

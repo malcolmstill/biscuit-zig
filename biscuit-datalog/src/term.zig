@@ -1,6 +1,7 @@
 const std = @import("std");
 const schema = @import("biscuit-schema");
 const Predicate = @import("predicate.zig").Predicate;
+const SymbolTable = @import("symbol_table.zig").SymbolTable;
 
 const TermKind = enum(u8) {
     variable,
@@ -33,6 +34,14 @@ pub const Term = union(TermKind) {
             // .bytes => |v| .{ .bytes = v.getSlice() },
             // .bool => |v| .{ .bool = v },
             // .set => |_| @panic("Unimplemented"),
+        };
+    }
+
+    pub fn convert(term: Term, old_symbols: *const SymbolTable, new_symbols: *SymbolTable) !Term {
+        return switch (term) {
+            .variable => |id| .{ .variable = std.math.cast(u32, try new_symbols.insert(try old_symbols.getString(id))) orelse return error.VariableIdTooLarge },
+            .string => |id| .{ .string = try new_symbols.insert(try old_symbols.getString(id)) },
+            else => term,
         };
     }
 

@@ -3,6 +3,7 @@ const mem = std.mem;
 const schema = @import("biscuit-schema");
 const trm = @import("term.zig");
 const Term = trm.Term;
+const SymbolTable = @import("symbol_table.zig").SymbolTable;
 
 pub const Predicate = struct {
     name: u64,
@@ -62,6 +63,23 @@ pub const Predicate = struct {
         }
 
         return true;
+    }
+
+    /// Convert predicate to new symbol space
+    ///
+    /// Equivalent to clone but with the symbol rewriting
+    pub fn convert(self: Predicate, old_symbols: *const SymbolTable, new_symbols: *SymbolTable) !Predicate {
+        const name = try old_symbols.getString(self.name);
+
+        var terms = try self.terms.clone();
+        for (terms.items, 0..) |term, i| {
+            terms.items[i] = try term.convert(old_symbols, new_symbols);
+        }
+
+        return .{
+            .name = try new_symbols.insert(name),
+            .terms = terms,
+        };
     }
 
     /// Clone the predicate

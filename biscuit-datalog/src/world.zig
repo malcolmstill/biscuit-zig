@@ -83,7 +83,7 @@ pub const World = struct {
 
     pub fn addFact(self: *World, fact: Fact) !void {
         std.debug.print("world: adding fact = {any}\n", .{fact});
-        try self.facts.add(try fact.clone());
+        try self.facts.add(fact);
     }
 
     pub fn addRule(self: *World, rule: Rule) !void {

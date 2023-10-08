@@ -3,6 +3,7 @@ const mem = std.mem;
 const schema = @import("biscuit-schema");
 const prd = @import("predicate.zig");
 const Predicate = prd.Predicate;
+const SymbolTable = @import("symbol_table.zig").SymbolTable;
 
 pub const Fact = struct {
     predicate: Predicate,
@@ -19,6 +20,11 @@ pub const Fact = struct {
 
     pub fn deinit(self: *Fact) void {
         self.predicate.deinit();
+    }
+
+    /// Convert fact to new symbol space
+    pub fn convert(self: Fact, old_symbols: *const SymbolTable, new_symbols: *SymbolTable) !Fact {
+        return .{ .predicate = try self.predicate.convert(old_symbols, new_symbols) };
     }
 
     pub fn clone(self: Fact) !Fact {

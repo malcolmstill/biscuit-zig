@@ -4,6 +4,7 @@ const schema = @import("biscuit-schema");
 const Fact = @import("biscuit-datalog").fact.Fact;
 const Rule = @import("biscuit-datalog").rule.Rule;
 const Check = @import("biscuit-datalog").check.Check;
+const SymbolTable = @import("biscuit-datalog").symbol_table.SymbolTable;
 const MIN_SCHEMA_VERSION = format.serialized_biscuit.MIN_SCHEMA_VERSION;
 const MAX_SCHEMA_VERSION = format.serialized_biscuit.MAX_SCHEMA_VERSION;
 
@@ -11,7 +12,7 @@ pub const Block = struct {
     decoded_block: ?schema.Block = null,
     version: u32,
     context: []const u8,
-    symbols: std.ArrayList([]const u8),
+    symbols: SymbolTable,
     facts: std.ArrayList(Fact),
     rules: std.ArrayList(Rule),
     checks: std.ArrayList(Check),
@@ -20,7 +21,7 @@ pub const Block = struct {
         return .{
             .version = 0,
             .context = "",
-            .symbols = std.ArrayList([]const u8).init(allocator),
+            .symbols = SymbolTable.init(allocator),
             .facts = std.ArrayList(Fact).init(allocator),
             .rules = std.ArrayList(Rule).init(allocator),
             .checks = std.ArrayList(Check).init(allocator),
@@ -43,7 +44,7 @@ pub const Block = struct {
         block.version = version;
 
         for (decoded_block.symbols.items) |symbol| {
-            try block.symbols.append(symbol.getSlice());
+            _ = try block.symbols.insert(symbol.getSlice());
         }
 
         for (decoded_block.facts_v2.items) |fact| {

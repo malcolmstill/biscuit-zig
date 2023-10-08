@@ -53,8 +53,7 @@ pub const Authorizer = struct {
             var b: Biscuit = biscuit;
 
             for (b.authority.facts.items) |fact| {
-                // FIXME: remap fact
-                try self.world.addFact(fact);
+                try self.world.addFact(try fact.convert(&b.authority.symbols, &self.symbols));
             }
 
             for (b.authority.rules.items) |rule| {
