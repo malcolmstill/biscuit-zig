@@ -2,6 +2,7 @@ const std = @import("std");
 const mem = std.mem;
 const Biscuit = @import("biscuit.zig").Biscuit;
 const World = @import("biscuit-datalog").world.World;
+const Check = @import("biscuit-datalog").check.Check;
 const SymbolTable = @import("biscuit-datalog").symbol_table.SymbolTable;
 
 pub const Authorizer = struct {
@@ -67,6 +68,11 @@ pub const Authorizer = struct {
 
             for (b.authority.checks.items) |check| {
                 std.debug.print("{any}\n", .{check});
+
+                for (check.queries.items) |query| {
+                    const is_match = self.world.queryMatch(query, self.symbols);
+                    _ = is_match;
+                }
             }
         }
     }

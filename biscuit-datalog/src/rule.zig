@@ -126,7 +126,7 @@ pub const Rule = struct {
         }
     }
 
-    pub fn find_match(self: Rule, facts: *const Set(Fact), symbols: SymbolTable) bool {
+    pub fn findMatch(self: Rule, facts: *const Set(Fact), symbols: SymbolTable) bool {
         _ = symbols;
         _ = facts;
         _ = self;
