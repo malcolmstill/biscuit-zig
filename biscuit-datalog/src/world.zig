@@ -90,4 +90,8 @@ pub const World = struct {
         std.debug.print("world: adding rule = {any}\n", .{rule});
         try self.rules.append(rule);
     }
+
+    pub fn query_match(self: *World, rule: Rule, symbols: SymbolTable) bool {
+        return rule.find_match(self.facts, symbols);
+    }
 };

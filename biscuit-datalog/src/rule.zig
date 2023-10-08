@@ -126,6 +126,14 @@ pub const Rule = struct {
         }
     }
 
+    pub fn find_match(self: Rule, facts: *const Set(Fact), symbols: SymbolTable) bool {
+        _ = symbols;
+        _ = facts;
+        _ = self;
+
+        return false; // FIXME: implement
+    }
+
     pub fn format(self: Rule, comptime _: []const u8, _: std.fmt.FormatOptions, writer: anytype) std.os.WriteError!void {
         try writer.print("{any} <- ", .{self.head});
         for (self.body.items, 0..) |*predicate, i| {
