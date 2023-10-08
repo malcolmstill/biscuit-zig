@@ -91,7 +91,7 @@ pub const World = struct {
         try self.rules.append(rule);
     }
 
-    pub fn queryMatch(self: *World, rule: Rule, symbols: SymbolTable) bool {
-        return rule.findMatch(&self.facts, symbols);
+    pub fn queryMatch(self: *World, rule: *Rule, symbols: SymbolTable) !bool {
+        return rule.findMatch(self.allocator, &self.facts, symbols);
     }
 };

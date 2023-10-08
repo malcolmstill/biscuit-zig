@@ -69,9 +69,10 @@ pub const Authorizer = struct {
             for (b.authority.checks.items) |check| {
                 std.debug.print("{any}\n", .{check});
 
-                for (check.queries.items) |query| {
-                    const is_match = self.world.queryMatch(query, self.symbols);
-                    _ = is_match;
+                for (check.queries.items) |*query| {
+                    const is_match = try self.world.queryMatch(query, self.symbols);
+
+                    std.debug.print("match {any} = {}\n", .{ query, is_match });
                 }
             }
         }

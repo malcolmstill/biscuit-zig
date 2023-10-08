@@ -126,12 +126,20 @@ pub const Rule = struct {
         }
     }
 
-    pub fn findMatch(self: Rule, facts: *const Set(Fact), symbols: SymbolTable) bool {
-        _ = symbols;
-        _ = facts;
-        _ = self;
+    pub fn findMatch(self: *Rule, allocator: mem.Allocator, facts: *const Set(Fact), symbols: SymbolTable) !bool {
+        var arena = std.heap.ArenaAllocator.init(allocator);
+        defer arena.deinit();
 
-        return false; // FIXME: implement
+        var matched_variables = try MatchedVariables.init(arena.allocator(), self);
+
+        var it = try Combinator.init(0, allocator, matched_variables, self.body.items, facts, symbols);
+        defer it.deinit();
+
+        if (try it.next()) |_| {
+            return true;
+        } else {
+            return false;
+        }
     }
 
     pub fn format(self: Rule, comptime _: []const u8, _: std.fmt.FormatOptions, writer: anytype) std.os.WriteError!void {
