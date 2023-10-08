@@ -66,7 +66,7 @@ pub const Authorizer = struct {
             var b: Biscuit = biscuit;
 
             for (b.authority.checks.items) |check| {
-                _ = check;
+                std.debug.print("{any}\n", .{check});
             }
         }
     }
