@@ -9,7 +9,7 @@ const TermKind = enum(u8) {
     string,
     // date,
     // bytes,
-    // bool,
+    bool,
     // set,
 };
 
@@ -19,7 +19,7 @@ pub const Term = union(TermKind) {
     string: u64,
     // date: u64,
     // bytes: []const u8,
-    // bool: bool,
+    bool: bool,
     // set: TermSet,
 
     pub fn fromSchema(term: schema.TermV2) !Term {
@@ -29,10 +29,9 @@ pub const Term = union(TermKind) {
             .variable => |v| .{ .variable = v },
             .integer => |v| .{ .integer = v },
             .string => |v| .{ .string = v },
-            else => @panic("Unimplemented"),
+            .bool => |v| .{ .bool = v },
             // .date => |v| .{ .date = v },
             // .bytes => |v| .{ .bytes = v.getSlice() },
-            // .bool => |v| .{ .bool = v },
             // .set => |_| @panic("Unimplemented"),
         };
     }
@@ -41,7 +40,7 @@ pub const Term = union(TermKind) {
         return switch (term) {
             .variable => |id| .{ .variable = std.math.cast(u32, try new_symbols.insert(try old_symbols.getString(id))) orelse return error.VariableIdTooLarge },
             .string => |id| .{ .string = try new_symbols.insert(try old_symbols.getString(id)) },
-            else => term,
+            .integer | .bool => term,
         };
     }
 
@@ -52,6 +51,7 @@ pub const Term = union(TermKind) {
             .variable => |v| v == term.variable, // are variables always eql? eql if the symbol is the same? not eql?
             .integer => |v| v == term.integer,
             .string => |v| v == term.string,
+            .bool => |v| v == term.bool,
         };
     }
 
@@ -73,6 +73,7 @@ pub const Term = union(TermKind) {
             .variable => true,
             .integer => |v| v == term.integer,
             .string => |v| v == term.string,
+            .bool => |v| v == term.bool,
         };
     }
 
@@ -81,6 +82,7 @@ pub const Term = union(TermKind) {
             .variable => |v| writer.print("$sym:{any}", .{v}),
             .integer => |v| writer.print("{any}", .{v}),
             .string => |v| writer.print("\"sym:{any}\"", .{v}),
+            .bool => |v| writer.print("{}", .{v}),
         };
     }
 
