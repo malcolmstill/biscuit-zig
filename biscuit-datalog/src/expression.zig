@@ -82,6 +82,17 @@ const Binary = enum {
                 .bitwise_xor => .{ .integer = i ^ j },
                 else => return error.UnexpectedOperationForIntegerOperands,
             };
+        } else if (tag(left) == .string and tag(right) == .string) {
+            return switch (self) {
+                .prefix => @panic("unimplemented"),
+                .suffix => @panic("unimplemented"),
+                .regex => @panic("unimplemented"),
+                .contains => @panic("unimplemented"),
+                .add => @panic("unimplemented"),
+                .equal => @panic("unimplemented"),
+                .not_equal => @panic("unimplemented"),
+                else => return error.UnexpectedOperationForStringOperands,
+            };
         } else if (tag(left) == .bool and tag(right) == .bool) {
             const i = left.bool;
             const j = right.bool;
