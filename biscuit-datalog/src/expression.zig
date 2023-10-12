@@ -3,6 +3,8 @@ const meta = std.meta;
 const Term = @import("term.zig").Term;
 const SymbolTable = @import("symbol_table.zig").SymbolTable;
 
+const tag = meta.activeTag;
+
 const Expression = []Op;
 
 const OpKind = enum(u8) {
@@ -58,55 +60,42 @@ const Binary = enum {
 
     pub fn evaluate(self: Binary, left: Term, right: Term, symbols: SymbolTable) !Term {
         _ = symbols;
-        switch (self) {
-            .less_than,
-            .greater_than,
-            .less_or_equal,
-            .greater_or_equal,
-            .equal,
-            .not_equal,
-            => |op| {
-                const i = if (meta.activeTag(left) == .integer) left.integer else return error.BinaryExpectedInteger;
-                const j = if (meta.activeTag(right) == .integer) right.integer else return error.BinaryExpectedInteger;
 
-                const b = switch (op) {
-                    .less_than => i < j,
-                    .greater_than => i > j,
-                    .less_or_equal => i <= j,
-                    .greater_or_equal => i >= j,
-                    .equal => i == j,
-                    .not_equal => i != j,
-                    else => @panic("unexpected op"),
-                };
+        // Integer operands
+        if (tag(left) == .integer and tag(right) == .integer) {
+            const i = left.integer;
+            const j = right.integer;
 
-                return .{ .bool = b };
-            },
-            .add,
-            .sub,
-            .mul,
-            .div,
-            .bitwise_and,
-            .bitwise_or,
-            .bitwise_xor,
-            => |op| {
-                const i = if (meta.activeTag(left) == .integer) left.integer else return error.BinaryExpectedInteger;
-                const j = if (meta.activeTag(right) == .integer) right.integer else return error.BinaryExpectedInteger;
+            return switch (self) {
+                .less_than => .{ .bool = i < j },
+                .greater_than => .{ .bool = i > j },
+                .less_or_equal => .{ .bool = i <= j },
+                .greater_or_equal => .{ .bool = i >= j },
+                .equal => .{ .bool = i == j },
+                .not_equal => .{ .bool = i != j },
+                .add => .{ .integer = i + j },
+                .sub => .{ .integer = i - j },
+                .mul => .{ .integer = i * j },
+                .div => .{ .integer = @divExact(i, j) },
+                .bitwise_and => .{ .integer = i & j },
+                .bitwise_or => .{ .integer = i | j },
+                .bitwise_xor => .{ .integer = i ^ j },
+                else => return error.UnexpectedOperationForIntegerOperands,
+            };
+        } else if (tag(left) == .bool and tag(right) == .bool) {
+            const i = left.bool;
+            const j = right.bool;
 
-                const res = switch (op) {
-                    .add => i + j,
-                    .sub => i - j,
-                    .mul => i * j,
-                    .div => @divExact(i, j),
-                    .bitwise_and => i & j,
-                    .bitwise_or => i | j,
-                    .bitwise_xor => i ^ j,
-                    else => @panic("unexpected op"),
-                };
-
-                return .{ .integer = res };
-            },
-            else => @panic("unimplemented"),
+            return switch (self) {
+                .@"and" => .{ .bool = i and j },
+                .@"or" => .{ .bool = i or j },
+                .equal => .{ .bool = i == j },
+                .not_equal => .{ .bool = i != j },
+                else => return error.UnexpectedOperationForBoolOperands,
+            };
         }
+
+        return error.UnexpectedExpression;
     }
 };
 
