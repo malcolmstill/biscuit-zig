@@ -93,6 +93,32 @@ const Binary = enum {
                 .not_equal => @panic("unimplemented"),
                 else => return error.UnexpectedOperationForStringOperands,
             };
+        } else if (tag(left) == .date and tag(right) == .date) {
+            const i = left.date;
+            _ = i;
+            const j = right.date;
+            _ = j;
+
+            return switch (self) {
+                .less_than => @panic("unimplemented"),
+                .greater_than => @panic("unimplemented"),
+                .less_or_equal => @panic("unimplemented"),
+                .greater_or_equal => @panic("unimplemented"),
+                .equal => @panic("unimplemented"),
+                .not_equal => @panic("unimplemented"),
+                else => return error.UnexpectedOperationForDateOperands,
+            };
+        } else if (tag(left) == .bytes and tag(right) == .bytes) {
+            const i = left.bytes;
+            _ = i;
+            const j = right.bytes;
+            _ = j;
+
+            return switch (self) {
+                .equal => @panic("unimplemented"),
+                .not_equal => @panic("unimplemented"),
+                else => return error.UnexpectedOperationForBytesOperands,
+            };
         } else if (tag(left) == .bool and tag(right) == .bool) {
             const i = left.bool;
             const j = right.bool;

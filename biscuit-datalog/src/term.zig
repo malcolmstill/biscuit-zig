@@ -1,4 +1,5 @@
 const std = @import("std");
+const mem = std.mem;
 const schema = @import("biscuit-schema");
 const Predicate = @import("predicate.zig").Predicate;
 const SymbolTable = @import("symbol_table.zig").SymbolTable;
@@ -7,8 +8,8 @@ const TermKind = enum(u8) {
     variable,
     integer,
     string,
-    // date,
-    // bytes,
+    date,
+    bytes,
     bool,
     // set,
 };
@@ -17,8 +18,8 @@ pub const Term = union(TermKind) {
     variable: u32,
     integer: i64,
     string: u64,
-    // date: u64,
-    // bytes: []const u8,
+    date: u64,
+    bytes: []const u8,
     bool: bool,
     // set: TermSet,
 
@@ -30,8 +31,8 @@ pub const Term = union(TermKind) {
             .integer => |v| .{ .integer = v },
             .string => |v| .{ .string = v },
             .bool => |v| .{ .bool = v },
-            // .date => |v| .{ .date = v },
-            // .bytes => |v| .{ .bytes = v.getSlice() },
+            .bytes => |v| .{ .bytes = v.getSlice() },
+            .date => |v| .{ .date = v },
             // .set => |_| @panic("Unimplemented"),
         };
     }
@@ -40,7 +41,7 @@ pub const Term = union(TermKind) {
         return switch (term) {
             .variable => |id| .{ .variable = std.math.cast(u32, try new_symbols.insert(try old_symbols.getString(id))) orelse return error.VariableIdTooLarge },
             .string => |id| .{ .string = try new_symbols.insert(try old_symbols.getString(id)) },
-            .integer | .bool => term,
+            .integer, .bool, .bytes, .date => term,
         };
     }
 
@@ -52,6 +53,8 @@ pub const Term = union(TermKind) {
             .integer => |v| v == term.integer,
             .string => |v| v == term.string,
             .bool => |v| v == term.bool,
+            .date => |v| v == term.date,
+            .bytes => |v| mem.eql(u8, v, term.bytes),
         };
     }
 
@@ -74,6 +77,8 @@ pub const Term = union(TermKind) {
             .integer => |v| v == term.integer,
             .string => |v| v == term.string,
             .bool => |v| v == term.bool,
+            .date => |v| v == term.date,
+            .bytes => |v| mem.eql(u8, v, term.bytes),
         };
     }
 
@@ -83,6 +88,8 @@ pub const Term = union(TermKind) {
             .integer => |v| writer.print("{any}", .{v}),
             .string => |v| writer.print("\"sym:{any}\"", .{v}),
             .bool => |v| writer.print("{}", .{v}),
+            .date => |v| writer.print("{}", .{v}), // FIXME: render a date
+            .bytes => |v| writer.print("{x}", .{v}),
         };
     }
 
