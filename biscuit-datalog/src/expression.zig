@@ -95,28 +95,21 @@ const Binary = enum {
             };
         } else if (tag(left) == .date and tag(right) == .date) {
             const i = left.date;
-            _ = i;
             const j = right.date;
-            _ = j;
 
             return switch (self) {
-                .less_than => @panic("unimplemented"),
-                .greater_than => @panic("unimplemented"),
-                .less_or_equal => @panic("unimplemented"),
-                .greater_or_equal => @panic("unimplemented"),
-                .equal => @panic("unimplemented"),
-                .not_equal => @panic("unimplemented"),
+                .less_than => .{ .bool = i < j },
+                .greater_than => .{ .bool = i > j },
+                .less_or_equal => .{ .bool = i <= j },
+                .greater_or_equal => .{ .bool = i >= j },
+                .equal => .{ .bool = i == j },
+                .not_equal => .{ .bool = i != j },
                 else => return error.UnexpectedOperationForDateOperands,
             };
         } else if (tag(left) == .bytes and tag(right) == .bytes) {
-            const i = left.bytes;
-            _ = i;
-            const j = right.bytes;
-            _ = j;
-
             return switch (self) {
-                .equal => @panic("unimplemented"),
-                .not_equal => @panic("unimplemented"),
+                .equal => .{ .bool = left.eql(right) },
+                .not_equal => .{ .bool = !left.eql(right) },
                 else => return error.UnexpectedOperationForBytesOperands,
             };
         } else if (tag(left) == .bool and tag(right) == .bool) {
