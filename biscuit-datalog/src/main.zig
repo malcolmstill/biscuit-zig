@@ -8,6 +8,7 @@ pub const world = @import("world.zig");
 test {
     _ = @import("check.zig");
     _ = @import("combinator.zig");
+    _ = @import("expression.zig");
     _ = @import("fact.zig");
     _ = @import("predicate.zig");
     _ = @import("rule.zig");

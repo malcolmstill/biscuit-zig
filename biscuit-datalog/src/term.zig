@@ -3,14 +3,15 @@ const mem = std.mem;
 const schema = @import("biscuit-schema");
 const Predicate = @import("predicate.zig").Predicate;
 const SymbolTable = @import("symbol_table.zig").SymbolTable;
+const Set = @import("set.zig").Set;
 
 const TermKind = enum(u8) {
     variable,
     integer,
     string,
     date,
-    bytes,
     bool,
+    bytes,
     // set,
 };
 
@@ -19,9 +20,9 @@ pub const Term = union(TermKind) {
     integer: i64,
     string: u64,
     date: u64,
-    bytes: []const u8,
     bool: bool,
-    // set: TermSet,
+    bytes: []const u8,
+    // set: Set(Term),
 
     pub fn fromSchema(term: schema.TermV2) !Term {
         const content = term.Content orelse return error.TermExpectedContent;
@@ -31,9 +32,9 @@ pub const Term = union(TermKind) {
             .integer => |v| .{ .integer = v },
             .string => |v| .{ .string = v },
             .bool => |v| .{ .bool = v },
-            .bytes => |v| .{ .bytes = v.getSlice() },
             .date => |v| .{ .date = v },
-            // .set => |_| @panic("Unimplemented"),
+            .bytes => @panic("Unimplemented"),
+            .set => @panic("Unimplemented"),
         };
     }
 
@@ -41,7 +42,9 @@ pub const Term = union(TermKind) {
         return switch (term) {
             .variable => |id| .{ .variable = std.math.cast(u32, try new_symbols.insert(try old_symbols.getString(id))) orelse return error.VariableIdTooLarge },
             .string => |id| .{ .string = try new_symbols.insert(try old_symbols.getString(id)) },
-            .integer, .bool, .bytes, .date => term,
+            .integer, .bool, .date => term,
+            .bytes => @panic("bytes unimplemented"),
+            // .set => |_| @panic("set unimplemented"),
         };
     }
 
@@ -55,6 +58,7 @@ pub const Term = union(TermKind) {
             .bool => |v| v == term.bool,
             .date => |v| v == term.date,
             .bytes => |v| mem.eql(u8, v, term.bytes),
+            // .set => |_| @panic("set unimplemented"),
         };
     }
 
@@ -79,6 +83,7 @@ pub const Term = union(TermKind) {
             .bool => |v| v == term.bool,
             .date => |v| v == term.date,
             .bytes => |v| mem.eql(u8, v, term.bytes),
+            // .set => |_| @panic("set unimplemented"),
         };
     }
 
@@ -89,7 +94,8 @@ pub const Term = union(TermKind) {
             .string => |v| writer.print("\"sym:{any}\"", .{v}),
             .bool => |v| writer.print("{}", .{v}),
             .date => |v| writer.print("{}", .{v}), // FIXME: render a date
-            .bytes => |v| writer.print("{x}", .{v}),
+            .bytes => |v| writer.print("{}", .{std.fmt.fmtSliceHexLower(v)}),
+            // .set => |_| @panic("set unimplemented"),
         };
     }
 
@@ -99,7 +105,20 @@ pub const Term = union(TermKind) {
 };
 
 pub fn hash(hasher: anytype, term: Term) void {
-    std.hash.autoHash(hasher, term);
+    // Hash the tag type
+    std.hash.autoHash(hasher, std.meta.activeTag(term));
+
+    // Hash the value
+    switch (term) {
+        .variable => |v| std.hash.autoHash(hasher, v),
+        .integer => |v| std.hash.autoHash(hasher, v),
+        .string => |v| std.hash.autoHash(hasher, v),
+        .bool => |v| std.hash.autoHash(hasher, v),
+        .date => |v| std.hash.autoHash(hasher, v),
+        .bytes => |bytes| {
+            for (bytes) |b| std.hash.autoHash(hasher, b);
+        },
+    }
 }
 
 pub const TermSet = struct {
