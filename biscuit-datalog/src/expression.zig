@@ -1,4 +1,5 @@
 const std = @import("std");
+const mem = std.mem;
 const meta = std.meta;
 const Term = @import("term.zig").Term;
 const SymbolTable = @import("symbol_table.zig").SymbolTable;
@@ -59,7 +60,6 @@ const Binary = enum {
     not_equal,
 
     pub fn evaluate(self: Binary, left: Term, right: Term, symbols: SymbolTable) !Term {
-        _ = symbols;
 
         // Integer operands
         if (tag(left) == .integer and tag(right) == .integer) {
@@ -83,14 +83,17 @@ const Binary = enum {
                 else => return error.UnexpectedOperationForIntegerOperands,
             };
         } else if (tag(left) == .string and tag(right) == .string) {
+            const sl = try symbols.getString(left.string);
+            const sr = try symbols.getString(right.string);
+
             return switch (self) {
-                .prefix => @panic("unimplemented"),
-                .suffix => @panic("unimplemented"),
+                .prefix => .{ .bool = mem.startsWith(u8, sl, sr) },
+                .suffix => .{ .bool = mem.endsWith(u8, sl, sr) },
                 .regex => @panic("unimplemented"),
-                .contains => @panic("unimplemented"),
+                .contains => .{ .bool = mem.containsAtLeast(u8, sl, 1, sr) },
                 .add => @panic("unimplemented"),
-                .equal => @panic("unimplemented"),
-                .not_equal => @panic("unimplemented"),
+                .equal => .{ .bool = mem.eql(u8, sl, sr) },
+                .not_equal => .{ .bool = !mem.eql(u8, sl, sr) },
                 else => return error.UnexpectedOperationForStringOperands,
             };
         } else if (tag(left) == .date and tag(right) == .date) {
