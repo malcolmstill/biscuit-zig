@@ -143,4 +143,19 @@ test {
 
     try testing.expectEqual(@as(Term, .{ .integer = 32 }), try Binary.add.evaluate(t1, t2, SymbolTable.init(testing.allocator)));
     try testing.expectEqual(@as(Term, .{ .integer = 220 }), try Binary.mul.evaluate(t1, t2, SymbolTable.init(testing.allocator)));
+
+    var symbols = SymbolTable.init(testing.allocator);
+    defer symbols.deinit();
+
+    const s = .{ .string = try symbols.insert("prefix_middle_suffix") };
+    const prefix = .{ .string = try symbols.insert("prefix") };
+    const suffix = .{ .string = try symbols.insert("suffix") };
+    const middle = .{ .string = try symbols.insert("middle") };
+
+    try testing.expectEqual(@as(Term, .{ .bool = true }), try Binary.equal.evaluate(s, s, symbols));
+    try testing.expectEqual(@as(Term, .{ .bool = false }), try Binary.equal.evaluate(s, prefix, symbols));
+    try testing.expectEqual(@as(Term, .{ .bool = true }), try Binary.not_equal.evaluate(s, prefix, symbols));
+    try testing.expectEqual(@as(Term, .{ .bool = true }), try Binary.prefix.evaluate(s, prefix, symbols));
+    try testing.expectEqual(@as(Term, .{ .bool = true }), try Binary.suffix.evaluate(s, suffix, symbols));
+    try testing.expectEqual(@as(Term, .{ .bool = true }), try Binary.contains.evaluate(s, middle, symbols));
 }
