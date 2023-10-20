@@ -1,7 +1,7 @@
 .{
     .name = "biscuit-zig",
     .version = "0.0.1",
-
+    .paths = .{},
     .dependencies = .{
         .zig_protobuf = .{
             .url = "https://github.com/malcolmstill/zig-protobuf/archive/a78339e4ebadc06b4631886c3d6bfc643c3e1fcf.tar.gz",
