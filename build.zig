@@ -31,7 +31,7 @@ pub fn build(b: *std.Build) void {
     // Define our biscuit-format module. This module depends on the external protobuf library
     var schema_module = b.createModule(.{
         .source_file = .{ .path = "biscuit-schema/src/main.zig" },
-        .dependencies = &[_]std.Build.ModuleDependency{
+        .dependencies = &.{
             .{
                 .name = "protobuf",
                 .module = protobuf.module("protobuf"),
@@ -41,7 +41,7 @@ pub fn build(b: *std.Build) void {
 
     var format_module = b.createModule(.{
         .source_file = .{ .path = "biscuit-format/src/main.zig" },
-        .dependencies = &[_]std.Build.ModuleDependency{
+        .dependencies = &.{
             .{
                 .name = "biscuit-schema",
                 .module = schema_module,
@@ -52,7 +52,7 @@ pub fn build(b: *std.Build) void {
     // Define our datalog module
     var datalog_module = b.createModule(.{
         .source_file = .{ .path = "biscuit-datalog/src/main.zig" },
-        .dependencies = &[_]std.Build.ModuleDependency{
+        .dependencies = &.{
             .{
                 .name = "biscuit-format",
                 .module = format_module,

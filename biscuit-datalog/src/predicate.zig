@@ -123,23 +123,23 @@ test {
 
     var terms_1 = std.ArrayList(Term).init(allocator);
     defer terms_1.deinit();
-    try terms_1.insertSlice(0, &[_]Term{ .{ .string = 10 }, .{ .integer = 20 } });
+    try terms_1.insertSlice(0, &.{ .{ .string = 10 }, .{ .integer = 20 } });
 
     var terms_2 = std.ArrayList(Term).init(allocator);
     defer terms_2.deinit();
-    try terms_2.insertSlice(0, &[_]Term{ .{ .string = 10 }, .{ .integer = 20 } });
+    try terms_2.insertSlice(0, &.{ .{ .string = 10 }, .{ .integer = 20 } });
 
     var terms_3 = std.ArrayList(Term).init(allocator);
     defer terms_3.deinit();
-    try terms_3.insertSlice(0, &[_]Term{ .{ .string = 10 }, .{ .integer = 21 } });
+    try terms_3.insertSlice(0, &.{ .{ .string = 10 }, .{ .integer = 21 } });
 
     var terms_4 = std.ArrayList(Term).init(allocator);
     defer terms_4.deinit();
-    try terms_4.insertSlice(0, &[_]Term{ .{ .string = 10 }, .{ .integer = 20 } });
+    try terms_4.insertSlice(0, &.{ .{ .string = 10 }, .{ .integer = 20 } });
 
     var terms_5 = std.ArrayList(Term).init(allocator);
     defer terms_5.deinit();
-    try terms_5.insertSlice(0, &[_]Term{ .{ .variable = 105 }, .{ .integer = 20 } });
+    try terms_5.insertSlice(0, &.{ .{ .variable = 105 }, .{ .integer = 20 } });
 
     const p1: Predicate = .{ .name = 99, .terms = terms_1 };
     const p2: Predicate = .{ .name = 99, .terms = terms_2 };
