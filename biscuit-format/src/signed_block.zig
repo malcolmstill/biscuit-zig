@@ -36,7 +36,7 @@ pub const SignedBlock = struct {
 
     pub fn algorithmBuf(self: *SignedBlock) [4]u8 {
         var buf: [4]u8 = undefined;
-        std.mem.writeIntNative(u32, buf[0..], @as(u32, @bitCast(@intFromEnum(self.algorithm))));
+        std.mem.writeInt(u32, buf[0..], @as(u32, @bitCast(@intFromEnum(self.algorithm))), @import("builtin").cpu.arch.endian());
         return buf;
     }
 };

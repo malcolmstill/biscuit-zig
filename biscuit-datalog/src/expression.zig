@@ -1,10 +1,7 @@
 const std = @import("std");
 const mem = std.mem;
-const meta = std.meta;
 const Term = @import("term.zig").Term;
 const SymbolTable = @import("symbol_table.zig").SymbolTable;
-
-const tag = meta.activeTag;
 
 const Expression = []Op;
 
@@ -29,7 +26,7 @@ const Unary = enum {
         _ = symbols; // Different type instead of SymbolTable
         //
         return switch (self) {
-            .negate => if (meta.activeTag(value) == .bool) !value.bool else return error.UnexpectedTermInUnaryNegate,
+            .negate => if (value == .bool) !value.bool else return error.UnexpectedTermInUnaryNegate,
             .parens => value,
             else => error.UnexpectedUnaryTermCombination,
         };
@@ -62,7 +59,7 @@ const Binary = enum {
     pub fn evaluate(self: Binary, left: Term, right: Term, symbols: SymbolTable) !Term {
 
         // Integer operands
-        if (tag(left) == .integer and tag(right) == .integer) {
+        if (left == .integer and right == .integer) {
             const i = left.integer;
             const j = right.integer;
 
@@ -82,7 +79,7 @@ const Binary = enum {
                 .bitwise_xor => .{ .integer = i ^ j },
                 else => return error.UnexpectedOperationForIntegerOperands,
             };
-        } else if (tag(left) == .string and tag(right) == .string) {
+        } else if (left == .string and right == .string) {
             const sl = try symbols.getString(left.string);
             const sr = try symbols.getString(right.string);
 
@@ -96,7 +93,7 @@ const Binary = enum {
                 .not_equal => .{ .bool = !mem.eql(u8, sl, sr) },
                 else => return error.UnexpectedOperationForStringOperands,
             };
-        } else if (tag(left) == .date and tag(right) == .date) {
+        } else if (left == .date and right == .date) {
             const i = left.date;
             const j = right.date;
 
@@ -109,13 +106,13 @@ const Binary = enum {
                 .not_equal => .{ .bool = i != j },
                 else => return error.UnexpectedOperationForDateOperands,
             };
-        } else if (tag(left) == .bytes and tag(right) == .bytes) {
+        } else if (left == .bytes and right == .bytes) {
             return switch (self) {
                 .equal => .{ .bool = left.eql(right) },
                 .not_equal => .{ .bool = !left.eql(right) },
                 else => return error.UnexpectedOperationForBytesOperands,
             };
-        } else if (tag(left) == .bool and tag(right) == .bool) {
+        } else if (left == .bool and right == .bool) {
             const i = left.bool;
             const j = right.bool;
 

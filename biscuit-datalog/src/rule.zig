@@ -105,7 +105,7 @@ pub const Rule = struct {
             defer predicate.deinit();
 
             for (predicate.terms.items, 0..) |head_term, i| {
-                const sym = if (meta.activeTag(head_term) == .variable) head_term.variable else continue;
+                const sym = if (head_term == .variable) head_term.variable else continue;
 
                 const value = bindings.get(sym) orelse continue :blk;
 

@@ -103,7 +103,7 @@ pub const Combinator = struct {
 
             // Set variables from predicate to match values
             for (self.predicates[0].terms.items, 0..) |term, i| {
-                const sym = if (meta.activeTag(term) == .variable) term.variable else continue;
+                const sym = if (term == .variable) term.variable else continue;
 
                 // Since we are pulling terms out of a fact, we know
                 // ahead of time that none of the terms will be variables.
