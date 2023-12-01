@@ -60,7 +60,7 @@ pub const Combinator = struct {
 
     pub fn init(id: usize, allocator: mem.Allocator, variables: MatchedVariables, predicates: []Predicate, all_facts: *const Set(Fact), symbols: SymbolTable) !*Combinator {
         std.debug.print("Init combinator[{}]: predicates = {any}\n", .{ id, predicates });
-        var c = try allocator.create(Combinator);
+        const c = try allocator.create(Combinator);
 
         c.* = .{
             .id = id,

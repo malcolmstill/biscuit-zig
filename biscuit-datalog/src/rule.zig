@@ -93,7 +93,7 @@ pub const Rule = struct {
         defer arena.deinit();
 
         std.debug.print("\n\nrule = {any}\n", .{self});
-        var matched_variables = try MatchedVariables.init(arena.allocator(), self);
+        const matched_variables = try MatchedVariables.init(arena.allocator(), self);
 
         // TODO: if body is empty stuff
 
@@ -130,7 +130,7 @@ pub const Rule = struct {
         var arena = std.heap.ArenaAllocator.init(allocator);
         defer arena.deinit();
 
-        var matched_variables = try MatchedVariables.init(arena.allocator(), self);
+        const matched_variables = try MatchedVariables.init(arena.allocator(), self);
 
         var it = try Combinator.init(0, allocator, matched_variables, self.body.items, facts, symbols);
         defer it.deinit();

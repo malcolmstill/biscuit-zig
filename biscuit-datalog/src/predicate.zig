@@ -119,7 +119,7 @@ pub fn hash(hasher: anytype, predicate: Predicate) void {
 
 test {
     const testing = std.testing;
-    var allocator = testing.allocator;
+    const allocator = testing.allocator;
 
     var terms_1 = std.ArrayList(Term).init(allocator);
     defer terms_1.deinit();

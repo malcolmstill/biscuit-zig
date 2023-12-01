@@ -67,7 +67,7 @@ pub const MatchedVariables = struct {
     /// If the variable is unset we bind to the term unconditionally and
     /// return true.
     pub fn insert(self: *MatchedVariables, variable: u64, term: Term) !bool {
-        var entry = self.variables.getEntry(variable) orelse return false;
+        const entry = self.variables.getEntry(variable) orelse return false;
 
         if (entry.value_ptr.*) |existing_term| {
             // The variable is already set to an existing term.

@@ -69,7 +69,7 @@ pub const Authorizer = struct {
 
         // Run checks in the biscuit
         if (self.biscuit) |biscuit| {
-            var b: Biscuit = biscuit;
+            const b: Biscuit = biscuit;
 
             for (b.authority.checks.items) |check| {
                 std.debug.print("{any}\n", .{check});

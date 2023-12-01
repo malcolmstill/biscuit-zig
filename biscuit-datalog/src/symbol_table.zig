@@ -25,7 +25,7 @@ pub const SymbolTable = struct {
             return sym;
         }
 
-        var string = try self.allocator.alloc(u8, symbol.len);
+        const string = try self.allocator.alloc(u8, symbol.len);
         @memcpy(string, symbol);
 
         // Otherwise we need to insert the new symbol
