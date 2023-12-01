@@ -114,6 +114,9 @@ pub const Term = union(TermKind) {
             .bool => |v| std.hash.autoHash(hasher, v),
             .date => |v| std.hash.autoHash(hasher, v),
             .bytes => |bytes| {
+                // We hash the individual bytes because just calling
+                // autoHash on the `bytes` slice will include the slice's pointer in the
+                // hashing, which we don't want.
                 for (bytes) |b| std.hash.autoHash(hasher, b);
             },
             .set => |v| v.hash(hasher),
