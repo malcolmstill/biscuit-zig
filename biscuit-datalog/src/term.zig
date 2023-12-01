@@ -69,8 +69,8 @@ pub const Term = union(TermKind) {
     /// _always_ match.
     pub fn match(self: Term, term: Term) bool {
         // If either term is a variable, we match
-        if (std.meta.activeTag(self) == .variable) return true;
-        if (std.meta.activeTag(term) == .variable) return true;
+        if (self == .variable) return true;
+        if (term == .variable) return true;
 
         // Otherwise we need variables of the same type
         if (std.meta.activeTag(self) != std.meta.activeTag(term)) return false;
