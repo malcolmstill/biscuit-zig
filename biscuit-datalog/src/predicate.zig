@@ -113,7 +113,7 @@ pub const Predicate = struct {
 pub fn hash(hasher: anytype, predicate: Predicate) void {
     std.hash.autoHash(hasher, predicate.name);
     for (predicate.terms.items) |term| {
-        trm.hash(hasher, term);
+        term.hash(hasher);
     }
 }
 
@@ -151,4 +151,6 @@ test {
     try testing.expect(!p1.match(p3));
     try testing.expect(!p1.match(p4));
     try testing.expect(p1.match(p5));
+
+    std.debug.print("predicate = {any}\n", .{p1});
 }

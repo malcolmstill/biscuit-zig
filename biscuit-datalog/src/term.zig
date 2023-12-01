@@ -12,7 +12,7 @@ const TermKind = enum(u8) {
     date,
     bool,
     bytes,
-    // set,
+    set,
 };
 
 pub const Term = union(TermKind) {
@@ -22,7 +22,7 @@ pub const Term = union(TermKind) {
     date: u64,
     bool: bool,
     bytes: []const u8,
-    // set: Set(Term),
+    set: Set(Term),
 
     pub fn fromSchema(term: schema.TermV2) !Term {
         const content = term.Content orelse return error.TermExpectedContent;
@@ -44,7 +44,7 @@ pub const Term = union(TermKind) {
             .string => |id| .{ .string = try new_symbols.insert(try old_symbols.getString(id)) },
             .integer, .bool, .date => term,
             .bytes => @panic("bytes unimplemented"),
-            // .set => |_| @panic("set unimplemented"),
+            .set => |_| @panic("set unimplemented"),
         };
     }
 
@@ -58,15 +58,14 @@ pub const Term = union(TermKind) {
             .bool => |v| v == term.bool,
             .date => |v| v == term.date,
             .bytes => |v| mem.eql(u8, v, term.bytes),
-            // .set => |_| @panic("set unimplemented"),
+            .set => |v| v.eql(term.set),
         };
     }
 
     /// Match terms
     ///
-    /// Note that this function isn't called `match` because it isn't a pure test.
-    /// We test for equality for most term types, but for variable terms we
-    /// _always_ match.
+    /// Note that this function isn't called `eql` because it isn't a pure equality test.
+    /// We test for equality for most term types, but for variable terms we _always_ match.
     pub fn match(self: Term, term: Term) bool {
         // If either term is a variable, we match
         if (self == .variable) return true;
@@ -83,7 +82,7 @@ pub const Term = union(TermKind) {
             .bool => |v| v == term.bool,
             .date => |v| v == term.date,
             .bytes => |v| mem.eql(u8, v, term.bytes),
-            // .set => |_| @panic("set unimplemented"),
+            .set => |v| v.eql(term.set),
         };
     }
 
@@ -95,31 +94,32 @@ pub const Term = union(TermKind) {
             .bool => |v| writer.print("{}", .{v}),
             .date => |v| writer.print("{}", .{v}), // FIXME: render a date
             .bytes => |v| writer.print("{}", .{std.fmt.fmtSliceHexLower(v)}),
-            // .set => |_| @panic("set unimplemented"),
+            .set => |v| writer.print("{}", .{v}),
         };
     }
 
     pub fn deinit(self: *Term) void {
         _ = self;
     }
-};
 
-pub fn hash(hasher: anytype, term: Term) void {
-    // Hash the tag type
-    std.hash.autoHash(hasher, std.meta.activeTag(term));
+    pub fn hash(term: Term, hasher: anytype) void {
+        // Hash the tag type
+        std.hash.autoHash(hasher, std.meta.activeTag(term));
 
-    // Hash the value
-    switch (term) {
-        .variable => |v| std.hash.autoHash(hasher, v),
-        .integer => |v| std.hash.autoHash(hasher, v),
-        .string => |v| std.hash.autoHash(hasher, v),
-        .bool => |v| std.hash.autoHash(hasher, v),
-        .date => |v| std.hash.autoHash(hasher, v),
-        .bytes => |bytes| {
-            for (bytes) |b| std.hash.autoHash(hasher, b);
-        },
+        // Hash the value
+        switch (term) {
+            .variable => |v| std.hash.autoHash(hasher, v),
+            .integer => |v| std.hash.autoHash(hasher, v),
+            .string => |v| std.hash.autoHash(hasher, v),
+            .bool => |v| std.hash.autoHash(hasher, v),
+            .date => |v| std.hash.autoHash(hasher, v),
+            .bytes => |bytes| {
+                for (bytes) |b| std.hash.autoHash(hasher, b);
+            },
+            .set => |v| v.hash(hasher),
+        }
     }
-}
+};
 
 pub const TermSet = struct {
     set: std.ArrayList(Term),

@@ -57,7 +57,6 @@ const Binary = enum {
     not_equal,
 
     pub fn evaluate(self: Binary, left: Term, right: Term, symbols: SymbolTable) !Term {
-
         // Integer operands
         if (left == .integer and right == .integer) {
             const i = left.integer;

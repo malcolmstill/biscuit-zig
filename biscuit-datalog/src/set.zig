@@ -49,12 +49,60 @@ pub fn Set(comptime K: type) type {
             try self.inner.put(value, {});
         }
 
-        pub fn contains(self: *Self, value: K) bool {
+        pub fn contains(self: Self, value: K) bool {
             return self.inner.contains(value);
         }
 
-        pub fn count(self: *Self) u32 {
+        pub fn count(self: *const Self) u32 {
             return self.inner.count();
+        }
+
+        /// Calculate a hash for the given set.
+        ///
+        /// 1. Initialises the results hash to 0
+        /// 2. Loops over all keys in the set and
+        ///    individually calculates their hash. Each
+        ///    hash is XOR'd onto the result hash (and
+        ///    so key order does not affect the final value)
+        /// 3. Returns resulting hash
+        pub fn hash(set: Self, hasher: anytype) void {
+            var h: u64 = 0;
+
+            var it = set.iterator();
+            while (it.next()) |key| {
+                var key_hasher = Wyhash.init(0);
+                key.hash(&key_hasher);
+                h ^= key_hasher.final();
+            }
+
+            std.hash.autoHash(hasher, h);
+        }
+
+        /// Key-by-key equality check for two sets
+        pub fn eql(left: Self, right: Self) bool {
+            var it = left.iterator();
+
+            while (it.next()) |key| {
+                if (!right.contains(key.*)) return false;
+            }
+
+            return true;
+        }
+
+        pub fn format(self: Self, comptime _: []const u8, _: std.fmt.FormatOptions, writer: anytype) std.os.WriteError!void {
+            try writer.print("set{{", .{});
+            var it = self.iterator();
+
+            const num_keys = self.count();
+            var i: usize = 0;
+
+            while (it.next()) |key| {
+                defer i += 1;
+
+                try writer.print("{any}", .{key});
+                if (i < num_keys - 1) try writer.print(", ", .{});
+            }
+            return writer.print("}}", .{});
         }
     };
 }
@@ -79,4 +127,6 @@ test {
     try s.add(Fact{ .predicate = Predicate{ .name = 10, .terms = undefined } });
     try s.add(Fact{ .predicate = Predicate{ .name = 10, .terms = undefined } });
     try testing.expectEqual(@as(u32, 2), s.count());
+
+    std.debug.print("set = {any}\n", .{s});
 }
