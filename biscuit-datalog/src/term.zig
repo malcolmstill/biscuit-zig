@@ -76,7 +76,7 @@ pub const Term = union(TermKind) {
 
         // ...and the values need to match
         return switch (self) {
-            .variable => true,
+            .variable => unreachable,
             .integer => |v| v == term.integer,
             .string => |v| v == term.string,
             .bool => |v| v == term.bool,
