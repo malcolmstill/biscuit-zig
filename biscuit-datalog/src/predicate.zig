@@ -1,8 +1,7 @@
 const std = @import("std");
 const mem = std.mem;
 const schema = @import("biscuit-schema");
-const trm = @import("term.zig");
-const Term = trm.Term;
+const Term = @import("term.zig").Term;
 const SymbolTable = @import("symbol_table.zig").SymbolTable;
 
 pub const Predicate = struct {
@@ -108,14 +107,14 @@ pub const Predicate = struct {
             .terms = terms,
         };
     }
-};
 
-pub fn hash(hasher: anytype, predicate: Predicate) void {
-    std.hash.autoHash(hasher, predicate.name);
-    for (predicate.terms.items) |term| {
-        term.hash(hasher);
+    pub fn hash(predicate: Predicate, hasher: anytype) void {
+        std.hash.autoHash(hasher, predicate.name);
+        for (predicate.terms.items) |term| {
+            term.hash(hasher);
+        }
     }
-}
+};
 
 test {
     const testing = std.testing;

@@ -1,8 +1,7 @@
 const std = @import("std");
 const mem = std.mem;
 const schema = @import("biscuit-schema");
-const prd = @import("predicate.zig");
-const Predicate = prd.Predicate;
+const Predicate = @import("predicate.zig").Predicate;
 const SymbolTable = @import("symbol_table.zig").SymbolTable;
 
 pub const Fact = struct {
@@ -48,6 +47,6 @@ pub const Fact = struct {
     }
 
     pub fn hash(self: Fact, hasher: anytype) void {
-        prd.hash(hasher, self.predicate);
+        self.predicate.hash(hasher);
     }
 };
