@@ -156,6 +156,7 @@ test "hashing" {
     try s2.add(.{ .integer = 2 });
     try s2.add(.{ .integer = 1 });
 
+    // Sets are equal regardless of insertion order
     try testing.expect(s1.eql(s2));
 
     var s1_hasher = Wyhash.init(0);
@@ -166,5 +167,7 @@ test "hashing" {
     s2.hash(&s2_hasher);
     const s2_hash = s2_hasher.final();
 
+    // Our sets that should be eql hash to the same value, regardless
+    // of insertion order
     try testing.expect(s1_hash == s2_hash);
 }
