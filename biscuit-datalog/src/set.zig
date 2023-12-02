@@ -15,6 +15,11 @@ pub fn Set(comptime K: type) type {
 
         pub const Iterator = InnerSet.KeyIterator;
 
+        // Sets are used in two places: we have Set(Fact) for storing our body of facts
+        // and Set(Term). Both Fact and Term define `.hash` and `.eql` (and internally
+        // other fields define those as required). We don't need to support arbitrary Set(T)
+        // and so don't have to consider other types that may or may not define these expected
+        // methods.
         const Context = struct {
             pub fn hash(ctx: Context, key: K) u64 {
                 _ = ctx;
@@ -129,4 +134,37 @@ test {
     try testing.expectEqual(@as(u32, 2), s.count());
 
     std.debug.print("set = {any}\n", .{s});
+}
+
+test "hashing" {
+    const Term = @import("term.zig").Term;
+
+    const testing = std.testing;
+    const allocator = testing.allocator;
+
+    var s1 = Set(Term).init(allocator);
+    defer s1.deinit();
+
+    var s2 = Set(Term).init(allocator);
+    defer s2.deinit();
+
+    try s1.add(.{ .integer = 1 });
+    try s1.add(.{ .integer = 2 });
+    try s1.add(.{ .integer = 3 });
+
+    try s2.add(.{ .integer = 3 });
+    try s2.add(.{ .integer = 2 });
+    try s2.add(.{ .integer = 1 });
+
+    try testing.expect(s1.eql(s2));
+
+    var s1_hasher = Wyhash.init(0);
+    s1.hash(&s1_hasher);
+    const s1_hash = s1_hasher.final();
+
+    var s2_hasher = Wyhash.init(0);
+    s2.hash(&s2_hasher);
+    const s2_hash = s2_hasher.final();
+
+    try testing.expect(s1_hash == s2_hash);
 }
