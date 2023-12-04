@@ -1,4 +1,5 @@
 const std = @import("std");
+const mem = std.mem;
 const meta = std.meta;
 const trait = std.meta.trait;
 const Wyhash = std.hash.Wyhash;
@@ -9,6 +10,7 @@ const Fact = @import("fact.zig").Fact;
 pub fn Set(comptime K: type) type {
     return struct {
         inner: InnerSet,
+        alloc: mem.Allocator,
 
         const InnerSet = std.HashMap(K, void, Context, 80);
         const Self = @This();
@@ -39,6 +41,7 @@ pub fn Set(comptime K: type) type {
         pub fn init(allocator: std.mem.Allocator) Self {
             return .{
                 .inner = InnerSet.init(allocator),
+                .alloc = allocator,
             };
         }
 
@@ -109,6 +112,46 @@ pub fn Set(comptime K: type) type {
             }
             return writer.print("}}", .{});
         }
+
+        pub fn intersection(set: Self, s: Self) !Self {
+            var new = Self.init(set.alloc);
+            var it = set.iterator();
+
+            while (it.next()) |term| {
+                if (s.contains(term.*)) try new.add(term.*);
+            }
+
+            return new;
+        }
+
+        pub fn @"union"(set: Self, s: Self) !Self {
+            var new = Self.init(set.alloc);
+
+            {
+                var it = set.iterator();
+                while (it.next()) |term| {
+                    try new.add(term.*);
+                }
+            }
+
+            {
+                var it = s.iterator();
+                while (it.next()) |term| {
+                    try new.add(term.*);
+                }
+            }
+
+            return new;
+        }
+
+        pub fn isSuperset(set: Self, s: Self) bool {
+            var it = s.iterator();
+            while (it.next()) |term| {
+                if (!set.contains(term.*)) return false;
+            }
+
+            return true;
+        }
     };
 }
 
@@ -170,4 +213,92 @@ test "hashing" {
     // Our sets that should be eql hash to the same value, regardless
     // of insertion order
     try testing.expect(s1_hash == s2_hash);
+}
+
+test "Superset" {
+    const Term = @import("term.zig").Term;
+
+    const testing = std.testing;
+    const allocator = testing.allocator;
+
+    var s1 = Set(Term).init(allocator);
+    defer s1.deinit();
+
+    var s2 = Set(Term).init(allocator);
+    defer s2.deinit();
+
+    var s3 = Set(Term).init(allocator);
+    defer s3.deinit();
+
+    try s1.add(.{ .integer = 1 });
+    try s1.add(.{ .integer = 2 });
+    try s1.add(.{ .integer = 3 });
+
+    try s2.add(.{ .integer = 3 });
+    try s2.add(.{ .integer = 2 });
+
+    try s3.add(.{ .integer = 6 });
+    try s3.add(.{ .integer = 2 });
+
+    try testing.expect(s1.isSuperset(s2));
+    try testing.expect(!s1.isSuperset(s3));
+}
+
+test "Union" {
+    const Term = @import("term.zig").Term;
+
+    const testing = std.testing;
+    const allocator = testing.allocator;
+
+    var s1 = Set(Term).init(allocator);
+    defer s1.deinit();
+
+    var s2 = Set(Term).init(allocator);
+    defer s2.deinit();
+
+    try s1.add(.{ .integer = 1 });
+    try s1.add(.{ .integer = 2 });
+    try s1.add(.{ .integer = 3 });
+
+    try s2.add(.{ .integer = 4 });
+    try s2.add(.{ .integer = 5 });
+
+    var s3 = try s1.@"union"(s2);
+    defer s3.deinit();
+
+    try testing.expect(s3.contains(.{ .integer = 1 }));
+    try testing.expect(s3.contains(.{ .integer = 2 }));
+    try testing.expect(s3.contains(.{ .integer = 3 }));
+    try testing.expect(s3.contains(.{ .integer = 4 }));
+    try testing.expect(s3.contains(.{ .integer = 5 }));
+}
+
+test "Intersection" {
+    const Term = @import("term.zig").Term;
+
+    const testing = std.testing;
+    const allocator = testing.allocator;
+
+    var s1 = Set(Term).init(allocator);
+    defer s1.deinit();
+
+    var s2 = Set(Term).init(allocator);
+    defer s2.deinit();
+
+    try s1.add(.{ .integer = 1 });
+    try s1.add(.{ .integer = 2 });
+    try s1.add(.{ .integer = 3 });
+
+    try s2.add(.{ .integer = 2 });
+    try s2.add(.{ .integer = 3 });
+    try s2.add(.{ .integer = 4 });
+
+    var s3 = try s1.intersection(s2);
+    defer s3.deinit();
+
+    try testing.expect(s3.contains(.{ .integer = 2 }));
+    try testing.expect(s3.contains(.{ .integer = 3 }));
+
+    try testing.expect(!s3.contains(.{ .integer = 1 }));
+    try testing.expect(!s3.contains(.{ .integer = 4 }));
 }

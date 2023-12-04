@@ -117,8 +117,13 @@ const Binary = enum {
                 .not_equal => .{ .bool = !left.set.eql(right.set) },
                 .intersection => .{ .set = left.set.intersection(right.set) },
                 .@"union" => .{ .set = left.set.@"union"(right.set) },
-                .contains => .{ .set = left.set.contains(right.set) },
+                .contains => .{ .set = left.set.isSuperset(right.set) },
                 else => return error.UnexpectedOperationForSetSetOperands,
+            };
+        } else if (left == .set) {
+            return switch (self) {
+                .contains => .{ .set = left.set.contains(right) },
+                else => return error.UnexpectedOperationForSetTermOperands,
             };
         } else if (left == .bool and right == .bool) {
             const i = left.bool;
