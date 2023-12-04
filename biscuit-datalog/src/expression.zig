@@ -111,6 +111,15 @@ const Binary = enum {
                 .not_equal => .{ .bool = !left.eql(right) },
                 else => return error.UnexpectedOperationForBytesOperands,
             };
+        } else if (left == .set and right == .set) {
+            return switch (self) {
+                .equal => .{ .bool = left.set.eql(right.set) },
+                .not_equal => .{ .bool = !left.set.eql(right.set) },
+                .intersection => .{ .set = left.set.intersection(right.set) },
+                .@"union" => .{ .set = left.set.@"union"(right.set) },
+                .contains => .{ .set = left.set.contains(right.set) },
+                else => return error.UnexpectedOperationForSetSetOperands,
+            };
         } else if (left == .bool and right == .bool) {
             const i = left.bool;
             const j = right.bool;
