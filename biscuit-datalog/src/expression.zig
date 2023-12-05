@@ -24,13 +24,17 @@ const Expression = struct {
                 .unary => |unary_op| {
                     const operand = stack.popOrNull() orelse return error.StackUnderflow;
 
-                    try stack.append(try unary_op.evaluate(operand, symbols));
+                    const result = try unary_op.evaluate(operand, symbols);
+
+                    try stack.append(result);
                 },
                 .binary => |binary_op| {
                     const right = stack.popOrNull() orelse return error.StackUnderflow;
                     const left = stack.popOrNull() orelse return error.StackUnderflow;
 
-                    try stack.append(try binary_op.evaluate(left, right, symbols));
+                    const result = try binary_op.evaluate(left, right, symbols);
+
+                    try stack.append(result);
                 },
             }
         }
