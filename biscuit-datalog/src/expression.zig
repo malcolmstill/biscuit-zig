@@ -24,16 +24,20 @@ const Expression = struct {
                 .unary => |unary_op| {
                     const operand = stack.popOrNull() orelse return error.StackUnderflow;
 
-                    try stack.push(unary_op.evaluate(operand, symbols));
+                    try stack.append(try unary_op.evaluate(operand, symbols));
                 },
                 .binary => |binary_op| {
                     const right = stack.popOrNull() orelse return error.StackUnderflow;
                     const left = stack.popOrNull() orelse return error.StackUnderflow;
 
-                    try stack.append(binary_op.evaluate(left, right, symbols));
+                    try stack.append(try binary_op.evaluate(left, right, symbols));
                 },
             }
         }
+
+        if (stack.items.len != 1) return error.InvalidStack;
+
+        return stack.items[0];
     }
 };
 
@@ -58,7 +62,7 @@ const Unary = enum {
         _ = symbols; // Different type instead of SymbolTable
         //
         return switch (self) {
-            .negate => if (value == .bool) !value.bool else return error.UnexpectedTermInUnaryNegate,
+            .negate => if (value == .bool) .{ .bool = !value.bool } else return error.UnexpectedTermInUnaryNegate,
             .parens => value,
             else => error.UnexpectedUnaryTermCombination,
         };
@@ -200,4 +204,36 @@ test {
     try testing.expectEqual(@as(Term, .{ .bool = true }), try Binary.prefix.evaluate(s, prefix, symbols));
     try testing.expectEqual(@as(Term, .{ .bool = true }), try Binary.suffix.evaluate(s, suffix, symbols));
     try testing.expectEqual(@as(Term, .{ .bool = true }), try Binary.contains.evaluate(s, middle, symbols));
+}
+
+test "negate" {
+    const testing = std.testing;
+
+    var symbols = SymbolTable.init(testing.allocator);
+    defer symbols.deinit();
+
+    _ = try symbols.insert("test1");
+    _ = try symbols.insert("test2");
+    _ = try symbols.insert("var1");
+    // var tmp_symbols = TemporarySymbolTable.init(testing.allocator, &symbols);
+
+    var ops = [_]Op{
+        .{ .value = .{ .integer = 1 } },
+        .{ .value = .{ .variable = 2 } },
+        .{ .binary = .less_than },
+        .{ .unary = .parens },
+        .{ .unary = .negate },
+    };
+
+    var values = std.AutoHashMap(u32, Term).init(testing.allocator);
+    defer values.deinit();
+
+    try values.put(2, .{ .integer = 0 });
+
+    const expr: Expression = .{ .ops = ops[0..] };
+
+    // FIXME: tmp_symbols
+    const res = try expr.evaluate(testing.allocator, values, symbols);
+
+    try testing.expectEqual(@as(Term, .{ .bool = true }), res);
 }
