@@ -115,14 +115,14 @@ const Binary = enum {
             return switch (self) {
                 .equal => .{ .bool = left.set.eql(right.set) },
                 .not_equal => .{ .bool = !left.set.eql(right.set) },
-                .intersection => .{ .set = left.set.intersection(right.set) },
-                .@"union" => .{ .set = left.set.@"union"(right.set) },
-                .contains => .{ .set = left.set.isSuperset(right.set) },
+                .intersection => .{ .set = try left.set.intersection(right.set) },
+                .@"union" => .{ .set = try left.set.@"union"(right.set) },
+                .contains => .{ .bool = left.set.isSuperset(right.set) },
                 else => return error.UnexpectedOperationForSetSetOperands,
             };
         } else if (left == .set) {
             return switch (self) {
-                .contains => .{ .set = left.set.contains(right) },
+                .contains => .{ .bool = left.set.contains(right) },
                 else => return error.UnexpectedOperationForSetTermOperands,
             };
         } else if (left == .bool and right == .bool) {
