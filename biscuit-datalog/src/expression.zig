@@ -3,7 +3,39 @@ const mem = std.mem;
 const Term = @import("term.zig").Term;
 const SymbolTable = @import("symbol_table.zig").SymbolTable;
 
-const Expression = []Op;
+const Expression = struct {
+    ops: []Op,
+
+    pub fn evaluate(expr: Expression, allocator: mem.Allocator, values: std.AutoHashMap(u32, Term), symbols: SymbolTable) !Term {
+        var stack = std.ArrayList(Term).init(allocator);
+        defer stack.deinit();
+
+        for (expr.ops) |op| {
+            switch (op) {
+                .value => |term| {
+                    switch (term) {
+                        .variable => |i| {
+                            const value = values.get(i) orelse return error.UnknownVariable;
+                            try stack.append(value);
+                        },
+                        else => try stack.append(term),
+                    }
+                },
+                .unary => |unary_op| {
+                    const operand = stack.popOrNull() orelse return error.StackUnderflow;
+
+                    try stack.push(unary_op.evaluate(operand, symbols));
+                },
+                .binary => |binary_op| {
+                    const right = stack.popOrNull() orelse return error.StackUnderflow;
+                    const left = stack.popOrNull() orelse return error.StackUnderflow;
+
+                    try stack.append(binary_op.evaluate(left, right, symbols));
+                },
+            }
+        }
+    }
+};
 
 const OpKind = enum(u8) {
     value,
