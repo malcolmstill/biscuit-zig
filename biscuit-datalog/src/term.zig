@@ -24,8 +24,8 @@ pub const Term = union(TermKind) {
     bytes: []const u8,
     set: Set(Term),
 
-    pub fn fromSchema(term: schema.TermV2) !Term {
-        const content = term.Content orelse return error.TermExpectedContent;
+    pub fn fromSchema(schema_term: schema.TermV2) !Term {
+        const content = schema_term.Content orelse return error.TermExpectedContent;
 
         return switch (content) {
             .variable => |v| .{ .variable = v },
@@ -48,17 +48,17 @@ pub const Term = union(TermKind) {
         };
     }
 
-    pub fn eql(self: Term, term: Term) bool {
-        if (std.meta.activeTag(self) != std.meta.activeTag(term)) return false;
+    pub fn eql(term: Term, other_term: Term) bool {
+        if (std.meta.activeTag(term) != std.meta.activeTag(other_term)) return false;
 
-        return switch (self) {
-            .variable => |v| v == term.variable, // are variables always eql? eql if the symbol is the same? not eql?
-            .integer => |v| v == term.integer,
-            .string => |v| v == term.string,
-            .bool => |v| v == term.bool,
-            .date => |v| v == term.date,
-            .bytes => |v| mem.eql(u8, v, term.bytes),
-            .set => |v| v.eql(term.set),
+        return switch (term) {
+            .variable => |v| v == other_term.variable, // are variables always eql? eql if the symbol is the same? not eql?
+            .integer => |v| v == other_term.integer,
+            .string => |v| v == other_term.string,
+            .bool => |v| v == other_term.bool,
+            .date => |v| v == other_term.date,
+            .bytes => |v| mem.eql(u8, v, other_term.bytes),
+            .set => |v| v.eql(other_term.set),
         };
     }
 
@@ -66,28 +66,28 @@ pub const Term = union(TermKind) {
     ///
     /// Note that this function isn't called `eql` because it isn't a pure equality test.
     /// We test for equality for most term types, but for variable terms we _always_ match.
-    pub fn match(self: Term, term: Term) bool {
+    pub fn match(term: Term, other_term: Term) bool {
         // If either term is a variable, we match
-        if (self == .variable) return true;
         if (term == .variable) return true;
+        if (other_term == .variable) return true;
 
         // Otherwise we need variables of the same type
-        if (std.meta.activeTag(self) != std.meta.activeTag(term)) return false;
+        if (std.meta.activeTag(term) != std.meta.activeTag(other_term)) return false;
 
         // ...and the values need to match
-        return switch (self) {
+        return switch (term) {
             .variable => unreachable,
-            .integer => |v| v == term.integer,
-            .string => |v| v == term.string,
-            .bool => |v| v == term.bool,
-            .date => |v| v == term.date,
-            .bytes => |v| mem.eql(u8, v, term.bytes),
-            .set => |v| v.eql(term.set),
+            .integer => |v| v == other_term.integer,
+            .string => |v| v == other_term.string,
+            .bool => |v| v == other_term.bool,
+            .date => |v| v == other_term.date,
+            .bytes => |v| mem.eql(u8, v, other_term.bytes),
+            .set => |v| v.eql(other_term.set),
         };
     }
 
-    pub fn format(self: Term, comptime _: []const u8, _: std.fmt.FormatOptions, writer: anytype) std.os.WriteError!void {
-        return switch (self) {
+    pub fn format(term: Term, comptime _: []const u8, _: std.fmt.FormatOptions, writer: anytype) std.os.WriteError!void {
+        return switch (term) {
             .variable => |v| writer.print("$sym:{any}", .{v}),
             .integer => |v| writer.print("{any}", .{v}),
             .string => |v| writer.print("\"sym:{any}\"", .{v}),
@@ -98,8 +98,8 @@ pub const Term = union(TermKind) {
         };
     }
 
-    pub fn deinit(self: *Term) void {
-        _ = self;
+    pub fn deinit(term: *Term) void {
+        _ = term;
     }
 
     pub fn hash(term: Term, hasher: anytype) void {
