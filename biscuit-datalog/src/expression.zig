@@ -62,10 +62,10 @@ const Unary = enum {
     parens,
     length,
 
-    pub fn evaluate(self: Unary, value: Term, symbols: SymbolTable) !Term {
+    pub fn evaluate(expr: Unary, value: Term, symbols: SymbolTable) !Term {
         _ = symbols; // Different type instead of SymbolTable
         //
-        return switch (self) {
+        return switch (expr) {
             .negate => if (value == .bool) .{ .bool = !value.bool } else return error.UnexpectedTermInUnaryNegate,
             .parens => value,
             else => error.UnexpectedUnaryTermCombination,
@@ -96,13 +96,13 @@ const Binary = enum {
     bitwise_xor,
     not_equal,
 
-    pub fn evaluate(self: Binary, left: Term, right: Term, symbols: SymbolTable) !Term {
+    pub fn evaluate(expr: Binary, left: Term, right: Term, symbols: SymbolTable) !Term {
         // Integer operands
         if (left == .integer and right == .integer) {
             const i = left.integer;
             const j = right.integer;
 
-            return switch (self) {
+            return switch (expr) {
                 .less_than => .{ .bool = i < j },
                 .greater_than => .{ .bool = i > j },
                 .less_or_equal => .{ .bool = i <= j },
@@ -122,7 +122,7 @@ const Binary = enum {
             const sl = try symbols.getString(left.string);
             const sr = try symbols.getString(right.string);
 
-            return switch (self) {
+            return switch (expr) {
                 .prefix => .{ .bool = mem.startsWith(u8, sl, sr) },
                 .suffix => .{ .bool = mem.endsWith(u8, sl, sr) },
                 .regex => @panic("unimplemented"),
@@ -136,7 +136,7 @@ const Binary = enum {
             const i = left.date;
             const j = right.date;
 
-            return switch (self) {
+            return switch (expr) {
                 .less_than => .{ .bool = i < j },
                 .greater_than => .{ .bool = i > j },
                 .less_or_equal => .{ .bool = i <= j },
@@ -146,13 +146,13 @@ const Binary = enum {
                 else => return error.UnexpectedOperationForDateOperands,
             };
         } else if (left == .bytes and right == .bytes) {
-            return switch (self) {
+            return switch (expr) {
                 .equal => .{ .bool = left.eql(right) },
                 .not_equal => .{ .bool = !left.eql(right) },
                 else => return error.UnexpectedOperationForBytesOperands,
             };
         } else if (left == .set and right == .set) {
-            return switch (self) {
+            return switch (expr) {
                 .equal => .{ .bool = left.set.eql(right.set) },
                 .not_equal => .{ .bool = !left.set.eql(right.set) },
                 .intersection => .{ .set = try left.set.intersection(right.set) },
@@ -161,7 +161,7 @@ const Binary = enum {
                 else => return error.UnexpectedOperationForSetSetOperands,
             };
         } else if (left == .set) {
-            return switch (self) {
+            return switch (expr) {
                 .contains => .{ .bool = left.set.contains(right) },
                 else => return error.UnexpectedOperationForSetTermOperands,
             };
@@ -169,7 +169,7 @@ const Binary = enum {
             const i = left.bool;
             const j = right.bool;
 
-            return switch (self) {
+            return switch (expr) {
                 .@"and" => .{ .bool = i and j },
                 .@"or" => .{ .bool = i or j },
                 .equal => .{ .bool = i == j },
