@@ -26,7 +26,7 @@ pub fn Set(comptime K: type) type {
             pub fn hash(ctx: Context, key: K) u64 {
                 _ = ctx;
 
-                // We assume here there is a method `pub hash(self: K, hasher: anytype)` on type K.
+                // We assume here there is a method `pub hash(set: K, hasher: anytype)` on type K.
                 var hasher = Wyhash.init(0);
                 key.hash(&hasher);
                 return hasher.final();
@@ -45,24 +45,24 @@ pub fn Set(comptime K: type) type {
             };
         }
 
-        pub fn deinit(self: *Self) void {
-            self.inner.deinit();
+        pub fn deinit(set: *Self) void {
+            set.inner.deinit();
         }
 
-        pub fn iterator(self: Self) InnerSet.KeyIterator {
-            return self.inner.keyIterator();
+        pub fn iterator(set: Self) InnerSet.KeyIterator {
+            return set.inner.keyIterator();
         }
 
-        pub fn add(self: *Self, value: K) !void {
-            try self.inner.put(value, {});
+        pub fn add(set: *Self, value: K) !void {
+            try set.inner.put(value, {});
         }
 
-        pub fn contains(self: Self, value: K) bool {
-            return self.inner.contains(value);
+        pub fn contains(set: Self, value: K) bool {
+            return set.inner.contains(value);
         }
 
-        pub fn count(self: *const Self) u32 {
-            return self.inner.count();
+        pub fn count(set: *const Self) u32 {
+            return set.inner.count();
         }
 
         /// Calculate a hash for the given set.
@@ -97,11 +97,11 @@ pub fn Set(comptime K: type) type {
             return true;
         }
 
-        pub fn format(self: Self, comptime _: []const u8, _: std.fmt.FormatOptions, writer: anytype) std.os.WriteError!void {
+        pub fn format(set: Self, comptime _: []const u8, _: std.fmt.FormatOptions, writer: anytype) std.os.WriteError!void {
             try writer.print("set{{", .{});
-            var it = self.iterator();
+            var it = set.iterator();
 
-            const num_keys = self.count();
+            const num_keys = set.count();
             var i: usize = 0;
 
             while (it.next()) |key| {
