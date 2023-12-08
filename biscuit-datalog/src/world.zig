@@ -43,7 +43,7 @@ pub const World = struct {
     }
 
     pub fn run(self: *World, symbols: SymbolTable) !void {
-        try self.runWithLimits(symbols, RunLimits{});
+        try self.runWithLimits(symbols, .{});
     }
 
     pub fn runWithLimits(self: *World, symbols: SymbolTable, limits: RunLimits) !void {
