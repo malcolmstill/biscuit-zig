@@ -10,8 +10,11 @@ test {
     _ = @import("combinator.zig");
     _ = @import("expression.zig");
     _ = @import("fact.zig");
+    _ = @import("matched_variables.zig");
     _ = @import("predicate.zig");
     _ = @import("rule.zig");
+    _ = @import("run_limits.zig");
+    _ = @import("set.zig");
     _ = @import("symbol_table.zig");
     _ = @import("term.zig");
     _ = @import("world.zig");
