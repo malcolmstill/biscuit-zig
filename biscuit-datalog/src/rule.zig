@@ -25,12 +25,12 @@ pub const Rule = struct {
         return .{ .head = head, .body = body };
     }
 
-    pub fn deinit(self: *Rule) void {
-        self.head.deinit();
-        for (self.body.items) |*predicate| {
+    pub fn deinit(rule: *Rule) void {
+        rule.head.deinit();
+        for (rule.body.items) |*predicate| {
             predicate.deinit();
         }
-        self.body.deinit();
+        rule.body.deinit();
     }
 
     /// ### Generate new facts from this rule and the existing facts
@@ -88,20 +88,20 @@ pub const Rule = struct {
     /// ```
     ///
     /// ...and we add it to the set of facts (the set will take care of deduplication)
-    pub fn apply(self: *Rule, allocator: mem.Allocator, facts: *const Set(Fact), new_facts: *Set(Fact), symbols: SymbolTable) !void {
+    pub fn apply(rule: *Rule, allocator: mem.Allocator, facts: *const Set(Fact), new_facts: *Set(Fact), symbols: SymbolTable) !void {
         var arena = std.heap.ArenaAllocator.init(allocator);
         defer arena.deinit();
 
-        std.debug.print("\n\nrule = {any}\n", .{self});
-        const matched_variables = try MatchedVariables.init(arena.allocator(), self);
+        std.debug.print("\n\nrule = {any}\n", .{rule});
+        const matched_variables = try MatchedVariables.init(arena.allocator(), rule);
 
         // TODO: if body is empty stuff
 
-        var it = try Combinator.init(0, allocator, matched_variables, self.body.items, facts, symbols);
+        var it = try Combinator.init(0, allocator, matched_variables, rule.body.items, facts, symbols);
         defer it.deinit();
 
         blk: while (try it.next()) |*bindings| {
-            var predicate = try self.head.cloneWithAllocator(allocator);
+            var predicate = try rule.head.cloneWithAllocator(allocator);
             defer predicate.deinit();
 
             for (predicate.terms.items, 0..) |head_term, i| {
@@ -126,13 +126,13 @@ pub const Rule = struct {
         }
     }
 
-    pub fn findMatch(self: *Rule, allocator: mem.Allocator, facts: *const Set(Fact), symbols: SymbolTable) !bool {
+    pub fn findMatch(rule: *Rule, allocator: mem.Allocator, facts: *const Set(Fact), symbols: SymbolTable) !bool {
         var arena = std.heap.ArenaAllocator.init(allocator);
         defer arena.deinit();
 
-        const matched_variables = try MatchedVariables.init(arena.allocator(), self);
+        const matched_variables = try MatchedVariables.init(arena.allocator(), rule);
 
-        var it = try Combinator.init(0, allocator, matched_variables, self.body.items, facts, symbols);
+        var it = try Combinator.init(0, allocator, matched_variables, rule.body.items, facts, symbols);
         defer it.deinit();
 
         if (try it.next()) |_| {
@@ -142,11 +142,11 @@ pub const Rule = struct {
         }
     }
 
-    pub fn format(self: Rule, comptime _: []const u8, _: std.fmt.FormatOptions, writer: anytype) std.os.WriteError!void {
-        try writer.print("{any} <- ", .{self.head});
-        for (self.body.items, 0..) |*predicate, i| {
+    pub fn format(rule: Rule, comptime _: []const u8, _: std.fmt.FormatOptions, writer: anytype) std.os.WriteError!void {
+        try writer.print("{any} <- ", .{rule.head});
+        for (rule.body.items, 0..) |*predicate, i| {
             try writer.print("{any}", .{predicate.*});
-            if (i < self.body.items.len - 1) try writer.print(", ", .{});
+            if (i < rule.body.items.len - 1) try writer.print(", ", .{});
         }
     }
 };
