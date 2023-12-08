@@ -127,14 +127,17 @@ pub fn build(b: *std.Build) void {
     });
     const run_schema_tests = b.addRunArtifact(schema_tests);
 
-    const sample_tests = b.addTest(.{
+    const testsuite_tests = b.addTest(.{
         .root_source_file = .{ .path = "biscuit-samples/src/main.zig" },
         .target = target,
         .optimize = optimize,
     });
-    sample_tests.addModule("biscuit-format", format_module);
-    sample_tests.addModule("biscuit", biscuit_module);
-    const run_sample_tests = b.addRunArtifact(sample_tests);
+    testsuite_tests.addModule("biscuit-format", format_module);
+    testsuite_tests.addModule("biscuit", biscuit_module);
+    const run_testsuite_tests = b.addRunArtifact(testsuite_tests);
+
+    const testsuite_step = b.step("testsuite", "Run all the testsuite tests");
+    testsuite_step.dependOn(&run_testsuite_tests.step);
 
     // This creates a build step. It will be visible in the `zig build --help` menu,
     // and can be selected like this: `zig build test`
@@ -144,5 +147,5 @@ pub fn build(b: *std.Build) void {
     test_step.dependOn(&run_datalog_tests.step);
     test_step.dependOn(&run_format_tests.step);
     test_step.dependOn(&run_schema_tests.step);
-    test_step.dependOn(&run_sample_tests.step);
+    test_step.dependOn(testsuite_step);
 }
