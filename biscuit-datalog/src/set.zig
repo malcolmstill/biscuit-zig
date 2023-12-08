@@ -176,7 +176,7 @@ test {
     try s.add(Fact{ .predicate = Predicate{ .name = 10, .terms = undefined } });
     try testing.expectEqual(@as(u32, 2), s.count());
 
-    std.log.debug("set = {any}\n", .{s});
+    std.debug.print("set = {any}\n", .{s});
 }
 
 test "hashing" {

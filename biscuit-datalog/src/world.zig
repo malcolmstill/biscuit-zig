@@ -47,7 +47,7 @@ pub const World = struct {
     }
 
     pub fn runWithLimits(world: *World, symbols: SymbolTable, limits: RunLimits) !void {
-        std.log.debug("runWithLimits\n", .{});
+        std.debug.print("runWithLimits\n", .{});
         for (0..limits.max_iterations) |_| {
             const starting_fact_count = world.facts.count();
 
@@ -68,10 +68,10 @@ pub const World = struct {
                 try world.facts.add(try fact.cloneWithAllocator(world.allocator));
             }
 
-            std.log.debug("starting_fact_count = {}, world.facts.count() = {}\n", .{ starting_fact_count, world.facts.count() });
+            std.debug.print("starting_fact_count = {}, world.facts.count() = {}\n", .{ starting_fact_count, world.facts.count() });
             // If we haven't generated any new facts, we're done.
             if (starting_fact_count == world.facts.count()) {
-                std.log.debug("No new facts!\n", .{});
+                std.debug.print("No new facts!\n", .{});
                 return;
             }
 
@@ -82,12 +82,12 @@ pub const World = struct {
     }
 
     pub fn addFact(world: *World, fact: Fact) !void {
-        std.log.debug("world: adding fact = {any}\n", .{fact});
+        std.debug.print("world: adding fact = {any}\n", .{fact});
         try world.facts.add(fact);
     }
 
     pub fn addRule(world: *World, rule: Rule) !void {
-        std.log.debug("world: adding rule = {any}\n", .{rule});
+        std.debug.print("world: adding rule = {any}\n", .{rule});
         try world.rules.append(rule);
     }
 

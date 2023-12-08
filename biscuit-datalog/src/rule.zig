@@ -92,7 +92,7 @@ pub const Rule = struct {
         var arena = std.heap.ArenaAllocator.init(allocator);
         defer arena.deinit();
 
-        std.log.debug("\n\nrule = {any}\n", .{rule});
+        std.debug.print("\n\nrule = {any}\n", .{rule});
         const matched_variables = try MatchedVariables.init(arena.allocator(), rule);
 
         // TODO: if body is empty stuff
@@ -113,7 +113,7 @@ pub const Rule = struct {
             }
 
             const fact = Fact.init(predicate);
-            std.log.debug("adding new fact = {any}\n", .{fact});
+            std.debug.print("adding new fact = {any}\n", .{fact});
 
             // Skip adding fact if we already have generated it. Because the
             // Set will clobber duplicate facts we'll lose a reference when
