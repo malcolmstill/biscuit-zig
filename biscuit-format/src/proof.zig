@@ -11,8 +11,8 @@ pub const Proof = union(ProofKind) {
     next_secret: Ed25519.SecretKey,
     final_signature: Ed25519.Signature,
 
-    pub fn fromDecodedProof(proof: schema.Proof) !Proof {
-        const content = proof.Content orelse return error.ExpectedProofContent;
+    pub fn fromDecodedProof(schema_proof: schema.Proof) !Proof {
+        const content = schema_proof.Content orelse return error.ExpectedProofContent;
 
         switch (content) {
             .nextSecret => |s| {

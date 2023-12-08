@@ -62,18 +62,18 @@ pub const Block = struct {
         return block;
     }
 
-    pub fn deinit(self: *Block) void {
-        for (self.checks.items) |*check| check.deinit();
-        for (self.rules.items) |*rule| rule.deinit();
-        for (self.facts.items) |*fact| fact.deinit();
+    pub fn deinit(block: *Block) void {
+        for (block.checks.items) |*check| check.deinit();
+        for (block.rules.items) |*rule| rule.deinit();
+        for (block.facts.items) |*fact| fact.deinit();
 
-        self.checks.deinit();
-        self.rules.deinit();
-        self.facts.deinit();
-        self.symbols.deinit();
+        block.checks.deinit();
+        block.rules.deinit();
+        block.facts.deinit();
+        block.symbols.deinit();
 
-        if (self.decoded_block) |block| {
-            block.deinit();
+        if (block.decoded_block) |decoded_block| {
+            decoded_block.deinit();
         }
     }
 };

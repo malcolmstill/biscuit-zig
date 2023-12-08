@@ -31,17 +31,17 @@ pub const Biscuit = struct {
         };
     }
 
-    pub fn deinit(self: *Biscuit) void {
-        for (self.blocks.items) |*block| {
+    pub fn deinit(biscuit: *Biscuit) void {
+        for (biscuit.blocks.items) |*block| {
             block.deinit();
         }
-        self.blocks.deinit();
-        self.authority.deinit();
-        self.serialized.deinit();
+        biscuit.blocks.deinit();
+        biscuit.authority.deinit();
+        biscuit.serialized.deinit();
     }
 
-    pub fn authorizer(self: *Biscuit, allocator: std.mem.Allocator) Authorizer {
-        return Authorizer.init(allocator, self.*);
+    pub fn authorizer(biscuit: *Biscuit, allocator: std.mem.Allocator) Authorizer {
+        return Authorizer.init(allocator, biscuit.*);
     }
 };
 

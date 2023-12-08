@@ -20,9 +20,9 @@ pub const Authorizer = struct {
         };
     }
 
-    pub fn deinit(self: *Authorizer) void {
-        self.world.deinit();
-        self.symbols.deinit();
+    pub fn deinit(authorizer: *Authorizer) void {
+        authorizer.world.deinit();
+        authorizer.symbols.deinit();
     }
 
     /// authorize
@@ -38,8 +38,8 @@ pub const Authorizer = struct {
     /// - Loop over the policies _of the authorizer_ (we won't have policies anywhere else)
     /// - Finally, again if we have a biscuit, loop over all of the biscuits non-authority
     ///   blocks and apply the checks therein.
-    pub fn authorize(self: *Authorizer) !void {
-        var errors = std.ArrayList(AuthorizerError).init(self.allocator);
+    pub fn authorize(authorizer: *Authorizer) !void {
+        var errors = std.ArrayList(AuthorizerError).init(authorizer.allocator);
         defer errors.deinit();
 
         std.debug.print("authorizing biscuit:\n", .{});
@@ -49,33 +49,33 @@ pub const Authorizer = struct {
         //
         // For example, the token may have a string "user123" which has id 12. But
         // when mapped into the world it may have id 5.
-        if (self.biscuit) |biscuit| {
+        if (authorizer.biscuit) |biscuit| {
             var b: Biscuit = biscuit;
 
             for (b.authority.facts.items) |fact| {
-                try self.world.addFact(try fact.convert(&b.authority.symbols, &self.symbols));
+                try authorizer.world.addFact(try fact.convert(&b.authority.symbols, &authorizer.symbols));
             }
 
             for (b.authority.rules.items) |rule| {
                 // FIXME: remap rule
-                try self.world.addRule(rule);
+                try authorizer.world.addRule(rule);
             }
         }
 
-        try self.world.run(self.symbols);
+        try authorizer.world.run(authorizer.symbols);
         // TODO: clear rules
 
         // TODO: Run checks that have been added to this authorizer
 
         // Run checks in the biscuit
-        if (self.biscuit) |biscuit| {
+        if (authorizer.biscuit) |biscuit| {
             const b: Biscuit = biscuit;
 
             for (b.authority.checks.items) |check| {
                 std.debug.print("{any}\n", .{check});
 
                 for (check.queries.items) |*query| {
-                    const is_match = try self.world.queryMatch(query, self.symbols);
+                    const is_match = try authorizer.world.queryMatch(query, authorizer.symbols);
 
                     if (!is_match) try errors.append(.{ .failed_check = 0 });
                     std.debug.print("match {any} = {}\n", .{ query, is_match });
