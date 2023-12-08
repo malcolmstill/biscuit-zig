@@ -31,9 +31,7 @@ const Validation = struct {
 
 const Result = union(enum) {
     Ok: usize,
-    Err: Err,
-
-    const Err = union(enum) {
+    Err: union(enum) {
         Format: union(enum) {
             InvalidSignatureSize: usize,
             Signature: union(enum) {
@@ -60,7 +58,7 @@ const Result = union(enum) {
             InvalidBlockRule: struct { usize, []const u8 },
         },
         Execution: []const u8,
-    };
+    },
 };
 
 const World = struct {
@@ -86,11 +84,7 @@ test "samples" {
     const dynamic_tree = try std.json.parseFromSliceLeaky(std.json.Value, alloc, json_string, .{});
     const r = try std.json.parseFromValueLeaky(Samples, alloc, dynamic_tree, .{});
 
-    std.debug.print("sk = {s}\n", .{r.root_private_key});
-    std.debug.print("pk = {s}\n", .{r.root_public_key});
-    for (r.testcases, 0..) |testcase, i| {
-        std.debug.print("testcase[{}] = {any}\n", .{ i, testcase });
-    }
+    std.debug.print("tests = {any}\n", .{std.json.fmt(r, .{ .whitespace = .indent_2 })});
 
     // const tokens: [1][]const u8 = .{
     //     // Token with check (in authority block) that should pass and a check (in the authority block) that should fail
