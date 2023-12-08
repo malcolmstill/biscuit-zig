@@ -151,5 +151,5 @@ test {
     try testing.expect(!p1.match(p4));
     try testing.expect(p1.match(p5));
 
-    std.debug.print("predicate = {any}\n", .{p1});
+    std.log.debug("predicate = {any}\n", .{p1});
 }

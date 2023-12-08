@@ -42,7 +42,7 @@ pub const Authorizer = struct {
         var errors = std.ArrayList(AuthorizerError).init(authorizer.allocator);
         defer errors.deinit();
 
-        std.debug.print("authorizing biscuit:\n", .{});
+        std.log.debug("authorizing biscuit:\n", .{});
         // Load facts and rules from authority block into world. Our block's facts
         // will have a particular symbol table that we map into the symvol table
         // of the world.
@@ -68,13 +68,13 @@ pub const Authorizer = struct {
         // Run checks in the biscuit
         if (authorizer.biscuit) |biscuit| {
             for (biscuit.authority.checks.items) |check| {
-                std.debug.print("{any}\n", .{check});
+                std.log.debug("{any}\n", .{check});
 
                 for (check.queries.items) |*query| {
                     const is_match = try authorizer.world.queryMatch(query, authorizer.symbols);
 
                     if (!is_match) try errors.append(.{ .failed_check = 0 });
-                    std.debug.print("match {any} = {}\n", .{ query, is_match });
+                    std.log.debug("match {any} = {}\n", .{ query, is_match });
                 }
             }
         }

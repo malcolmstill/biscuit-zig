@@ -59,7 +59,7 @@ pub const Combinator = struct {
     symbols: SymbolTable,
 
     pub fn init(id: usize, allocator: mem.Allocator, variables: MatchedVariables, predicates: []Predicate, all_facts: *const Set(Fact), symbols: SymbolTable) !*Combinator {
-        std.debug.print("Init combinator[{}]: predicates = {any}\n", .{ id, predicates });
+        std.log.debug("Init combinator[{}]: predicates = {any}\n", .{ id, predicates });
         const c = try allocator.create(Combinator);
 
         c.* = .{
@@ -97,7 +97,7 @@ pub const Combinator = struct {
             const fact = combinator.fact_iterator.next() orelse return null;
             // Only consider facts that match the current predicate
             if (!fact.matchPredicate(combinator.predicates[0])) continue;
-            std.debug.print("combinator[{}]: fact = {any}\n", .{ combinator.id, fact });
+            std.log.debug("combinator[{}]: fact = {any}\n", .{ combinator.id, fact });
 
             var vars: MatchedVariables = try combinator.variables.clone();
 
@@ -116,7 +116,7 @@ pub const Combinator = struct {
                 }
             }
 
-            // std.debug.print("len = {}\n", .{combinator.predicates[1..].len});
+            // std.log.debug("len = {}\n", .{combinator.predicates[1..].len});
             const next_predicates = combinator.predicates[1..];
             if (next_predicates.len == 0) {
                 return vars;

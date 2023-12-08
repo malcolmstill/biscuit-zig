@@ -13,7 +13,7 @@ pub const Biscuit = struct {
     symbols: std.ArrayList([]const u8),
 
     pub fn initFromBytes(allocator: mem.Allocator, bytes: []const u8, public_key: Ed25519.PublicKey) !Biscuit {
-        std.debug.print("\ninitialising biscuit:\n", .{});
+        std.log.debug("\ninitialising biscuit:\n", .{});
         const serialized = try SerializedBiscuit.initFromBytes(allocator, bytes, public_key);
 
         const authority = try Block.initFromBytes(allocator, serialized.authority.block);
