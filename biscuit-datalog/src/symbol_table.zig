@@ -12,34 +12,34 @@ pub const SymbolTable = struct {
         };
     }
 
-    pub fn deinit(self: *SymbolTable) void {
-        for (self.symbols.items) |symbol| {
-            self.allocator.free(symbol);
+    pub fn deinit(symbol_table: *SymbolTable) void {
+        for (symbol_table.symbols.items) |symbol| {
+            symbol_table.allocator.free(symbol);
         }
-        self.symbols.deinit();
+        symbol_table.symbols.deinit();
     }
 
-    pub fn insert(self: *SymbolTable, symbol: []const u8) !u64 {
+    pub fn insert(symbol_table: *SymbolTable, symbol: []const u8) !u64 {
         // If we find the symbol already in the table we can just return the index
-        if (self.get(symbol)) |sym| {
+        if (symbol_table.get(symbol)) |sym| {
             return sym;
         }
 
-        const string = try self.allocator.alloc(u8, symbol.len);
+        const string = try symbol_table.allocator.alloc(u8, symbol.len);
         @memcpy(string, symbol);
 
         // Otherwise we need to insert the new symbol
-        try self.symbols.append(string);
+        try symbol_table.symbols.append(string);
 
-        return self.symbols.items.len - 1 + NON_DEFAULT_SYMBOLS_OFFSET;
+        return symbol_table.symbols.items.len - 1 + NON_DEFAULT_SYMBOLS_OFFSET;
     }
 
-    pub fn get(self: *SymbolTable, symbol: []const u8) ?u64 {
+    pub fn get(symbol_table: *SymbolTable, symbol: []const u8) ?u64 {
         if (default_symbols.get(symbol)) |index| {
             return index;
         }
 
-        for (self.symbols.items, 0..) |sym, i| {
+        for (symbol_table.symbols.items, 0..) |sym, i| {
             if (!mem.eql(u8, symbol, sym)) continue;
 
             return i + NON_DEFAULT_SYMBOLS_OFFSET;
@@ -48,13 +48,13 @@ pub const SymbolTable = struct {
         return null;
     }
 
-    pub fn getString(self: *const SymbolTable, sym_index: u64) ![]const u8 {
+    pub fn getString(symbol_table: *const SymbolTable, sym_index: u64) ![]const u8 {
         if (indexToDefault(sym_index)) |str| {
             return str;
         }
 
-        if (sym_index >= NON_DEFAULT_SYMBOLS_OFFSET and sym_index < NON_DEFAULT_SYMBOLS_OFFSET + self.symbols.items.len) {
-            return self.symbols.items[sym_index - NON_DEFAULT_SYMBOLS_OFFSET];
+        if (sym_index >= NON_DEFAULT_SYMBOLS_OFFSET and sym_index < NON_DEFAULT_SYMBOLS_OFFSET + symbol_table.symbols.items.len) {
+            return symbol_table.symbols.items[sym_index - NON_DEFAULT_SYMBOLS_OFFSET];
         }
 
         return error.SymbolNotFound;
