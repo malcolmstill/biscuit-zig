@@ -32,66 +32,66 @@ pub const World = struct {
         };
     }
 
-    pub fn deinit(self: *World) void {
-        var it = self.facts.iterator();
+    pub fn deinit(world: *World) void {
+        var it = world.facts.iterator();
         while (it.next()) |fact| {
             fact.deinit();
         }
-        self.symbols.deinit();
-        self.rules.deinit();
-        self.facts.deinit();
+        world.symbols.deinit();
+        world.rules.deinit();
+        world.facts.deinit();
     }
 
-    pub fn run(self: *World, symbols: SymbolTable) !void {
-        try self.runWithLimits(symbols, .{});
+    pub fn run(world: *World, symbols: SymbolTable) !void {
+        try world.runWithLimits(symbols, .{});
     }
 
-    pub fn runWithLimits(self: *World, symbols: SymbolTable, limits: RunLimits) !void {
+    pub fn runWithLimits(world: *World, symbols: SymbolTable, limits: RunLimits) !void {
         std.debug.print("runWithLimits\n", .{});
         for (0..limits.max_iterations) |_| {
-            const starting_fact_count = self.facts.count();
+            const starting_fact_count = world.facts.count();
 
-            var new_facts = Set(Fact).init(self.allocator);
+            var new_facts = Set(Fact).init(world.allocator);
             defer {
                 var it = new_facts.iterator();
                 while (it.next()) |fact| fact.deinit();
                 new_facts.deinit();
             }
 
-            for (self.rules.items) |*rule| {
-                try rule.apply(self.allocator, &self.facts, &new_facts, symbols);
+            for (world.rules.items) |*rule| {
+                try rule.apply(world.allocator, &world.facts, &new_facts, symbols);
             }
 
             var it = new_facts.iterator();
             while (it.next()) |fact| {
-                if (self.facts.contains(fact.*)) continue;
-                try self.facts.add(try fact.cloneWithAllocator(self.allocator));
+                if (world.facts.contains(fact.*)) continue;
+                try world.facts.add(try fact.cloneWithAllocator(world.allocator));
             }
 
-            std.debug.print("starting_fact_count = {}, self.facts.count() = {}\n", .{ starting_fact_count, self.facts.count() });
+            std.debug.print("starting_fact_count = {}, world.facts.count() = {}\n", .{ starting_fact_count, world.facts.count() });
             // If we haven't generated any new facts, we're done.
-            if (starting_fact_count == self.facts.count()) {
+            if (starting_fact_count == world.facts.count()) {
                 std.debug.print("No new facts!\n", .{});
                 return;
             }
 
-            if (self.facts.count() > limits.max_facts) return error.TooManyFacts;
+            if (world.facts.count() > limits.max_facts) return error.TooManyFacts;
         }
 
         return error.TooManyIterations;
     }
 
-    pub fn addFact(self: *World, fact: Fact) !void {
+    pub fn addFact(world: *World, fact: Fact) !void {
         std.debug.print("world: adding fact = {any}\n", .{fact});
-        try self.facts.add(fact);
+        try world.facts.add(fact);
     }
 
-    pub fn addRule(self: *World, rule: Rule) !void {
+    pub fn addRule(world: *World, rule: Rule) !void {
         std.debug.print("world: adding rule = {any}\n", .{rule});
-        try self.rules.append(rule);
+        try world.rules.append(rule);
     }
 
-    pub fn queryMatch(self: *World, rule: *Rule, symbols: SymbolTable) !bool {
-        return rule.findMatch(self.allocator, &self.facts, symbols);
+    pub fn queryMatch(world: *World, rule: *Rule, symbols: SymbolTable) !bool {
+        return rule.findMatch(world.allocator, &world.facts, symbols);
     }
 };
