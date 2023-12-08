@@ -50,13 +50,11 @@ pub const Authorizer = struct {
         // For example, the token may have a string "user123" which has id 12. But
         // when mapped into the world it may have id 5.
         if (authorizer.biscuit) |biscuit| {
-            var b: Biscuit = biscuit;
-
-            for (b.authority.facts.items) |fact| {
-                try authorizer.world.addFact(try fact.convert(&b.authority.symbols, &authorizer.symbols));
+            for (biscuit.authority.facts.items) |fact| {
+                try authorizer.world.addFact(try fact.convert(&biscuit.authority.symbols, &authorizer.symbols));
             }
 
-            for (b.authority.rules.items) |rule| {
+            for (biscuit.authority.rules.items) |rule| {
                 // FIXME: remap rule
                 try authorizer.world.addRule(rule);
             }
@@ -69,9 +67,7 @@ pub const Authorizer = struct {
 
         // Run checks in the biscuit
         if (authorizer.biscuit) |biscuit| {
-            const b: Biscuit = biscuit;
-
-            for (b.authority.checks.items) |check| {
+            for (biscuit.authority.checks.items) |check| {
                 std.debug.print("{any}\n", .{check});
 
                 for (check.queries.items) |*query| {
