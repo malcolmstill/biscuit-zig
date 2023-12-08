@@ -64,6 +64,25 @@ pub fn build(b: *std.Build) void {
         },
     });
 
+    // Define our datalog module
+    const biscuit_module = b.createModule(.{
+        .source_file = .{ .path = "biscuit/src/main.zig" },
+        .dependencies = &.{
+            .{
+                .name = "biscuit-format",
+                .module = format_module,
+            },
+            .{
+                .name = "biscuit-schema",
+                .module = schema_module,
+            },
+            .{
+                .name = "biscuit-datalog",
+                .module = datalog_module,
+            },
+        },
+    });
+
     // Add modules to root
     // lib.addModule("biscuit-format", format_module);
     // lib.addModule("biscuit-datalog", datalog_module);
@@ -108,6 +127,15 @@ pub fn build(b: *std.Build) void {
     });
     const run_schema_tests = b.addRunArtifact(schema_tests);
 
+    const sample_tests = b.addTest(.{
+        .root_source_file = .{ .path = "biscuit-samples/src/main.zig" },
+        .target = target,
+        .optimize = optimize,
+    });
+    sample_tests.addModule("biscuit-format", format_module);
+    sample_tests.addModule("biscuit", biscuit_module);
+    const run_sample_tests = b.addRunArtifact(sample_tests);
+
     // This creates a build step. It will be visible in the `zig build --help` menu,
     // and can be selected like this: `zig build test`
     // This will evaluate the `test` step rather than the default, which is "install".
@@ -116,4 +144,5 @@ pub fn build(b: *std.Build) void {
     test_step.dependOn(&run_datalog_tests.step);
     test_step.dependOn(&run_format_tests.step);
     test_step.dependOn(&run_schema_tests.step);
+    test_step.dependOn(&run_sample_tests.step);
 }
