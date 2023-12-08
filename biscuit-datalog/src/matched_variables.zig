@@ -31,11 +31,11 @@ const Term = @import("term.zig").Term;
 pub const MatchedVariables = struct {
     variables: std.AutoHashMap(u64, ?Term),
 
-    pub fn init(allocator: mem.Allocator, self: *Rule) !MatchedVariables {
+    pub fn init(allocator: mem.Allocator, rule: *Rule) !MatchedVariables {
         var variables = std.AutoHashMap(u64, ?Term).init(allocator);
 
         // Add all variables in predicates in the rule's body to variable set
-        for (self.body.items) |predicate| {
+        for (rule.body.items) |predicate| {
             for (predicate.terms.items) |term| {
                 switch (term) {
                     .variable => |v| try variables.put(v, null), // Should we check the key doesn't exist?
@@ -47,17 +47,17 @@ pub const MatchedVariables = struct {
         return .{ .variables = variables };
     }
 
-    pub fn deinit(self: *MatchedVariables) void {
-        self.variables.deinit();
+    pub fn deinit(matched_variables: *MatchedVariables) void {
+        matched_variables.variables.deinit();
     }
 
-    pub fn clone(self: *const MatchedVariables) !MatchedVariables {
-        const variables = try self.variables.clone();
+    pub fn clone(matched_variables: *const MatchedVariables) !MatchedVariables {
+        const variables = try matched_variables.variables.clone();
         return .{ .variables = variables };
     }
 
-    pub fn get(self: *const MatchedVariables, key: u64) ?Term {
-        return self.variables.get(key) orelse return null;
+    pub fn get(matched_variables: *const MatchedVariables, key: u64) ?Term {
+        return matched_variables.variables.get(key) orelse return null;
     }
 
     /// Attempt to bind a variable to a term. If we have already bound
@@ -66,8 +66,8 @@ pub const MatchedVariables = struct {
     ///
     /// If the variable is unset we bind to the term unconditionally and
     /// return true.
-    pub fn insert(self: *MatchedVariables, variable: u64, term: Term) !bool {
-        const entry = self.variables.getEntry(variable) orelse return false;
+    pub fn insert(matched_variables: *MatchedVariables, variable: u64, term: Term) !bool {
+        const entry = matched_variables.variables.getEntry(variable) orelse return false;
 
         if (entry.value_ptr.*) |existing_term| {
             // The variable is already set to an existing term.
@@ -77,14 +77,14 @@ pub const MatchedVariables = struct {
         } else {
             // The variable is unset. Bind term to the variable
             // and return true.
-            try self.variables.put(variable, term);
+            try matched_variables.variables.put(variable, term);
             return true;
         }
     }
 
     /// Are all the variables in our map bound?
-    pub fn isComplete(self: *const MatchedVariables) bool {
-        var it = self.variables.valueIterator();
+    pub fn isComplete(matched_variables: *const MatchedVariables) bool {
+        var it = matched_variables.variables.valueIterator();
         while (it.next()) |term| {
             if (term.* == null) return false;
         }
@@ -94,13 +94,13 @@ pub const MatchedVariables = struct {
 
     /// If every variable in MatchedVariables has been assigned a term return a map
     /// from variable -> non-null term, otherwise return null.
-    pub fn complete(self: *const MatchedVariables, allocator: mem.Allocator) !?std.AutoHashMap(u64, Term) {
-        if (!self.isComplete()) return null;
+    pub fn complete(matched_variables: *const MatchedVariables, allocator: mem.Allocator) !?std.AutoHashMap(u64, Term) {
+        if (!matched_variables.isComplete()) return null;
 
         var completed_variables = std.AutoHashMap(u64, Term).init(allocator);
         errdefer completed_variables.deinit();
 
-        var it = self.variables.iterator();
+        var it = matched_variables.variables.iterator();
         while (it.next()) |kv| {
             const key: u64 = kv.key_ptr.*;
             const value: ?Term = kv.value_ptr.*;
