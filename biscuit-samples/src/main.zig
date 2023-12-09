@@ -40,12 +40,43 @@ pub fn main() anyerror!void {
 
         const token = try std.fs.cwd().readFileAlloc(alloc, testcase.filename, 0xFFFFFFF);
 
-        var b = try Biscuit.initFromBytes(alloc, token, public_key);
-        defer b.deinit();
-
-        var a = b.authorizer(alloc);
-        defer a.deinit();
-
-        try a.authorize();
+        for (testcase.validations.map.values()) |validation| {
+            switch (validation.result) {
+                .Ok => try runValidation(alloc, token, public_key),
+                .Err => |e| switch (e) {
+                    .Format => |f| switch (f) {
+                        .InvalidSignatureSize => runValidation(alloc, token, public_key) catch |err| switch (err) {
+                            error.IncorrectBlockSignatureLength => continue,
+                            else => return err,
+                        },
+                        .Signature => |s| switch (s) {
+                            .InvalidSignature => runValidation(alloc, token, public_key) catch |err| switch (err) {
+                                error.SignatureVerificationFailed => continue,
+                                else => return err,
+                            },
+                        },
+                    },
+                    .FailedLogic => |f| switch (f) {
+                        .Unauthorized => runValidation(alloc, token, public_key) catch |err| switch (err) {
+                            else => return err,
+                        },
+                        .InvalidBlockRule => runValidation(alloc, token, public_key) catch |err| switch (err) {
+                            else => return err,
+                        },
+                    },
+                    .Execution => runValidation(alloc, token, public_key) catch |err| switch (err) {
+                        else => return err,
+                    },
+                },
+            }
+        }
     }
+}
+
+pub fn runValidation(alloc: mem.Allocator, token: []const u8, public_key: std.crypto.sign.Ed25519.PublicKey) !void {
+    var b = try Biscuit.initFromBytes(alloc, token, public_key);
+    defer b.deinit();
+
+    var a = b.authorizer(alloc);
+    defer a.deinit();
 }
