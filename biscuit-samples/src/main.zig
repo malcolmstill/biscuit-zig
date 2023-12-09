@@ -3,6 +3,7 @@ const mem = std.mem;
 const decode = @import("biscuit-format").decode;
 const Biscuit = @import("biscuit").Biscuit;
 const Samples = @import("sample.zig").Samples;
+const Result = @import("sample.zig").Result;
 
 var gpa = std.heap.GeneralPurposeAllocator(.{}){};
 
@@ -41,35 +42,45 @@ pub fn main() anyerror!void {
         const token = try std.fs.cwd().readFileAlloc(alloc, testcase.filename, 0xFFFFFFF);
 
         for (testcase.validations.map.values()) |validation| {
-            switch (validation.result) {
-                .Ok => try runValidation(alloc, token, public_key),
-                .Err => |e| switch (e) {
-                    .Format => |f| switch (f) {
-                        .InvalidSignatureSize => runValidation(alloc, token, public_key) catch |err| switch (err) {
-                            error.IncorrectBlockSignatureLength => continue,
+            try validate(alloc, token, public_key, validation.result);
+        }
+    }
+}
+
+pub fn validate(alloc: mem.Allocator, token: []const u8, public_key: std.crypto.sign.Ed25519.PublicKey, result: Result) !void {
+    switch (result) {
+        .Ok => try runValidation(alloc, token, public_key),
+        .Err => |e| {
+            switch (e) {
+                .Format => |f| switch (f) {
+                    .InvalidSignatureSize => runValidation(alloc, token, public_key) catch |err| switch (err) {
+                        error.IncorrectBlockSignatureLength => return,
+                        else => return err,
+                    },
+                    .Signature => |s| switch (s) {
+                        .InvalidSignature => runValidation(alloc, token, public_key) catch |err| switch (err) {
+                            error.SignatureVerificationFailed,
+                            error.InvalidEncoding,
+                            => return,
                             else => return err,
-                        },
-                        .Signature => |s| switch (s) {
-                            .InvalidSignature => runValidation(alloc, token, public_key) catch |err| switch (err) {
-                                error.SignatureVerificationFailed => continue,
-                                else => return err,
-                            },
                         },
                     },
-                    .FailedLogic => |f| switch (f) {
-                        .Unauthorized => runValidation(alloc, token, public_key) catch |err| switch (err) {
-                            else => return err,
-                        },
-                        .InvalidBlockRule => runValidation(alloc, token, public_key) catch |err| switch (err) {
-                            else => return err,
-                        },
+                },
+                .FailedLogic => |f| switch (f) {
+                    .Unauthorized => runValidation(alloc, token, public_key) catch |err| switch (err) {
+                        else => return err,
                     },
-                    .Execution => runValidation(alloc, token, public_key) catch |err| switch (err) {
+                    .InvalidBlockRule => runValidation(alloc, token, public_key) catch |err| switch (err) {
                         else => return err,
                     },
                 },
+                .Execution => runValidation(alloc, token, public_key) catch |err| switch (err) {
+                    else => return err,
+                },
             }
-        }
+
+            return error.ExpectedError;
+        },
     }
 }
 

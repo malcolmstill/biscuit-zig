@@ -27,7 +27,7 @@ const Validation = struct {
     revocation_ids: [][]const u8,
 };
 
-const Result = union(enum) {
+pub const Result = union(enum) {
     Ok: usize,
     Err: union(enum) {
         Format: union(enum) {
