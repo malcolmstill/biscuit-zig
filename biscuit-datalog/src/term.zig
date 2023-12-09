@@ -33,8 +33,8 @@ pub const Term = union(TermKind) {
             .string => |v| .{ .string = v },
             .bool => |v| .{ .bool = v },
             .date => |v| .{ .date = v },
-            .bytes => @panic("Unimplemented"),
-            .set => @panic("Unimplemented"),
+            .bytes => return error.FromSchemaNotImplementedForBytes,
+            .set => return error.FromSchemaNotImplementedForSet,
         };
     }
 
@@ -43,8 +43,8 @@ pub const Term = union(TermKind) {
             .variable => |id| .{ .variable = std.math.cast(u32, try new_symbols.insert(try old_symbols.getString(id))) orelse return error.VariableIdTooLarge },
             .string => |id| .{ .string = try new_symbols.insert(try old_symbols.getString(id)) },
             .integer, .bool, .date => term,
-            .bytes => @panic("bytes unimplemented"),
-            .set => |_| @panic("set unimplemented"),
+            .bytes => return error.ConvertNotImplementedForBytes,
+            .set => |_| return error.ConvertNotImplementedForBytes,
         };
     }
 

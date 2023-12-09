@@ -37,8 +37,6 @@ pub fn main() anyerror!void {
             if (!mem.eql(u8, name, testcase.filename)) continue;
         }
 
-        std.debug.print("test = {any}\n", .{std.json.fmt(testcase, .{ .whitespace = .indent_2 })});
-
         const token = try std.fs.cwd().readFileAlloc(alloc, testcase.filename, 0xFFFFFFF);
 
         for (testcase.validations.map.values()) |validation| {

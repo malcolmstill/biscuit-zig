@@ -125,9 +125,9 @@ const Binary = enum {
             return switch (expr) {
                 .prefix => .{ .bool = mem.startsWith(u8, sl, sr) },
                 .suffix => .{ .bool = mem.endsWith(u8, sl, sr) },
-                .regex => @panic("unimplemented"),
+                .regex => return error.RegexUnimplemented,
                 .contains => .{ .bool = mem.containsAtLeast(u8, sl, 1, sr) },
-                .add => @panic("unimplemented"),
+                .add => return error.StringConcatNotImplemented,
                 .equal => .{ .bool = mem.eql(u8, sl, sr) },
                 .not_equal => .{ .bool = !mem.eql(u8, sl, sr) },
                 else => return error.UnexpectedOperationForStringOperands,
