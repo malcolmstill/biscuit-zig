@@ -11,7 +11,7 @@ pub const Predicate = struct {
     pub fn fromSchema(allocator: mem.Allocator, schema_predicate: schema.PredicateV2) !Predicate {
         var terms = std.ArrayList(Term).init(allocator);
         for (schema_predicate.terms.items) |term| {
-            try terms.append(try Term.fromSchema(term));
+            try terms.append(try Term.fromSchema(allocator, term));
         }
 
         return .{ .name = schema_predicate.name, .terms = terms };

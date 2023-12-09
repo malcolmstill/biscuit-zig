@@ -24,7 +24,7 @@ pub const Term = union(TermKind) {
     bytes: []const u8,
     set: Set(Term),
 
-    pub fn fromSchema(schema_term: schema.TermV2) !Term {
+    pub fn fromSchema(allocator: mem.Allocator, schema_term: schema.TermV2) !Term {
         const content = schema_term.Content orelse return error.TermExpectedContent;
 
         return switch (content) {
@@ -34,7 +34,13 @@ pub const Term = union(TermKind) {
             .bool => |v| .{ .bool = v },
             .date => |v| .{ .date = v },
             .bytes => return error.FromSchemaNotImplementedForBytes,
-            .set => return error.FromSchemaNotImplementedForSet,
+            .set => |v| {
+                var set = Set(Term).init(allocator);
+                for (v.set.items) |term| {
+                    try set.add(try Term.fromSchema(allocator, term));
+                }
+                return .{ .set = set };
+            },
         };
     }
 
