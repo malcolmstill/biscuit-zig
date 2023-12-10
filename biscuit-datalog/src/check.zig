@@ -4,6 +4,9 @@ const Rule = @import("rule.zig").Rule;
 
 pub const Check = struct {
     queries: std.ArrayList(Rule),
+    kind: Kind,
+
+    const Kind = enum(u8) { one, all };
 
     pub fn fromSchema(allocator: std.mem.Allocator, schema_check: schema.CheckV2) !Check {
         var rules = std.ArrayList(Rule).init(allocator);
@@ -11,7 +14,15 @@ pub const Check = struct {
             try rules.append(try Rule.fromSchema(allocator, query));
         }
 
-        return .{ .queries = rules };
+        const schema_check_kind = schema_check.kind orelse return error.CheckExpectedKind;
+
+        const kind: Kind = switch (schema_check_kind) {
+            .One => .one,
+            .All => .all,
+            else => return error.CheckUnknownKind,
+        };
+
+        return .{ .queries = rules, .kind = kind };
     }
 
     pub fn deinit(check: *Check) void {
