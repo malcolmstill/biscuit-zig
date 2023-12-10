@@ -10,16 +10,16 @@ var gpa = std.heap.GeneralPurposeAllocator(.{}){};
 pub fn main() anyerror!void {
     defer _ = gpa.deinit();
 
-    var args = try std.process.argsWithAllocator(gpa.allocator());
-    defer args.deinit();
-    _ = args.skip();
-
-    const testname = args.next();
-
     var arena = std.heap.ArenaAllocator.init(gpa.allocator());
     defer arena.deinit();
 
     const alloc = arena.allocator();
+
+    var args = try std.process.argsWithAllocator(alloc);
+    defer args.deinit();
+    _ = args.skip();
+
+    const testname = args.next();
 
     // 2. Parse json
     const json_string = @embedFile("samples/samples.json");
