@@ -101,6 +101,8 @@ pub const Rule = struct {
         defer it.deinit();
 
         blk: while (try it.next()) |*bindings| {
+            // TODO: Describe why clonedWithAllocator? More generally, describe in comment the overall
+            // lifetimes / memory allocation approach during evaluation.
             var predicate = try rule.head.cloneWithAllocator(allocator);
             defer predicate.deinit();
 
@@ -126,6 +128,11 @@ pub const Rule = struct {
         }
     }
 
+    /// Given a rule (e.g. from a query), return true if we can find at least one set of variable bindings that
+    /// are consistent.
+    ///
+    /// Note: whilst the combinator may return multiple valid matches, `findMatch` only requires a single match
+    /// so stopping on the first `it.next()` that returns not-null is enough.
     pub fn findMatch(rule: *Rule, allocator: mem.Allocator, facts: *const Set(Fact), symbols: SymbolTable) !bool {
         var arena = std.heap.ArenaAllocator.init(allocator);
         defer arena.deinit();
@@ -135,11 +142,7 @@ pub const Rule = struct {
         var it = try Combinator.init(0, allocator, matched_variables, rule.body.items, facts, symbols);
         defer it.deinit();
 
-        if (try it.next()) |_| {
-            return true;
-        } else {
-            return false;
-        }
+        return try it.next() != null;
     }
 
     pub fn format(rule: Rule, comptime _: []const u8, _: std.fmt.FormatOptions, writer: anytype) std.os.WriteError!void {

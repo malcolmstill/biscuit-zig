@@ -81,6 +81,7 @@ pub const Combinator = struct {
         combinator.allocator.destroy(combinator);
     }
 
+    /// next returns the next _valid_ combination of variable bindings
     pub fn next(combinator: *Combinator) !?MatchedVariables {
         blk: while (true) {
             // Return from next combinator until expended
