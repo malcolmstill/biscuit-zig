@@ -9,20 +9,34 @@ const Term = @import("term.zig").Term;
 const SymbolTable = @import("symbol_table.zig").SymbolTable;
 const MatchedVariables = @import("matched_variables.zig").MatchedVariables;
 const Combinator = @import("combinator.zig").Combinator;
+const Scope = @import("scope.zig").Scope;
+const Expression = @import("expression.zig").Expression;
 
 pub const Rule = struct {
     head: Predicate,
     body: std.ArrayList(Predicate),
+    expressions: std.ArrayList(Expression),
+    scopes: std.ArrayList(Scope),
 
-    pub fn fromSchema(allocator: std.mem.Allocator, rule: schema.RuleV2) !Rule {
-        const head = try Predicate.fromSchema(allocator, rule.head orelse return error.NoHeadInRuleSchema);
+    pub fn fromSchema(allocator: std.mem.Allocator, schema_rule: schema.RuleV2) !Rule {
+        const head = try Predicate.fromSchema(allocator, schema_rule.head orelse return error.NoHeadInRuleSchema);
 
         var body = std.ArrayList(Predicate).init(allocator);
-        for (rule.body.items) |predicate| {
+        for (schema_rule.body.items) |predicate| {
             try body.append(try Predicate.fromSchema(allocator, predicate));
         }
 
-        return .{ .head = head, .body = body };
+        var expressions = std.ArrayList(Expression).init(allocator);
+        for (schema_rule.expressions.items) |expression| {
+            try expressions.append(try Expression.fromSchema(allocator, expression));
+        }
+
+        var scopes = std.ArrayList(Scope).init(allocator);
+        for (schema_rule.scope.items) |scope| {
+            try scopes.append(try Scope.fromSchema(scope));
+        }
+
+        return .{ .head = head, .body = body, .expressions = expressions, .scopes = scopes };
     }
 
     pub fn deinit(rule: *Rule) void {
