@@ -14,13 +14,11 @@ pub const Check = struct {
             try rules.append(try Rule.fromSchema(allocator, query));
         }
 
-        const schema_check_kind = schema_check.kind orelse return error.CheckExpectedKind;
-
-        const kind: Kind = switch (schema_check_kind) {
+        const kind: Kind = if (schema_check.kind) |kind| switch (kind) {
             .One => .one,
             .All => .all,
             else => return error.CheckUnknownKind,
-        };
+        } else .one;
 
         return .{ .queries = rules, .kind = kind };
     }

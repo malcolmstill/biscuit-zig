@@ -56,6 +56,10 @@ pub const Expression = struct {
         return .{ .ops = ops };
     }
 
+    pub fn deinit(expression: *Expression) void {
+        expression.ops.deinit();
+    }
+
     pub fn evaluate(expr: Expression, allocator: mem.Allocator, values: std.AutoHashMap(u32, Term), symbols: SymbolTable) !Term {
         var stack = std.ArrayList(Term).init(allocator);
         defer stack.deinit();

@@ -45,6 +45,13 @@ pub const Rule = struct {
             predicate.deinit();
         }
         rule.body.deinit();
+
+        for (rule.expressions.items) |*expression| {
+            expression.deinit();
+        }
+        rule.expressions.deinit();
+
+        rule.scopes.deinit();
     }
 
     /// ### Generate new facts from this rule and the existing facts

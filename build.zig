@@ -105,6 +105,8 @@ pub fn build(b: *std.Build) !void {
     main_tests.addModule("biscuit-datalog", datalog_module);
 
     const run_main_tests = b.addRunArtifact(main_tests);
+    const main_step = b.step("test-biscuit", "Run the biscuit module tests");
+    main_step.dependOn(&run_main_tests.step);
 
     const datalog_tests = b.addTest(.{
         .root_source_file = .{ .path = "biscuit-datalog/src/main.zig" },
