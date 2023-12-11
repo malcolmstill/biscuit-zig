@@ -1,10 +1,60 @@
 const std = @import("std");
 const mem = std.mem;
+const schema = @import("biscuit-schema");
 const Term = @import("term.zig").Term;
 const SymbolTable = @import("symbol_table.zig").SymbolTable;
 
-const Expression = struct {
-    ops: []Op,
+pub const Expression = struct {
+    ops: std.ArrayList(Op),
+
+    pub fn fromSchema(allocator: std.mem.Allocator, schema_expression: schema.ExpressionV2) !Expression {
+        var ops = std.ArrayList(Op).init(allocator);
+
+        for (schema_expression.ops.items) |schema_op| {
+            const schema_op_content = schema_op.Content orelse return error.ExpectedOp;
+            const op: Op = switch (schema_op_content) {
+                .value => |term| .{ .value = try Term.fromSchema(allocator, term) },
+                .unary => |unary_op| .{
+                    .unary = switch (unary_op.kind) {
+                        .Negate => .negate,
+                        .Parens => .parens,
+                        .Length => .length,
+                        else => return error.UnknownSchemaUnaryOp,
+                    },
+                },
+                .Binary => |binary_op| .{
+                    .binary = switch (binary_op.kind) {
+                        .LessThan => .less_than,
+                        .GreaterThan => .greater_than,
+                        .LessOrEqual => .less_or_equal,
+                        .GreaterOrEqual => .greater_or_equal,
+                        .Equal => .equal,
+                        .Contains => .contains,
+                        .Prefix => .prefix,
+                        .Suffix => .suffix,
+                        .Regex => .regex,
+                        .Add => .add,
+                        .Sub => .sub,
+                        .Mul => .mul,
+                        .Div => .div,
+                        .And => .@"and",
+                        .Or => .@"or",
+                        .Intersection => .intersection,
+                        .Union => .@"union",
+                        .BitwiseAnd => .bitwise_and,
+                        .BitwiseOr => .bitwise_or,
+                        .BitwiseXor => .bitwise_xor,
+                        .NotEqual => .not_equal,
+                        else => return error.UnknownSchemaBinaryOp,
+                    },
+                },
+            };
+
+            try ops.append(op);
+        }
+
+        return .{ .ops = ops };
+    }
 
     pub fn evaluate(expr: Expression, allocator: mem.Allocator, values: std.AutoHashMap(u32, Term), symbols: SymbolTable) !Term {
         var stack = std.ArrayList(Term).init(allocator);
