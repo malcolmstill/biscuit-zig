@@ -4,28 +4,37 @@ const Rule = @import("rule.zig").Rule;
 
 pub const Check = struct {
     queries: std.ArrayList(Rule),
+    kind: Kind,
 
-    pub fn fromSchema(allocator: std.mem.Allocator, check: schema.CheckV2) !Check {
+    const Kind = enum(u8) { one, all };
+
+    pub fn fromSchema(allocator: std.mem.Allocator, schema_check: schema.CheckV2) !Check {
         var rules = std.ArrayList(Rule).init(allocator);
-        for (check.queries.items) |query| {
+        for (schema_check.queries.items) |query| {
             try rules.append(try Rule.fromSchema(allocator, query));
         }
 
-        return .{ .queries = rules };
+        const kind: Kind = if (schema_check.kind) |kind| switch (kind) {
+            .One => .one,
+            .All => .all,
+            else => return error.CheckUnknownKind,
+        } else .one;
+
+        return .{ .queries = rules, .kind = kind };
     }
 
-    pub fn deinit(self: *Check) void {
-        for (self.queries.items) |*query| {
+    pub fn deinit(check: *Check) void {
+        for (check.queries.items) |*query| {
             query.deinit();
         }
-        self.queries.deinit();
+        check.queries.deinit();
     }
 
-    pub fn format(self: Check, comptime _: []const u8, _: std.fmt.FormatOptions, writer: anytype) std.os.WriteError!void {
+    pub fn format(check: Check, comptime _: []const u8, _: std.fmt.FormatOptions, writer: anytype) std.os.WriteError!void {
         try writer.print("check if ", .{});
-        for (self.queries.items, 0..) |*query, i| {
+        for (check.queries.items, 0..) |*query, i| {
             try writer.print("{any}", .{query.*});
-            if (i < self.queries.items.len - 1) try writer.print(", ", .{});
+            if (i < check.queries.items.len - 1) try writer.print(", ", .{});
         }
         return writer.print("", .{});
     }

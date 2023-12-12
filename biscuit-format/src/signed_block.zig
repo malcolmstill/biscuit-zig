@@ -8,10 +8,10 @@ pub const SignedBlock = struct {
     signature: Ed25519.Signature,
     public_key: Ed25519.PublicKey,
 
-    pub fn fromDecodedBlock(block: schema.SignedBlock) !SignedBlock {
-        const block_signature = block.signature.getSlice();
+    pub fn fromDecodedBlock(schema_signed_block: schema.SignedBlock) !SignedBlock {
+        const block_signature = schema_signed_block.signature.getSlice();
 
-        const next_key = block.nextKey orelse return error.ExpectedNextKey;
+        const next_key = schema_signed_block.nextKey orelse return error.ExpectedNextKey;
         const algorithm = next_key.algorithm;
         const block_public_key = next_key.key.getSlice();
 
@@ -27,16 +27,16 @@ pub const SignedBlock = struct {
         const public_key = try Ed25519.PublicKey.fromBytes(pubkey_buf);
 
         return .{
-            .block = block.block.getSlice(),
+            .block = schema_signed_block.block.getSlice(),
             .algorithm = algorithm,
             .signature = signature,
             .public_key = public_key,
         };
     }
 
-    pub fn algorithmBuf(self: *SignedBlock) [4]u8 {
+    pub fn algorithmBuf(signed_block: *SignedBlock) [4]u8 {
         var buf: [4]u8 = undefined;
-        std.mem.writeIntNative(u32, buf[0..], @as(u32, @bitCast(@intFromEnum(self.algorithm))));
+        std.mem.writeInt(u32, buf[0..], @as(u32, @bitCast(@intFromEnum(signed_block.algorithm))), @import("builtin").cpu.arch.endian());
         return buf;
     }
 };

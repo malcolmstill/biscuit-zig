@@ -46,9 +46,9 @@ pub const SerializedBiscuit = struct {
         return biscuit;
     }
 
-    pub fn deinit(self: *SerializedBiscuit) void {
-        self.blocks.deinit();
-        self.decoded_biscuit.deinit();
+    pub fn deinit(serialized_block: *SerializedBiscuit) void {
+        serialized_block.blocks.deinit();
+        serialized_block.decoded_biscuit.deinit();
     }
 
     /// Verify the token
@@ -66,24 +66,24 @@ pub const SerializedBiscuit = struct {
     ///    b) If the token is not sealed we check the last block's
     ///       public key is the public key of the private key in the
     ///       the proof.
-    fn verify(self: *SerializedBiscuit, root_public_key: Ed25519.PublicKey) !void {
+    fn verify(serialized_block: *SerializedBiscuit, root_public_key: Ed25519.PublicKey) !void {
         var pk = root_public_key;
 
         // Verify the authority block's signature
         {
-            var verifier = try self.authority.signature.verifier(pk);
+            var verifier = try serialized_block.authority.signature.verifier(pk);
 
-            verifier.update(self.authority.block);
-            verifier.update(&self.authority.algorithmBuf());
-            verifier.update(&self.authority.public_key.bytes);
+            verifier.update(serialized_block.authority.block);
+            verifier.update(&serialized_block.authority.algorithmBuf());
+            verifier.update(&serialized_block.authority.public_key.bytes);
 
             try verifier.verify();
 
-            pk = self.authority.public_key;
+            pk = serialized_block.authority.public_key;
         }
 
         // Verify the other blocks' signatures
-        for (self.blocks.items) |*block| {
+        for (serialized_block.blocks.items) |*block| {
             var verifier = try block.signature.verifier(pk);
 
             verifier.update(block.block);
@@ -96,14 +96,14 @@ pub const SerializedBiscuit = struct {
         }
 
         // Check the proof
-        switch (self.proof) {
+        switch (serialized_block.proof) {
             .next_secret => |next_secret| {
                 if (!std.mem.eql(u8, &pk.bytes, &next_secret.publicKeyBytes())) {
                     return error.SecretKeyProofFailedMismatchedPublicKeys;
                 }
             },
             .final_signature => |final_signature| {
-                var last_block = if (self.blocks.items.len == 0) self.authority else self.blocks.items[self.blocks.items.len - 1];
+                var last_block = if (serialized_block.blocks.items.len == 0) serialized_block.authority else serialized_block.blocks.items[serialized_block.blocks.items.len - 1];
                 var verifier = try final_signature.verifier(pk);
 
                 verifier.update(last_block.block);

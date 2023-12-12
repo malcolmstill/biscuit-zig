@@ -13,8 +13,9 @@ pub const Biscuit = struct {
     symbols: std.ArrayList([]const u8),
 
     pub fn initFromBytes(allocator: mem.Allocator, bytes: []const u8, public_key: Ed25519.PublicKey) !Biscuit {
-        std.debug.print("\ninitialising biscuit:\n", .{});
-        const serialized = try SerializedBiscuit.initFromBytes(allocator, bytes, public_key);
+        std.debug.print("\nInitialising biscuit:\n", .{});
+        var serialized = try SerializedBiscuit.initFromBytes(allocator, bytes, public_key);
+        errdefer serialized.deinit();
 
         const authority = try Block.initFromBytes(allocator, serialized.authority.block);
 
@@ -31,17 +32,17 @@ pub const Biscuit = struct {
         };
     }
 
-    pub fn deinit(self: *Biscuit) void {
-        for (self.blocks.items) |*block| {
+    pub fn deinit(biscuit: *Biscuit) void {
+        for (biscuit.blocks.items) |*block| {
             block.deinit();
         }
-        self.blocks.deinit();
-        self.authority.deinit();
-        self.serialized.deinit();
+        biscuit.blocks.deinit();
+        biscuit.authority.deinit();
+        biscuit.serialized.deinit();
     }
 
-    pub fn authorizer(self: *Biscuit, allocator: std.mem.Allocator) Authorizer {
-        return Authorizer.init(allocator, self.*);
+    pub fn authorizer(biscuit: *Biscuit, allocator: std.mem.Allocator) Authorizer {
+        return Authorizer.init(allocator, biscuit.*);
     }
 };
 
@@ -108,9 +109,6 @@ test "Tokens that should fail to validate" {
         var a = b.authorizer(allocator);
         defer a.deinit();
 
-        a.authorize() catch |err| switch (err) {
-            error.AuthorizationFailed => {},
-            else => return error.ExpectedAuthorizationFailed,
-        };
+        try testing.expectError(error.AuthorizationFailed, a.authorize());
     }
 }

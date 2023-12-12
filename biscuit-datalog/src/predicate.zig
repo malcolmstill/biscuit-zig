@@ -1,44 +1,43 @@
 const std = @import("std");
 const mem = std.mem;
 const schema = @import("biscuit-schema");
-const trm = @import("term.zig");
-const Term = trm.Term;
+const Term = @import("term.zig").Term;
 const SymbolTable = @import("symbol_table.zig").SymbolTable;
 
 pub const Predicate = struct {
     name: u64,
     terms: std.ArrayList(Term),
 
-    pub fn fromSchema(allocator: mem.Allocator, predicate: schema.PredicateV2) !Predicate {
+    pub fn fromSchema(allocator: mem.Allocator, schema_predicate: schema.PredicateV2) !Predicate {
         var terms = std.ArrayList(Term).init(allocator);
-        for (predicate.terms.items) |term| {
-            try terms.append(try Term.fromSchema(term));
+        for (schema_predicate.terms.items) |term| {
+            try terms.append(try Term.fromSchema(allocator, term));
         }
 
-        return .{ .name = predicate.name, .terms = terms };
+        return .{ .name = schema_predicate.name, .terms = terms };
     }
 
-    pub fn format(self: Predicate, comptime _: []const u8, _: std.fmt.FormatOptions, writer: anytype) std.os.WriteError!void {
-        try writer.print("sym:{any}(", .{self.name});
-        for (self.terms.items, 0..) |*term, i| {
+    pub fn format(predicate: Predicate, comptime _: []const u8, _: std.fmt.FormatOptions, writer: anytype) std.os.WriteError!void {
+        try writer.print("sym:{any}(", .{predicate.name});
+        for (predicate.terms.items, 0..) |*term, i| {
             try writer.print("{any}", .{term.*});
-            if (i < self.terms.items.len - 1) try writer.print(", ", .{});
+            if (i < predicate.terms.items.len - 1) try writer.print(", ", .{});
         }
         return writer.print(")", .{});
     }
 
-    pub fn deinit(self: *Predicate) void {
-        for (self.terms.items) |*term| {
+    pub fn deinit(predicate: *Predicate) void {
+        for (predicate.terms.items) |*term| {
             term.deinit();
         }
-        self.terms.deinit();
+        predicate.terms.deinit();
     }
 
-    pub fn eql(self: Predicate, predicate: Predicate) bool {
-        if (self.name != predicate.name) return false;
-        if (self.terms.items.len != predicate.terms.items.len) return false;
+    pub fn eql(predicate: Predicate, other_predicate: Predicate) bool {
+        if (predicate.name != other_predicate.name) return false;
+        if (predicate.terms.items.len != other_predicate.terms.items.len) return false;
 
-        for (self.terms.items, predicate.terms.items) |term_a, term_b| {
+        for (predicate.terms.items, other_predicate.terms.items) |term_a, term_b| {
             if (!term_a.eql(term_b)) return false;
         }
 
@@ -54,11 +53,11 @@ pub const Predicate = struct {
     /// exactly equality, because variable terms can match any
     /// other term. See also the definition of `fn match` in
     /// `term.zig`.
-    pub fn match(self: Predicate, predicate: Predicate) bool {
-        if (self.name != predicate.name) return false;
-        if (self.terms.items.len != predicate.terms.items.len) return false;
+    pub fn match(predicate: Predicate, other_predicate: Predicate) bool {
+        if (predicate.name != other_predicate.name) return false;
+        if (predicate.terms.items.len != other_predicate.terms.items.len) return false;
 
-        for (self.terms.items, predicate.terms.items) |term_a, term_b| {
+        for (predicate.terms.items, other_predicate.terms.items) |term_a, term_b| {
             if (!term_a.match(term_b)) return false;
         }
 
@@ -68,10 +67,10 @@ pub const Predicate = struct {
     /// Convert predicate to new symbol space
     ///
     /// Equivalent to clone but with the symbol rewriting
-    pub fn convert(self: Predicate, old_symbols: *const SymbolTable, new_symbols: *SymbolTable) !Predicate {
-        const name = try old_symbols.getString(self.name);
+    pub fn convert(predicate: Predicate, old_symbols: *const SymbolTable, new_symbols: *SymbolTable) !Predicate {
+        const name = try old_symbols.getString(predicate.name);
 
-        var terms = try self.terms.clone();
+        var terms = try predicate.terms.clone();
         for (terms.items, 0..) |term, i| {
             terms.items[i] = try term.convert(old_symbols, new_symbols);
         }
@@ -86,10 +85,10 @@ pub const Predicate = struct {
     ///
     /// Reuses the allocator that allocated the original predicate's
     /// terms.
-    pub fn clone(self: *const Predicate) !Predicate {
+    pub fn clone(predicate: *const Predicate) !Predicate {
         return .{
-            .name = self.name,
-            .terms = try self.terms.clone(),
+            .name = predicate.name,
+            .terms = try predicate.terms.clone(),
         };
     }
 
@@ -97,49 +96,49 @@ pub const Predicate = struct {
     ///
     /// Reuses the allocator that allocated the original predicate's
     /// terms.
-    pub fn cloneWithAllocator(self: *const Predicate, allocator: mem.Allocator) !Predicate {
+    pub fn cloneWithAllocator(predicate: *const Predicate, allocator: mem.Allocator) !Predicate {
         var terms = std.ArrayList(Term).init(allocator);
-        for (self.terms.items) |term| {
+        for (predicate.terms.items) |term| {
             try terms.append(term);
         }
 
         return .{
-            .name = self.name,
+            .name = predicate.name,
             .terms = terms,
         };
     }
-};
 
-pub fn hash(hasher: anytype, predicate: Predicate) void {
-    std.hash.autoHash(hasher, predicate.name);
-    for (predicate.terms.items) |term| {
-        trm.hash(hasher, term);
+    pub fn hash(predicate: Predicate, hasher: anytype) void {
+        std.hash.autoHash(hasher, predicate.name);
+        for (predicate.terms.items) |term| {
+            term.hash(hasher);
+        }
     }
-}
+};
 
 test {
     const testing = std.testing;
-    var allocator = testing.allocator;
+    const allocator = testing.allocator;
 
     var terms_1 = std.ArrayList(Term).init(allocator);
     defer terms_1.deinit();
-    try terms_1.insertSlice(0, &[_]Term{ .{ .string = 10 }, .{ .integer = 20 } });
+    try terms_1.insertSlice(0, &.{ .{ .string = 10 }, .{ .integer = 20 } });
 
     var terms_2 = std.ArrayList(Term).init(allocator);
     defer terms_2.deinit();
-    try terms_2.insertSlice(0, &[_]Term{ .{ .string = 10 }, .{ .integer = 20 } });
+    try terms_2.insertSlice(0, &.{ .{ .string = 10 }, .{ .integer = 20 } });
 
     var terms_3 = std.ArrayList(Term).init(allocator);
     defer terms_3.deinit();
-    try terms_3.insertSlice(0, &[_]Term{ .{ .string = 10 }, .{ .integer = 21 } });
+    try terms_3.insertSlice(0, &.{ .{ .string = 10 }, .{ .integer = 21 } });
 
     var terms_4 = std.ArrayList(Term).init(allocator);
     defer terms_4.deinit();
-    try terms_4.insertSlice(0, &[_]Term{ .{ .string = 10 }, .{ .integer = 20 } });
+    try terms_4.insertSlice(0, &.{ .{ .string = 10 }, .{ .integer = 20 } });
 
     var terms_5 = std.ArrayList(Term).init(allocator);
     defer terms_5.deinit();
-    try terms_5.insertSlice(0, &[_]Term{ .{ .variable = 105 }, .{ .integer = 20 } });
+    try terms_5.insertSlice(0, &.{ .{ .variable = 105 }, .{ .integer = 20 } });
 
     const p1: Predicate = .{ .name = 99, .terms = terms_1 };
     const p2: Predicate = .{ .name = 99, .terms = terms_2 };
@@ -151,4 +150,6 @@ test {
     try testing.expect(!p1.match(p3));
     try testing.expect(!p1.match(p4));
     try testing.expect(p1.match(p5));
+
+    std.debug.print("predicate = {any}\n", .{p1});
 }

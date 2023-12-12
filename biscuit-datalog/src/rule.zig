@@ -9,28 +9,49 @@ const Term = @import("term.zig").Term;
 const SymbolTable = @import("symbol_table.zig").SymbolTable;
 const MatchedVariables = @import("matched_variables.zig").MatchedVariables;
 const Combinator = @import("combinator.zig").Combinator;
+const Scope = @import("scope.zig").Scope;
+const Expression = @import("expression.zig").Expression;
 
 pub const Rule = struct {
     head: Predicate,
     body: std.ArrayList(Predicate),
+    expressions: std.ArrayList(Expression),
+    scopes: std.ArrayList(Scope),
 
-    pub fn fromSchema(allocator: std.mem.Allocator, rule: schema.RuleV2) !Rule {
-        const head = try Predicate.fromSchema(allocator, rule.head orelse return error.NoHeadInRuleSchema);
+    pub fn fromSchema(allocator: std.mem.Allocator, schema_rule: schema.RuleV2) !Rule {
+        const head = try Predicate.fromSchema(allocator, schema_rule.head orelse return error.NoHeadInRuleSchema);
 
         var body = std.ArrayList(Predicate).init(allocator);
-        for (rule.body.items) |predicate| {
+        for (schema_rule.body.items) |predicate| {
             try body.append(try Predicate.fromSchema(allocator, predicate));
         }
 
-        return .{ .head = head, .body = body };
+        var expressions = std.ArrayList(Expression).init(allocator);
+        for (schema_rule.expressions.items) |expression| {
+            try expressions.append(try Expression.fromSchema(allocator, expression));
+        }
+
+        var scopes = std.ArrayList(Scope).init(allocator);
+        for (schema_rule.scope.items) |scope| {
+            try scopes.append(try Scope.fromSchema(scope));
+        }
+
+        return .{ .head = head, .body = body, .expressions = expressions, .scopes = scopes };
     }
 
-    pub fn deinit(self: *Rule) void {
-        self.head.deinit();
-        for (self.body.items) |*predicate| {
+    pub fn deinit(rule: *Rule) void {
+        rule.head.deinit();
+        for (rule.body.items) |*predicate| {
             predicate.deinit();
         }
-        self.body.deinit();
+        rule.body.deinit();
+
+        for (rule.expressions.items) |*expression| {
+            expression.deinit();
+        }
+        rule.expressions.deinit();
+
+        rule.scopes.deinit();
     }
 
     /// ### Generate new facts from this rule and the existing facts
@@ -88,24 +109,26 @@ pub const Rule = struct {
     /// ```
     ///
     /// ...and we add it to the set of facts (the set will take care of deduplication)
-    pub fn apply(self: *Rule, allocator: mem.Allocator, facts: *const Set(Fact), new_facts: *Set(Fact), symbols: SymbolTable) !void {
+    pub fn apply(rule: *Rule, allocator: mem.Allocator, facts: *const Set(Fact), new_facts: *Set(Fact), symbols: SymbolTable) !void {
         var arena = std.heap.ArenaAllocator.init(allocator);
         defer arena.deinit();
 
-        std.debug.print("\n\nrule = {any}\n", .{self});
-        var matched_variables = try MatchedVariables.init(arena.allocator(), self);
+        std.debug.print("\n\nrule = {any}\n", .{rule});
+        const matched_variables = try MatchedVariables.init(arena.allocator(), rule);
 
         // TODO: if body is empty stuff
 
-        var it = try Combinator.init(0, allocator, matched_variables, self.body.items, facts, symbols);
+        var it = try Combinator.init(0, allocator, matched_variables, rule.body.items, facts, symbols);
         defer it.deinit();
 
         blk: while (try it.next()) |*bindings| {
-            var predicate = try self.head.cloneWithAllocator(allocator);
+            // TODO: Describe why clonedWithAllocator? More generally, describe in comment the overall
+            // lifetimes / memory allocation approach during evaluation.
+            var predicate = try rule.head.cloneWithAllocator(allocator);
             defer predicate.deinit();
 
             for (predicate.terms.items, 0..) |head_term, i| {
-                const sym = if (meta.activeTag(head_term) == .variable) head_term.variable else continue;
+                const sym = if (head_term == .variable) head_term.variable else continue;
 
                 const value = bindings.get(sym) orelse continue :blk;
 
@@ -126,27 +149,28 @@ pub const Rule = struct {
         }
     }
 
-    pub fn findMatch(self: *Rule, allocator: mem.Allocator, facts: *const Set(Fact), symbols: SymbolTable) !bool {
+    /// Given a rule (e.g. from a query), return true if we can find at least one set of variable bindings that
+    /// are consistent.
+    ///
+    /// Note: whilst the combinator may return multiple valid matches, `findMatch` only requires a single match
+    /// so stopping on the first `it.next()` that returns not-null is enough.
+    pub fn findMatch(rule: *Rule, allocator: mem.Allocator, facts: *const Set(Fact), symbols: SymbolTable) !bool {
         var arena = std.heap.ArenaAllocator.init(allocator);
         defer arena.deinit();
 
-        var matched_variables = try MatchedVariables.init(arena.allocator(), self);
+        const matched_variables = try MatchedVariables.init(arena.allocator(), rule);
 
-        var it = try Combinator.init(0, allocator, matched_variables, self.body.items, facts, symbols);
+        var it = try Combinator.init(0, allocator, matched_variables, rule.body.items, facts, symbols);
         defer it.deinit();
 
-        if (try it.next()) |_| {
-            return true;
-        } else {
-            return false;
-        }
+        return try it.next() != null;
     }
 
-    pub fn format(self: Rule, comptime _: []const u8, _: std.fmt.FormatOptions, writer: anytype) std.os.WriteError!void {
-        try writer.print("{any} <- ", .{self.head});
-        for (self.body.items, 0..) |*predicate, i| {
+    pub fn format(rule: Rule, comptime _: []const u8, _: std.fmt.FormatOptions, writer: anytype) std.os.WriteError!void {
+        try writer.print("{any} <- ", .{rule.head});
+        for (rule.body.items, 0..) |*predicate, i| {
             try writer.print("{any}", .{predicate.*});
-            if (i < self.body.items.len - 1) try writer.print(", ", .{});
+            if (i < rule.body.items.len - 1) try writer.print(", ", .{});
         }
     }
 };

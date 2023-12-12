@@ -9,7 +9,6 @@ const MIN_SCHEMA_VERSION = format.serialized_biscuit.MIN_SCHEMA_VERSION;
 const MAX_SCHEMA_VERSION = format.serialized_biscuit.MAX_SCHEMA_VERSION;
 
 pub const Block = struct {
-    decoded_block: ?schema.Block = null,
     version: u32,
     context: []const u8,
     symbols: SymbolTable,
@@ -30,12 +29,10 @@ pub const Block = struct {
 
     pub fn initFromBytes(allocator: std.mem.Allocator, data: []const u8) !Block {
         const decoded_block = try schema.decodeBlock(allocator, data);
-        errdefer decoded_block.deinit();
+        defer decoded_block.deinit();
 
         var block = try init(allocator);
         errdefer block.deinit();
-
-        block.decoded_block = decoded_block;
 
         const version = decoded_block.version orelse return error.ExpectedVersion;
         if (version < MIN_SCHEMA_VERSION) return error.BlockVersionTooLow;
@@ -62,18 +59,14 @@ pub const Block = struct {
         return block;
     }
 
-    pub fn deinit(self: *Block) void {
-        for (self.checks.items) |*check| check.deinit();
-        for (self.rules.items) |*rule| rule.deinit();
-        for (self.facts.items) |*fact| fact.deinit();
+    pub fn deinit(block: *Block) void {
+        for (block.checks.items) |*check| check.deinit();
+        for (block.rules.items) |*rule| rule.deinit();
+        for (block.facts.items) |*fact| fact.deinit();
 
-        self.checks.deinit();
-        self.rules.deinit();
-        self.facts.deinit();
-        self.symbols.deinit();
-
-        if (self.decoded_block) |block| {
-            block.deinit();
-        }
+        block.checks.deinit();
+        block.rules.deinit();
+        block.facts.deinit();
+        block.symbols.deinit();
     }
 };

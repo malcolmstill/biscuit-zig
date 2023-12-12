@@ -60,7 +60,7 @@ pub const Combinator = struct {
 
     pub fn init(id: usize, allocator: mem.Allocator, variables: MatchedVariables, predicates: []Predicate, all_facts: *const Set(Fact), symbols: SymbolTable) !*Combinator {
         std.debug.print("Init combinator[{}]: predicates = {any}\n", .{ id, predicates });
-        var c = try allocator.create(Combinator);
+        const c = try allocator.create(Combinator);
 
         c.* = .{
             .id = id,
@@ -76,34 +76,35 @@ pub const Combinator = struct {
         return c;
     }
 
-    pub fn deinit(self: *Combinator) void {
-        self.variables.deinit();
-        self.allocator.destroy(self);
+    pub fn deinit(combinator: *Combinator) void {
+        combinator.variables.deinit();
+        combinator.allocator.destroy(combinator);
     }
 
-    pub fn next(self: *Combinator) !?MatchedVariables {
+    /// next returns the next _valid_ combination of variable bindings
+    pub fn next(combinator: *Combinator) !?MatchedVariables {
         blk: while (true) {
             // Return from next combinator until expended
-            if (self.next_combinator) |c| {
+            if (combinator.next_combinator) |c| {
                 if (try c.next()) |vars| {
                     return vars;
                 } else {
                     c.deinit();
-                    self.next_combinator = null;
+                    combinator.next_combinator = null;
                     continue;
                 }
             }
 
-            const fact = self.fact_iterator.next() orelse return null;
+            const fact = combinator.fact_iterator.next() orelse return null;
             // Only consider facts that match the current predicate
-            if (!fact.matchPredicate(self.predicates[0])) continue;
-            std.debug.print("combinator[{}]: fact = {any}\n", .{ self.id, fact });
+            if (!fact.matchPredicate(combinator.predicates[0])) continue;
+            std.debug.print("combinator[{}]: fact = {any}\n", .{ combinator.id, fact });
 
-            var vars: MatchedVariables = try self.variables.clone();
+            var vars: MatchedVariables = try combinator.variables.clone();
 
             // Set variables from predicate to match values
-            for (self.predicates[0].terms.items, 0..) |term, i| {
-                const sym = if (meta.activeTag(term) == .variable) term.variable else continue;
+            for (combinator.predicates[0].terms.items, 0..) |term, i| {
+                const sym = if (term == .variable) term.variable else continue;
 
                 // Since we are pulling terms out of a fact, we know
                 // ahead of time that none of the terms will be variables.
@@ -116,14 +117,14 @@ pub const Combinator = struct {
                 }
             }
 
-            // std.debug.print("len = {}\n", .{self.predicates[1..].len});
-            const next_predicates = self.predicates[1..];
+            // std.debug.print("len = {}\n", .{combinator.predicates[1..].len});
+            const next_predicates = combinator.predicates[1..];
             if (next_predicates.len == 0) {
                 return vars;
             } else {
-                if (self.next_combinator) |c| c.deinit();
+                if (combinator.next_combinator) |c| c.deinit();
 
-                self.next_combinator = try Combinator.init(self.id + 1, self.allocator, vars, next_predicates, self.facts, self.symbols);
+                combinator.next_combinator = try Combinator.init(combinator.id + 1, combinator.allocator, vars, next_predicates, combinator.facts, combinator.symbols);
             }
         }
 
