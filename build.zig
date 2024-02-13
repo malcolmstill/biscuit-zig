@@ -30,18 +30,15 @@ pub fn build(b: *std.Build) !void {
 
     // Define our biscuit-format module. This module depends on the external protobuf library
     const schema_module = b.createModule(.{
-        .source_file = .{ .path = "biscuit-schema/src/main.zig" },
-        .dependencies = &.{
-            .{
-                .name = "protobuf",
-                .module = protobuf.module("protobuf"),
-            },
+        .root_source_file = .{ .path = "biscuit-schema/src/main.zig" },
+        .imports = &.{
+            .{ .name = "protobuf", .module = protobuf.module("protobuf") },
         },
     });
 
     const format_module = b.createModule(.{
-        .source_file = .{ .path = "biscuit-format/src/main.zig" },
-        .dependencies = &.{
+        .root_source_file = .{ .path = "biscuit-format/src/main.zig" },
+        .imports = &.{
             .{
                 .name = "biscuit-schema",
                 .module = schema_module,
@@ -51,8 +48,8 @@ pub fn build(b: *std.Build) !void {
 
     // Define our datalog module
     const datalog_module = b.createModule(.{
-        .source_file = .{ .path = "biscuit-datalog/src/main.zig" },
-        .dependencies = &.{
+        .root_source_file = .{ .path = "biscuit-datalog/src/main.zig" },
+        .imports = &.{
             .{
                 .name = "biscuit-format",
                 .module = format_module,
@@ -66,8 +63,8 @@ pub fn build(b: *std.Build) !void {
 
     // Define our datalog module
     const biscuit_module = b.createModule(.{
-        .source_file = .{ .path = "biscuit/src/main.zig" },
-        .dependencies = &.{
+        .root_source_file = .{ .path = "biscuit/src/main.zig" },
+        .imports = &.{
             .{
                 .name = "biscuit-format",
                 .module = format_module,
@@ -100,9 +97,9 @@ pub fn build(b: *std.Build) !void {
         .optimize = optimize,
     });
     // main_tests.addModule("protobuf", protobuf.module("protobuf"));
-    main_tests.addModule("biscuit-schema", schema_module);
-    main_tests.addModule("biscuit-format", format_module);
-    main_tests.addModule("biscuit-datalog", datalog_module);
+    main_tests.root_module.addImport("biscuit-schema", schema_module);
+    main_tests.root_module.addImport("biscuit-format", format_module);
+    main_tests.root_module.addImport("biscuit-datalog", datalog_module);
 
     const run_main_tests = b.addRunArtifact(main_tests);
     const main_step = b.step("test-biscuit", "Run the biscuit module tests");
@@ -134,8 +131,8 @@ pub fn build(b: *std.Build) !void {
         .target = target,
         .optimize = optimize,
     });
-    testsuite_tests.addModule("biscuit-format", format_module);
-    testsuite_tests.addModule("biscuit", biscuit_module);
+    testsuite_tests.root_module.addImport("biscuit-format", format_module);
+    testsuite_tests.root_module.addImport("biscuit", biscuit_module);
     const run_testsuite_tests = b.addRunArtifact(testsuite_tests);
 
     const testsuite_step = b.step("testsuite", "Run all the testsuite tests");
@@ -148,8 +145,8 @@ pub fn build(b: *std.Build) !void {
         .target = target,
         .optimize = optimize,
     });
-    testrunner.addModule("biscuit-format", format_module);
-    testrunner.addModule("biscuit", biscuit_module);
+    testrunner.root_module.addImport("biscuit-format", format_module);
+    testrunner.root_module.addImport("biscuit", biscuit_module);
 
     const json_string = @embedFile("biscuit-samples/src/samples/samples.json");
     const dynamic_tree = try std.json.parseFromSliceLeaky(std.json.Value, b.allocator, json_string, .{});

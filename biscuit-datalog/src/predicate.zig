@@ -17,7 +17,7 @@ pub const Predicate = struct {
         return .{ .name = schema_predicate.name, .terms = terms };
     }
 
-    pub fn format(predicate: Predicate, comptime _: []const u8, _: std.fmt.FormatOptions, writer: anytype) std.os.WriteError!void {
+    pub fn format(predicate: Predicate, comptime _: []const u8, _: std.fmt.FormatOptions, writer: anytype) !void {
         try writer.print("sym:{any}(", .{predicate.name});
         for (predicate.terms.items, 0..) |*term, i| {
             try writer.print("{any}", .{term.*});

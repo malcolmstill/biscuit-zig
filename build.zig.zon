@@ -12,8 +12,8 @@
     },
     .dependencies = .{
         .zig_protobuf = .{
-            .url = "https://github.com/Arwalk/zig-protobuf/archive/77d3ab00a7a5785ccccf26141c77969eb31ea696.tar.gz",
-            .hash = "122099b855ce3ab4c52fc048c24dc741ac73d43efa0d62f51ea0f0f0524ab91273e2",
+            .url = "https://github.com/Arwalk/zig-protobuf/archive/207ac787fe453ba3f55b4b2313a099800bf28e87.tar.gz",
+            .hash = "12205d26faf459d53ad9788df7b03fafa49c2c944528f4b1ae9f3dc64393189a683c",
         },
     },
 }

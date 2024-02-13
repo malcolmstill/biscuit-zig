@@ -97,7 +97,7 @@ pub fn Set(comptime K: type) type {
             return true;
         }
 
-        pub fn format(set: Self, comptime _: []const u8, _: std.fmt.FormatOptions, writer: anytype) std.os.WriteError!void {
+        pub fn format(set: Self, comptime _: []const u8, _: std.fmt.FormatOptions, writer: anytype) !void {
             try writer.print("set{{", .{});
             var it = set.iterator();
 
