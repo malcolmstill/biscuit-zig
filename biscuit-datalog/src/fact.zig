@@ -42,7 +42,7 @@ pub const Fact = struct {
         return fact.predicate.match(predicate);
     }
 
-    pub fn format(fact: Fact, comptime _: []const u8, _: std.fmt.FormatOptions, writer: anytype) std.os.WriteError!void {
+    pub fn format(fact: Fact, comptime _: []const u8, _: std.fmt.FormatOptions, writer: anytype) !void {
         return writer.print("{any}", .{fact.predicate});
     }
 

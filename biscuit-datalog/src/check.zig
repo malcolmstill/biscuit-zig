@@ -30,7 +30,7 @@ pub const Check = struct {
         check.queries.deinit();
     }
 
-    pub fn format(check: Check, comptime _: []const u8, _: std.fmt.FormatOptions, writer: anytype) std.os.WriteError!void {
+    pub fn format(check: Check, comptime _: []const u8, _: std.fmt.FormatOptions, writer: anytype) !void {
         try writer.print("check if ", .{});
         for (check.queries.items, 0..) |*query, i| {
             try writer.print("{any}", .{query.*});

@@ -166,7 +166,7 @@ pub const Rule = struct {
         return try it.next() != null;
     }
 
-    pub fn format(rule: Rule, comptime _: []const u8, _: std.fmt.FormatOptions, writer: anytype) std.os.WriteError!void {
+    pub fn format(rule: Rule, comptime _: []const u8, _: std.fmt.FormatOptions, writer: anytype) !void {
         try writer.print("{any} <- ", .{rule.head});
         for (rule.body.items, 0..) |*predicate, i| {
             try writer.print("{any}", .{predicate.*});

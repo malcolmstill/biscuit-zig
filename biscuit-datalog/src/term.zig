@@ -92,7 +92,7 @@ pub const Term = union(TermKind) {
         };
     }
 
-    pub fn format(term: Term, comptime _: []const u8, _: std.fmt.FormatOptions, writer: anytype) std.os.WriteError!void {
+    pub fn format(term: Term, comptime _: []const u8, _: std.fmt.FormatOptions, writer: anytype) !void {
         return switch (term) {
             .variable => |v| writer.print("$sym:{any}", .{v}),
             .integer => |v| writer.print("{any}", .{v}),
