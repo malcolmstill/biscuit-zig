@@ -5,6 +5,13 @@ jobs:
   tests:
     strategy:
       matrix:
+        dir:
+          [
+            "./biscuit-schema",
+            "./biscuit-format",
+            "./biscuit-datalog",
+            "./biscuit",
+          ]
         os: [ubuntu-latest]
     runs-on: ${{matrix.os}}
     steps:
@@ -12,6 +19,7 @@ jobs:
       - uses: goto-bus-stop/setup-zig@v1
         with:
           version: master
+      - working-directory: ${{matrix.dir}}
       - run: zig build test
   lint:
     runs-on: ubuntu-latest
@@ -21,14 +29,3 @@ jobs:
         with:
           version: master
       - run: zig fmt --check .
-  build-biscuit-library:
-    strategy:
-      matrix:
-        os: [ubuntu-latest]
-    runs-on: ${{matrix.os}}
-    steps:
-      - uses: actions/checkout@v2
-      - uses: goto-bus-stop/setup-zig@v1
-        with:
-          version: master
-      - run: zig build
