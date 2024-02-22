@@ -7,10 +7,11 @@ jobs:
       matrix:
         dir:
           [
-            "./biscuit-schema",
-            "./biscuit-format",
-            "./biscuit-datalog",
-            "./biscuit",
+            "biscuit-schema",
+            "biscuit-format",
+            "biscuit-datalog",
+            "biscuit",
+            "biscuit-samples",
           ]
         os: [ubuntu-latest]
     runs-on: ${{matrix.os}}
@@ -20,7 +21,7 @@ jobs:
         with:
           version: master
       - name: zig build test
-        working-directory: ${{matrix.dir}}
+        working-directory: "./${{matrix.dir}}"
         run: zig build test
   lint:
     runs-on: ubuntu-latest

@@ -28,7 +28,7 @@ pub fn build(b: *std.Build) !void {
 
     const run_testsuite_tests = b.addRunArtifact(testsuite_tests);
 
-    const testsuite_step = b.step("testsuite", "Run all the testsuite tests");
+    const testsuite_step = b.step("test", "Run all the testsuite tests");
     testsuite_step.dependOn(&run_testsuite_tests.step);
 
     // Load samples.json to generate zig build testsuite commands for each case (for great justice)
@@ -56,7 +56,7 @@ pub fn build(b: *std.Build) !void {
         var it = std.mem.splitScalar(u8, test_filename, '_');
         const short_name = it.next() orelse return error.ExpectedShortName;
 
-        const step = b.step(b.fmt("testsuite-{s}", .{short_name}), b.fmt("Run test {s}: {s}", .{ test_filename, title }));
+        const step = b.step(b.fmt("test-{s}", .{short_name}), b.fmt("Run test {s}: {s}", .{ test_filename, title }));
         step.dependOn(&run_test.step);
         testsuite_step.dependOn(&run_test.step);
     }
