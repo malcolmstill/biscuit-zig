@@ -19,8 +19,9 @@ jobs:
       - uses: goto-bus-stop/setup-zig@v1
         with:
           version: master
-      - working-directory: ${{matrix.dir}}
-      - run: zig build test
+      - name: zig build test
+        working-directory: ${{matrix.dir}}
+        run: zig build test
   lint:
     runs-on: ubuntu-latest
     steps:
