@@ -13,15 +13,17 @@ pub const Biscuit = struct {
     symbols: std.ArrayList([]const u8),
 
     pub fn initFromBytes(allocator: mem.Allocator, bytes: []const u8, public_key: Ed25519.PublicKey) !Biscuit {
-        std.debug.print("\nInitialising biscuit:\n", .{});
         var serialized = try SerializedBiscuit.initFromBytes(allocator, bytes, public_key);
         errdefer serialized.deinit();
 
         const authority = try Block.initFromBytes(allocator, serialized.authority.block);
+        std.debug.print("authority block =\n{any}\n", .{authority});
 
         var blocks = std.ArrayList(Block).init(allocator);
         for (serialized.blocks.items) |b| {
-            try blocks.append(try Block.initFromBytes(allocator, b.block));
+            const block = try Block.initFromBytes(allocator, b.block);
+            std.debug.print("non-authority block =\n{any}\n", .{block});
+            try blocks.append(block);
         }
 
         return .{

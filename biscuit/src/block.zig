@@ -27,6 +27,7 @@ pub const Block = struct {
         };
     }
 
+    /// Given a blocks contents as bytes, derserialize into runtime block
     pub fn initFromBytes(allocator: std.mem.Allocator, data: []const u8) !Block {
         const decoded_block = try schema.decodeBlock(allocator, data);
         defer decoded_block.deinit();
@@ -77,7 +78,7 @@ pub const Block = struct {
 
         try writer.print("  symbols:\n", .{});
         for (block.symbols.symbols.items, 0..) |symbol, i| {
-            try writer.print("    [{}]: {s}\n", .{ i + 1024, symbol });
+            try writer.print("    [{}]: {s}\n", .{ i, symbol });
         }
 
         try writer.print("  facts:\n", .{});

@@ -2,6 +2,7 @@ const std = @import("std");
 const mem = std.mem;
 const decode = @import("biscuit-format").decode;
 const Biscuit = @import("biscuit").Biscuit;
+const AuthorizerError = @import("biscuit").AuthorizerError;
 const Samples = @import("sample.zig").Samples;
 const Result = @import("sample.zig").Result;
 
@@ -46,17 +47,20 @@ pub fn main() anyerror!void {
 }
 
 pub fn validate(alloc: mem.Allocator, token: []const u8, public_key: std.crypto.sign.Ed25519.PublicKey, result: Result) !void {
+    var errors = std.ArrayList(AuthorizerError).init(alloc);
+    defer errors.deinit();
+
     switch (result) {
-        .Ok => try runValidation(alloc, token, public_key),
+        .Ok => try runValidation(alloc, token, public_key, &errors),
         .Err => |e| {
             switch (e) {
                 .Format => |f| switch (f) {
-                    .InvalidSignatureSize => runValidation(alloc, token, public_key) catch |err| switch (err) {
+                    .InvalidSignatureSize => runValidation(alloc, token, public_key, &errors) catch |err| switch (err) {
                         error.IncorrectBlockSignatureLength => return,
                         else => return err,
                     },
                     .Signature => |s| switch (s) {
-                        .InvalidSignature => runValidation(alloc, token, public_key) catch |err| switch (err) {
+                        .InvalidSignature => runValidation(alloc, token, public_key, &errors) catch |err| switch (err) {
                             error.SignatureVerificationFailed,
                             error.InvalidEncoding,
                             => return,
@@ -65,14 +69,42 @@ pub fn validate(alloc: mem.Allocator, token: []const u8, public_key: std.crypto.
                     },
                 },
                 .FailedLogic => |f| switch (f) {
-                    .Unauthorized => runValidation(alloc, token, public_key) catch |err| switch (err) {
+                    .Unauthorized => |u| runValidation(alloc, token, public_key, &errors) catch |err| switch (err) {
+                        error.AuthorizationFailed => {
+
+                            // Check that we have expected check failures
+                            for (u.checks) |expected_failed_check| {
+                                var check_accounted_for = false;
+
+                                switch (expected_failed_check) {
+                                    .Block => |expected_failed_block_check| {
+                                        for (errors.items) |found_failed_check| {
+                                            switch (found_failed_check) {
+                                                .failed_block_check => |failed_block_check| {
+                                                    if (failed_block_check.block_id == expected_failed_block_check.block_id and failed_block_check.check_id == expected_failed_block_check.check_id) {
+                                                        // continue :blk;
+                                                        check_accounted_for = true;
+                                                    }
+                                                },
+                                                .failed_authority_check => return error.NotImplemented,
+                                            }
+                                        }
+                                    },
+                                    .Authorizer => return error.NotImplemented,
+                                }
+
+                                if (!check_accounted_for) return error.ExpectedFailedCheck;
+                            }
+
+                            return;
+                        },
                         else => return err,
                     },
-                    .InvalidBlockRule => runValidation(alloc, token, public_key) catch |err| switch (err) {
+                    .InvalidBlockRule => runValidation(alloc, token, public_key, &errors) catch |err| switch (err) {
                         else => return err,
                     },
                 },
-                .Execution => runValidation(alloc, token, public_key) catch |err| switch (err) {
+                .Execution => runValidation(alloc, token, public_key, &errors) catch |err| switch (err) {
                     else => return err,
                 },
             }
@@ -82,10 +114,12 @@ pub fn validate(alloc: mem.Allocator, token: []const u8, public_key: std.crypto.
     }
 }
 
-pub fn runValidation(alloc: mem.Allocator, token: []const u8, public_key: std.crypto.sign.Ed25519.PublicKey) !void {
+pub fn runValidation(alloc: mem.Allocator, token: []const u8, public_key: std.crypto.sign.Ed25519.PublicKey, errors: *std.ArrayList(AuthorizerError)) !void {
     var b = try Biscuit.initFromBytes(alloc, token, public_key);
     defer b.deinit();
 
     var a = b.authorizer(alloc);
     defer a.deinit();
+
+    try a.authorize(errors);
 }

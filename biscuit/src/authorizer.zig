@@ -39,10 +39,7 @@ pub const Authorizer = struct {
     /// 4. _biscuit_ (where it exists): run the authority block's checks
     /// 5. _authorizer_: Run the _authorizer's_ policies
     /// 6. _biscuit_ (where it exists): run the checks from all the non-authority blocks
-    pub fn authorize(authorizer: *Authorizer) !void {
-        var errors = std.ArrayList(AuthorizerError).init(authorizer.allocator);
-        defer errors.deinit();
-
+    pub fn authorize(authorizer: *Authorizer, errors: *std.ArrayList(AuthorizerError)) !void {
         std.debug.print("authorizing biscuit:\n", .{});
         // 1.
         // Load facts and rules from authority block into world. Our block's facts
@@ -72,10 +69,10 @@ pub const Authorizer = struct {
             for (biscuit.authority.checks.items) |check| {
                 std.debug.print("{any}\n", .{check});
 
-                for (check.queries.items) |*query| {
+                for (check.queries.items, 0..) |*query, check_id| {
                     const is_match = try authorizer.world.queryMatch(query, authorizer.symbols);
 
-                    if (!is_match) try errors.append(.{ .failed_check = 0 });
+                    if (!is_match) try errors.append(.{ .failed_block_check = .{ .block_id = 0, .check_id = check_id } });
                     std.debug.print("match {any} = {}\n", .{ query, is_match });
                 }
             }
@@ -85,14 +82,14 @@ pub const Authorizer = struct {
 
         // TODO: 6. Run checks in the biscuit's authority block
         if (authorizer.biscuit) |biscuit| {
-            for (biscuit.blocks.items) |block| {
+            for (biscuit.blocks.items, 1..) |block, block_id| {
                 std.debug.print("block = {any}\n", .{block});
-                for (block.checks.items) |check| {
+                for (block.checks.items, 0..) |check, check_id| {
                     std.debug.print("check = {any}\n", .{check});
                     for (check.queries.items) |*query| {
                         const is_match = try authorizer.world.queryMatch(query, authorizer.symbols);
 
-                        if (!is_match) try errors.append(.{ .failed_check = 0 });
+                        if (!is_match) try errors.append(.{ .failed_block_check = .{ .block_id = block_id, .check_id = check_id } });
                         std.debug.print("match {any} = {}\n", .{ query, is_match });
                     }
                 }
@@ -105,9 +102,11 @@ pub const Authorizer = struct {
 };
 
 const AuthorizerErrorKind = enum(u8) {
-    failed_check,
+    failed_authority_check,
+    failed_block_check,
 };
 
-const AuthorizerError = union(AuthorizerErrorKind) {
-    failed_check: u32,
+pub const AuthorizerError = union(AuthorizerErrorKind) {
+    failed_authority_check: struct { check_id: usize },
+    failed_block_check: struct { block_id: usize, check_id: usize },
 };
