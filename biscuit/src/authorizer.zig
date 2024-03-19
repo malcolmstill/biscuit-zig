@@ -29,20 +29,22 @@ pub const Authorizer = struct {
     ///
     /// authorize the Authorizer
     ///
-    /// The following high level steps take place during authorization:
-    /// - If we have a biscuit load the biscuit's authority block's facts and
-    ///   and rules into the Authorizer's world
-    /// - Run the world to generate new facts
-    /// - Loop over and apply all of checks _of the authorizer_
-    /// - Again, if we have a biscuit, loop over and apply the biscuit's authority block's checks
-    /// - Loop over the policies _of the authorizer_ (we won't have policies anywhere else)
-    /// - Finally, again if we have a biscuit, loop over all of the biscuits non-authority
-    ///   blocks and apply the checks therein.
+    /// The following high-level steps take place during authorization:
+    /// 1. _biscuit_ (where it exists): load _all_ of the facts and rules
+    ///   in the biscuit. We can add all the facts and rules as this time because
+    ///   the facts and rules are scoped, i.e. the facts / rules are added to particular
+    ///   scopes within the world.
+    /// 2. Run the world to generate new facts.
+    /// 3. _authorizer_: Run the _authorizer's_ checks
+    /// 4. _biscuit_ (where it exists): run the authority block's checks
+    /// 5. _authorizer_: Run the _authorizer's_ policies
+    /// 6. _biscuit_ (where it exists): run the checks from all the non-authority blocks
     pub fn authorize(authorizer: *Authorizer) !void {
         var errors = std.ArrayList(AuthorizerError).init(authorizer.allocator);
         defer errors.deinit();
 
         std.debug.print("authorizing biscuit:\n", .{});
+        // 1.
         // Load facts and rules from authority block into world. Our block's facts
         // will have a particular symbol table that we map into the symvol table
         // of the world.
@@ -60,12 +62,12 @@ pub const Authorizer = struct {
             }
         }
 
+        // 2. Run the world to generate all facts
         try authorizer.world.run(authorizer.symbols);
-        // TODO: clear rules
 
-        // TODO: Run checks that have been added to this authorizer
+        // TODO: 3. Run checks that have been added to this authorizer
 
-        // Run checks in the biscuit
+        // 4. Run checks in the biscuit's authority block
         if (authorizer.biscuit) |biscuit| {
             for (biscuit.authority.checks.items) |check| {
                 std.debug.print("{any}\n", .{check});
@@ -79,9 +81,23 @@ pub const Authorizer = struct {
             }
         }
 
-        // TODO: run policies
+        // TODO: 5. run policies from the authorizer
 
-        // TODO: run other block checks
+        // TODO: 6. Run checks in the biscuit's authority block
+        if (authorizer.biscuit) |biscuit| {
+            for (biscuit.blocks.items) |block| {
+                std.debug.print("block = {any}\n", .{block});
+                for (block.checks.items) |check| {
+                    std.debug.print("check = {any}\n", .{check});
+                    for (check.queries.items) |*query| {
+                        const is_match = try authorizer.world.queryMatch(query, authorizer.symbols);
+
+                        if (!is_match) try errors.append(.{ .failed_check = 0 });
+                        std.debug.print("match {any} = {}\n", .{ query, is_match });
+                    }
+                }
+            }
+        }
 
         // FIXME: return logic
         if (errors.items.len > 0) return error.AuthorizationFailed;

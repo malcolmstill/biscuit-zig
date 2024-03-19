@@ -69,4 +69,32 @@ pub const Block = struct {
         block.facts.deinit();
         block.symbols.deinit();
     }
+
+    pub fn format(block: Block, comptime _: []const u8, _: std.fmt.FormatOptions, writer: anytype) !void {
+        try writer.print("block:\n", .{});
+        try writer.print("  version: {}\n", .{block.version});
+        try writer.print("  context: {s}\n", .{block.context});
+
+        try writer.print("  symbols:\n", .{});
+        for (block.symbols.symbols.items, 0..) |symbol, i| {
+            try writer.print("    [{}]: {s}\n", .{ i + 1024, symbol });
+        }
+
+        try writer.print("  facts:\n", .{});
+        for (block.facts.items, 0..) |fact, i| {
+            try writer.print("    [{}]: {any}\n", .{ i, fact });
+        }
+
+        try writer.print("  rules:\n", .{});
+        for (block.rules.items, 0..) |rule, i| {
+            try writer.print("    [{}]: {any}\n", .{ i, rule });
+        }
+
+        try writer.print("  checks:\n", .{});
+        for (block.checks.items, 0..) |check, i| {
+            try writer.print("    [{}]: {any}\n", .{ i, check });
+        }
+
+        return;
+    }
 };

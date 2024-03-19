@@ -23,7 +23,7 @@ pub const Origin = struct {
     }
 };
 
-// TrustedOrigin represents the set of origins trusted by a particular rule
+/// TrustedOrigin represents the set of origins trusted by a particular rule
 pub const TrustedOrigins = struct {
     origin: Origin,
 
