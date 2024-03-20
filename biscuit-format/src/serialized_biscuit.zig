@@ -66,24 +66,24 @@ pub const SerializedBiscuit = struct {
     ///    b) If the token is not sealed we check the last block's
     ///       public key is the public key of the private key in the
     ///       the proof.
-    fn verify(serialized_block: *SerializedBiscuit, root_public_key: Ed25519.PublicKey) !void {
+    fn verify(serialized_biscuit: *SerializedBiscuit, root_public_key: Ed25519.PublicKey) !void {
         var pk = root_public_key;
 
         // Verify the authority block's signature
         {
-            var verifier = try serialized_block.authority.signature.verifier(pk);
+            var verifier = try serialized_biscuit.authority.signature.verifier(pk);
 
-            verifier.update(serialized_block.authority.block);
-            verifier.update(&serialized_block.authority.algorithmBuf());
-            verifier.update(&serialized_block.authority.public_key.bytes);
+            verifier.update(serialized_biscuit.authority.block);
+            verifier.update(&serialized_biscuit.authority.algorithmBuf());
+            verifier.update(&serialized_biscuit.authority.public_key.bytes);
 
             try verifier.verify();
 
-            pk = serialized_block.authority.public_key;
+            pk = serialized_biscuit.authority.public_key;
         }
 
         // Verify the other blocks' signatures
-        for (serialized_block.blocks.items) |*block| {
+        for (serialized_biscuit.blocks.items) |*block| {
             var verifier = try block.signature.verifier(pk);
 
             verifier.update(block.block);
@@ -96,14 +96,14 @@ pub const SerializedBiscuit = struct {
         }
 
         // Check the proof
-        switch (serialized_block.proof) {
+        switch (serialized_biscuit.proof) {
             .next_secret => |next_secret| {
                 if (!std.mem.eql(u8, &pk.bytes, &next_secret.publicKeyBytes())) {
                     return error.SecretKeyProofFailedMismatchedPublicKeys;
                 }
             },
             .final_signature => |final_signature| {
-                var last_block = if (serialized_block.blocks.items.len == 0) serialized_block.authority else serialized_block.blocks.items[serialized_block.blocks.items.len - 1];
+                var last_block = if (serialized_biscuit.blocks.items.len == 0) serialized_biscuit.authority else serialized_biscuit.blocks.items[serialized_biscuit.blocks.items.len - 1];
                 var verifier = try final_signature.verifier(pk);
 
                 verifier.update(last_block.block);
