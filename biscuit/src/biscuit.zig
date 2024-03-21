@@ -12,8 +12,8 @@ pub const Biscuit = struct {
     blocks: std.ArrayList(Block),
     symbols: std.ArrayList([]const u8),
 
-    pub fn initFromBytes(allocator: mem.Allocator, bytes: []const u8, public_key: Ed25519.PublicKey) !Biscuit {
-        var serialized = try SerializedBiscuit.initFromBytes(allocator, bytes, public_key);
+    pub fn initFromBytes(allocator: mem.Allocator, token_bytes: []const u8, public_key: Ed25519.PublicKey) !Biscuit {
+        var serialized = try SerializedBiscuit.initFromBytes(allocator, token_bytes, public_key);
         errdefer serialized.deinit();
 
         const authority = try Block.initFromBytes(allocator, serialized.authority.block);
