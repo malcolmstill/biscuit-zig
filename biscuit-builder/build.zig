@@ -15,18 +15,14 @@ pub fn build(b: *std.Build) void {
     // set a preferred release mode, allowing the user to decide how to optimize.
     const optimize = b.standardOptimizeOption(.{});
 
-    const ziglyph = b.dependency("ziglyph", .{ .optimize = optimize, .target = target });
     const schema = b.dependency("biscuit-schema", .{ .target = target, .optimize = optimize });
     const format = b.dependency("biscuit-format", .{ .target = target, .optimize = optimize });
-    const builder = b.dependency("biscuit-builder", .{ .target = target, .optimize = optimize });
 
-    _ = b.addModule("biscuit-parser", .{
-        .root_source_file = .{ .path = "src/main.zig" },
+    _ = b.addModule("biscuit-builder", .{
+        .root_source_file = .{ .path = "src/root.zig" },
         .imports = &.{
             .{ .name = "biscuit-schema", .module = schema.module("biscuit-schema") },
             .{ .name = "biscuit-format", .module = format.module("biscuit-format") },
-            .{ .name = "biscuit-builder", .module = builder.module("biscuit-builder") },
-            .{ .name = "ziglyph", .module = ziglyph.module("ziglyph") },
         },
     });
 
@@ -39,8 +35,6 @@ pub fn build(b: *std.Build) void {
     });
     lib_unit_tests.root_module.addImport("biscuit-schema", schema.module("biscuit-schema"));
     lib_unit_tests.root_module.addImport("biscuit-format", format.module("biscuit-format"));
-    lib_unit_tests.root_module.addImport("biscuit-builder", builder.module("biscuit-builder"));
-    lib_unit_tests.root_module.addImport("ziglyph", ziglyph.module("ziglyph"));
 
     const run_lib_unit_tests = b.addRunArtifact(lib_unit_tests);
 
