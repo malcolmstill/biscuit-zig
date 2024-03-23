@@ -4,12 +4,14 @@ const datalog = @import("biscuit-datalog");
 const TermTag = enum(u8) {
     variable,
     string,
+    integer,
     bool,
 };
 
 pub const Term = union(TermTag) {
     variable: []const u8,
     string: []const u8,
+    integer: i64,
     bool: bool,
 
     pub fn deinit(_: Term) void {}
@@ -18,6 +20,7 @@ pub const Term = union(TermTag) {
         return switch (term) {
             .variable => |s| .{ .variable = @truncate(try symbols.insert(s)) }, // FIXME: assert symbol fits in u32
             .string => |s| .{ .string = try symbols.insert(s) },
+            .integer => |n| .{ .integer = n },
             .bool => |b| .{ .bool = b },
         };
     }
@@ -26,6 +29,7 @@ pub const Term = union(TermTag) {
         switch (term) {
             .variable => |v| try writer.print("${s}", .{v}),
             .string => |s| try writer.print("\"{s}\"", .{s}),
+            .integer => |n| try writer.print("{}", .{n}),
             .bool => |b| if (b) try writer.print("true", .{}) else try writer.print("false", .{}),
         }
     }

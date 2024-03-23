@@ -6,7 +6,7 @@ const SignedBlock = @import("signed_block.zig").SignedBlock;
 const Proof = @import("proof.zig").Proof;
 
 pub const MIN_SCHEMA_VERSION = 3;
-pub const MAX_SCHEMA_VERSION = 3;
+pub const MAX_SCHEMA_VERSION = 4;
 
 pub const SerializedBiscuit = struct {
     decoded_biscuit: schema.Biscuit,

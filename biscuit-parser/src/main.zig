@@ -101,6 +101,16 @@ pub const Parser = struct {
             return .{ .string = value };
         }
 
+        number_blk: {
+            var term_parser = Parser.init(rst);
+
+            const value = term_parser.number() catch break :number_blk;
+
+            parser.offset += term_parser.offset;
+
+            return .{ .integer = value };
+        }
+
         bool_blk: {
             var term_parser = Parser.init(rst);
 
@@ -127,6 +137,16 @@ pub const Parser = struct {
             parser.offset += term_parser.offset;
 
             return .{ .string = value };
+        }
+
+        number_blk: {
+            var term_parser = Parser.init(rst);
+
+            const value = term_parser.number() catch break :number_blk;
+
+            parser.offset += term_parser.offset;
+
+            return .{ .integer = value };
         }
 
         bool_blk: {
@@ -204,6 +224,23 @@ pub const Parser = struct {
         return error.ExpectedStringTerm;
     }
 
+    fn number(parser: *Parser) !i64 {
+        const start = parser.offset;
+
+        for (parser.rest()) |c| {
+            if (ziglyph.isAsciiDigit(c)) {
+                parser.offset += 1;
+                continue;
+            }
+
+            break;
+        }
+
+        const text = parser.input[start..parser.offset];
+
+        return try std.fmt.parseInt(i64, text, 10);
+    }
+
     fn boolean(parser: *Parser) !bool {
         if (std.mem.startsWith(u8, parser.rest(), "true")) {
             parser.offset += "term".len;
@@ -253,6 +290,8 @@ pub const Parser = struct {
             parser.skipWhiteSpace();
 
             if (!std.mem.startsWith(u8, parser.rest(), "or")) break;
+
+            parser.offset += "or".len;
 
             const body = try parser.ruleBody(allocator);
 

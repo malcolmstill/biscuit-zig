@@ -33,7 +33,7 @@ pub const Term = union(TermKind) {
             .string => |v| .{ .string = v },
             .bool => |v| .{ .bool = v },
             .date => |v| .{ .date = v },
-            .bytes => return error.FromSchemaNotImplementedForBytes,
+            .bytes => |v| .{ .bytes = v.getSlice() },
             .set => |v| {
                 var set = Set(Term).init(allocator);
                 for (v.set.items) |term| {

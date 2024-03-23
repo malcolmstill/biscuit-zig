@@ -78,7 +78,6 @@ pub const Authorizer = struct {
         // when mapped into the world it may have id 5.
         if (authorizer.biscuit) |biscuit| {
             for (biscuit.authority.facts.items) |fact| {
-                std.debug.print("Adding biscuit authority block fact to authorizer: {any}\n", .{fact});
                 try authorizer.world.addFact(try fact.convert(&biscuit.authority.symbols, &authorizer.symbols));
             }
 
@@ -92,6 +91,7 @@ pub const Authorizer = struct {
 
         //  3. Run checks that have been added to this authorizer
         for (authorizer.checks.items) |c| {
+            std.debug.print("authorizer check = {any}\n", .{c});
             const check = try c.convert(authorizer.allocator, &authorizer.symbols);
 
             for (check.queries.items, 0..) |*query, check_id| {
