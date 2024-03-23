@@ -49,6 +49,13 @@ pub fn Set(comptime K: type) type {
             set.inner.deinit();
         }
 
+        pub fn clone(set: *const Self) !Self {
+            return .{
+                .inner = try set.inner.clone(),
+                .alloc = set.alloc,
+            };
+        }
+
         pub fn iterator(set: Self) InnerSet.KeyIterator {
             return set.inner.keyIterator();
         }

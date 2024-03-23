@@ -48,9 +48,17 @@ pub const Term = union(TermKind) {
         return switch (term) {
             .variable => |id| .{ .variable = std.math.cast(u32, try new_symbols.insert(try old_symbols.getString(id))) orelse return error.VariableIdTooLarge },
             .string => |id| .{ .string = try new_symbols.insert(try old_symbols.getString(id)) },
-            .integer, .bool, .date => term,
-            .bytes => return error.ConvertNotImplementedForBytes,
-            .set => |_| return error.ConvertNotImplementedForBytes,
+            .integer, .bool, .date, .bytes => term,
+            .set => |s| blk: {
+                var set: Set(Term) = try s.clone();
+
+                var it = set.iterator();
+                while (it.next()) |trm_ptr| {
+                    trm_ptr.* = try trm_ptr.*.convert(old_symbols, new_symbols);
+                }
+
+                break :blk .{ .set = set };
+            },
         };
     }
 
