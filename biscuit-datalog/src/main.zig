@@ -1,5 +1,7 @@
 pub const fact = @import("fact.zig");
+pub const Fact = @import("fact.zig").Fact;
 pub const predicate = @import("predicate.zig");
+pub const Predicate = @import("predicate.zig").Predicate;
 pub const rule = @import("rule.zig");
 pub const check = @import("check.zig");
 pub const symbol_table = @import("symbol_table.zig");

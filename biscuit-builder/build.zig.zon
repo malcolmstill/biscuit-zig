@@ -40,6 +40,7 @@
         //},
         .@"biscuit-schema" = .{ .path = "../biscuit-schema" },
         .@"biscuit-format" = .{ .path = "../biscuit-format" },
+        .@"biscuit-datalog" = .{ .path = "../biscuit-datalog" },
     },
 
     // Specifies the set of files and directories that are included in this package.

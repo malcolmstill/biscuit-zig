@@ -12,7 +12,11 @@ pub const Fact = struct {
     }
 
     /// convert to datalog fact
-    pub fn convert(_: Fact) datalog.Fact {
-        unreachable;
+    pub fn convert(fact: Fact) datalog.Fact {
+        return .{ .predicate = fact.predicate.convert() };
+    }
+
+    pub fn format(fact: Fact, comptime _: []const u8, _: std.fmt.FormatOptions, writer: anytype) !void {
+        return writer.print("{any}", .{fact.predicate});
     }
 };

@@ -11,14 +11,11 @@ pub const Parser = struct {
         return .{ .input = input };
     }
 
-    pub fn fact(parser: *Parser) !Fact {
-        return try parser.factPredicate();
+    pub fn fact(parser: *Parser, allocator: std.mem.Allocator) !Fact {
+        return try parser.factPredicate(allocator);
     }
 
     pub fn factPredicate(parser: *Parser, allocator: std.mem.Allocator) !Fact {
-        std.debug.print("{s}[0] = {s}\n", .{ @src().fn_name, parser.rest() });
-        defer std.debug.print("{s}[1] = {s}\n", .{ @src().fn_name, parser.rest() });
-
         const name = parser.readName();
 
         parser.skipWhiteSpace();
@@ -65,9 +62,6 @@ pub const Parser = struct {
     }
 
     pub fn factTerm(parser: *Parser) !Term {
-        std.debug.print("{s}[0] = {s}\n", .{ @src().fn_name, parser.rest() });
-        defer std.debug.print("{s}[1] = {s}\n", .{ @src().fn_name, parser.rest() });
-
         const rst = parser.rest();
 
         try parser.reject('$'); // Variables are disallowed in a fact term
@@ -97,18 +91,12 @@ pub const Parser = struct {
     }
 
     fn string(parser: *Parser) ![]const u8 {
-        std.debug.print("{s}[0] = {s}\n", .{ @src().fn_name, parser.rest() });
-        defer std.debug.print("{s}[1] = {s}\n", .{ @src().fn_name, parser.rest() });
-
         try parser.expect('"');
 
         return error.ExpectedStringTerm;
     }
 
     fn boolean(parser: *Parser) !bool {
-        std.debug.print("{s}[0] = {s}\n", .{ @src().fn_name, parser.rest() });
-        defer std.debug.print("{s}[1] = {s}\n", .{ @src().fn_name, parser.rest() });
-
         if (std.mem.startsWith(u8, parser.rest(), "true")) {
             parser.offset += "term".len;
             return true;

@@ -17,12 +17,14 @@ pub fn build(b: *std.Build) void {
 
     const schema = b.dependency("biscuit-schema", .{ .target = target, .optimize = optimize });
     const format = b.dependency("biscuit-format", .{ .target = target, .optimize = optimize });
+    const datalog = b.dependency("biscuit-datalog", .{ .target = target, .optimize = optimize });
 
     _ = b.addModule("biscuit-builder", .{
         .root_source_file = .{ .path = "src/root.zig" },
         .imports = &.{
             .{ .name = "biscuit-schema", .module = schema.module("biscuit-schema") },
             .{ .name = "biscuit-format", .module = format.module("biscuit-format") },
+            .{ .name = "biscuit-datalog", .module = datalog.module("biscuit-datalog") },
         },
     });
 

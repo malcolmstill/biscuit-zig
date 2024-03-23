@@ -41,26 +41,26 @@ pub fn main() anyerror!void {
         const token = try std.fs.cwd().readFileAlloc(alloc, testcase.filename, 0xFFFFFFF);
 
         for (testcase.validations.map.values()) |validation| {
-            try validate(alloc, token, public_key, validation.result);
+            try validate(alloc, token, public_key, validation.result, validation.authorizer_code);
         }
     }
 }
 
-pub fn validate(alloc: mem.Allocator, token: []const u8, public_key: std.crypto.sign.Ed25519.PublicKey, result: Result) !void {
+pub fn validate(alloc: mem.Allocator, token: []const u8, public_key: std.crypto.sign.Ed25519.PublicKey, result: Result, authorizer_code: []const u8) !void {
     var errors = std.ArrayList(AuthorizerError).init(alloc);
     defer errors.deinit();
 
     switch (result) {
-        .Ok => try runValidation(alloc, token, public_key, &errors),
+        .Ok => try runValidation(alloc, token, public_key, authorizer_code, &errors),
         .Err => |e| {
             switch (e) {
                 .Format => |f| switch (f) {
-                    .InvalidSignatureSize => runValidation(alloc, token, public_key, &errors) catch |err| switch (err) {
+                    .InvalidSignatureSize => runValidation(alloc, token, public_key, authorizer_code, &errors) catch |err| switch (err) {
                         error.IncorrectBlockSignatureLength => return,
                         else => return err,
                     },
                     .Signature => |s| switch (s) {
-                        .InvalidSignature => runValidation(alloc, token, public_key, &errors) catch |err| switch (err) {
+                        .InvalidSignature => runValidation(alloc, token, public_key, authorizer_code, &errors) catch |err| switch (err) {
                             error.SignatureVerificationFailed,
                             error.InvalidEncoding,
                             => return,
@@ -69,7 +69,7 @@ pub fn validate(alloc: mem.Allocator, token: []const u8, public_key: std.crypto.
                     },
                 },
                 .FailedLogic => |f| switch (f) {
-                    .Unauthorized => |u| runValidation(alloc, token, public_key, &errors) catch |err| switch (err) {
+                    .Unauthorized => |u| runValidation(alloc, token, public_key, authorizer_code, &errors) catch |err| switch (err) {
                         error.AuthorizationFailed => {
 
                             // Check that we have expected check failures
@@ -100,11 +100,11 @@ pub fn validate(alloc: mem.Allocator, token: []const u8, public_key: std.crypto.
                         },
                         else => return err,
                     },
-                    .InvalidBlockRule => runValidation(alloc, token, public_key, &errors) catch |err| switch (err) {
+                    .InvalidBlockRule => runValidation(alloc, token, public_key, authorizer_code, &errors) catch |err| switch (err) {
                         else => return err,
                     },
                 },
-                .Execution => runValidation(alloc, token, public_key, &errors) catch |err| switch (err) {
+                .Execution => runValidation(alloc, token, public_key, authorizer_code, &errors) catch |err| switch (err) {
                     else => return err,
                 },
             }
@@ -114,12 +114,28 @@ pub fn validate(alloc: mem.Allocator, token: []const u8, public_key: std.crypto.
     }
 }
 
-pub fn runValidation(alloc: mem.Allocator, token: []const u8, public_key: std.crypto.sign.Ed25519.PublicKey, errors: *std.ArrayList(AuthorizerError)) !void {
+pub fn runValidation(alloc: mem.Allocator, token: []const u8, public_key: std.crypto.sign.Ed25519.PublicKey, authorizer_code: []const u8, errors: *std.ArrayList(AuthorizerError)) !void {
     var b = try Biscuit.initFromBytes(alloc, token, public_key);
     defer b.deinit();
 
     var a = b.authorizer(alloc);
     defer a.deinit();
+
+    var it = std.mem.split(u8, authorizer_code, ";");
+    while (it.next()) |code| {
+        const text = std.mem.trim(u8, code, " ");
+        if (text.len == 0) continue;
+
+        if (std.mem.startsWith(u8, text, "check if") or std.mem.startsWith(u8, text, "check all")) {
+            // try a.addCheck(text);
+        } else if (std.mem.startsWith(u8, text, "allow if") or std.mem.startsWith(u8, text, "deny if")) {
+            // try a.addPolicy(text);
+        } else if (std.mem.startsWith(u8, text, "revocation_id")) {
+            //
+        } else {
+            try a.addFact(text);
+        }
+    }
 
     try a.authorize(errors);
 }

@@ -4,9 +4,12 @@ const Biscuit = @import("biscuit.zig").Biscuit;
 const World = @import("biscuit-datalog").world.World;
 const Check = @import("biscuit-datalog").check.Check;
 const SymbolTable = @import("biscuit-datalog").symbol_table.SymbolTable;
+const Parser = @import("biscuit-parser").Parser;
+const builder = @import("biscuit-builder");
 
 pub const Authorizer = struct {
     allocator: mem.Allocator,
+    checks: std.ArrayList(builder.Check),
     biscuit: ?Biscuit,
     world: World,
     symbols: SymbolTable,
@@ -14,6 +17,7 @@ pub const Authorizer = struct {
     pub fn init(allocator: std.mem.Allocator, biscuit: Biscuit) Authorizer {
         return .{
             .allocator = allocator,
+            .checks = std.ArrayList(builder.Check).init(allocator),
             .biscuit = biscuit,
             .world = World.init(allocator),
             .symbols = SymbolTable.init(allocator),
@@ -23,6 +27,27 @@ pub const Authorizer = struct {
     pub fn deinit(authorizer: *Authorizer) void {
         authorizer.world.deinit();
         authorizer.symbols.deinit();
+
+        for (authorizer.checks.items) |check| {
+            check.deinit();
+        }
+        authorizer.checks.deinit();
+    }
+
+    pub fn addFact(authorizer: *Authorizer, input: []const u8) !void {
+        var parser = Parser.init(input);
+
+        const fact = try parser.fact(authorizer.allocator);
+
+        try authorizer.world.addFact(fact.convert());
+    }
+
+    pub fn addCheck(authorizer: *Authorizer, input: []const u8) void {
+        var parser = Parser.init(input);
+
+        const check = try parser.check();
+
+        try authorizer.checks.append(check);
     }
 
     /// authorize

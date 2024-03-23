@@ -14,4 +14,13 @@ pub const Predicate = struct {
     pub fn convert(_: Predicate) datalog.Predicate {
         unreachable;
     }
+
+    pub fn format(predicate: Predicate, comptime _: []const u8, _: std.fmt.FormatOptions, writer: anytype) !void {
+        try writer.print("{s}(", .{predicate.name});
+        for (predicate.terms.items, 0..) |*term, i| {
+            try writer.print("{any}", .{term.*});
+            if (i < predicate.terms.items.len - 1) try writer.print(", ", .{});
+        }
+        return writer.print(")", .{});
+    }
 };
