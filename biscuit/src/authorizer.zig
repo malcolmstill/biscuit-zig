@@ -35,14 +35,17 @@ pub const Authorizer = struct {
     }
 
     pub fn addFact(authorizer: *Authorizer, input: []const u8) !void {
+        std.debug.print("addFact = \"{s}\"\n", .{input});
         var parser = Parser.init(input);
 
         const fact = try parser.fact(authorizer.allocator);
 
-        try authorizer.world.addFact(fact.convert());
+        std.debug.print("fact = {any}\n", .{fact});
+
+        try authorizer.world.addFact(try fact.convert(authorizer.allocator, &authorizer.symbols));
     }
 
-    pub fn addCheck(authorizer: *Authorizer, input: []const u8) void {
+    pub fn addCheck(authorizer: *Authorizer, input: []const u8) !void {
         var parser = Parser.init(input);
 
         const check = try parser.check();

@@ -6,7 +6,7 @@ pub const Check = struct {
     queries: std.ArrayList(Rule),
     kind: Kind,
 
-    const Kind = enum(u8) { one, all };
+    pub const Kind = enum(u8) { one, all };
 
     pub fn fromSchema(allocator: std.mem.Allocator, schema_check: schema.CheckV2) !Check {
         var rules = std.ArrayList(Rule).init(allocator);

@@ -5,6 +5,9 @@ pub const Predicate = @import("predicate.zig").Predicate;
 pub const rule = @import("rule.zig");
 pub const check = @import("check.zig");
 pub const symbol_table = @import("symbol_table.zig");
+pub const SymbolTable = @import("symbol_table.zig").SymbolTable;
+pub const Term = @import("term.zig").Term;
+pub const Check = @import("check.zig").Check;
 pub const world = @import("world.zig");
 
 test {

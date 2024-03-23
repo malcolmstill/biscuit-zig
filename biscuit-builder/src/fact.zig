@@ -12,8 +12,8 @@ pub const Fact = struct {
     }
 
     /// convert to datalog fact
-    pub fn convert(fact: Fact) datalog.Fact {
-        return .{ .predicate = fact.predicate.convert() };
+    pub fn convert(fact: Fact, allocator: std.mem.Allocator, symbols: *datalog.SymbolTable) !datalog.Fact {
+        return .{ .predicate = try fact.predicate.convert(allocator, symbols) };
     }
 
     pub fn format(fact: Fact, comptime _: []const u8, _: std.fmt.FormatOptions, writer: anytype) !void {

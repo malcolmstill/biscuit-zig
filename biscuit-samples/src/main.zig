@@ -123,11 +123,11 @@ pub fn runValidation(alloc: mem.Allocator, token: []const u8, public_key: std.cr
 
     var it = std.mem.split(u8, authorizer_code, ";");
     while (it.next()) |code| {
-        const text = std.mem.trim(u8, code, " ");
+        const text = std.mem.trim(u8, code, " \n");
         if (text.len == 0) continue;
 
         if (std.mem.startsWith(u8, text, "check if") or std.mem.startsWith(u8, text, "check all")) {
-            // try a.addCheck(text);
+            try a.addCheck(text);
         } else if (std.mem.startsWith(u8, text, "allow if") or std.mem.startsWith(u8, text, "deny if")) {
             // try a.addPolicy(text);
         } else if (std.mem.startsWith(u8, text, "revocation_id")) {
