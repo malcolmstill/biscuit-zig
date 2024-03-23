@@ -1,6 +1,7 @@
 const std = @import("std");
 const schema = @import("biscuit-schema");
 const Rule = @import("rule.zig").Rule;
+const SymbolTable = @import("symbol_table.zig").SymbolTable;
 
 pub const Check = struct {
     queries: std.ArrayList(Rule),
@@ -38,5 +39,18 @@ pub const Check = struct {
             if (i < check.queries.items.len - 1) try writer.print(", ", .{});
         }
         return writer.print("", .{});
+    }
+
+    pub fn convert(check: Check, old_symbols: *const SymbolTable, new_symbols: *SymbolTable) !Check {
+        var queries = try check.queries.clone();
+
+        for (queries.items, 0..) |query, i| {
+            queries.items[i] = try query.convert(old_symbols, new_symbols);
+        }
+
+        return .{
+            .queries = queries,
+            .kind = check.kind,
+        };
     }
 };

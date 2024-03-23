@@ -40,7 +40,8 @@ pub fn main() anyerror!void {
 
         const token = try std.fs.cwd().readFileAlloc(alloc, testcase.filename, 0xFFFFFFF);
 
-        for (testcase.validations.map.values()) |validation| {
+        for (testcase.validations.map.values(), 0..) |validation, i| {
+            errdefer std.debug.print("Error on validation {} of {s}\n", .{ i, testcase.filename });
             try validate(alloc, token, public_key, validation.result, validation.authorizer_code);
         }
     }

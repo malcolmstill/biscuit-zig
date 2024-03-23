@@ -1,5 +1,6 @@
 const std = @import("std");
 const schema = @import("biscuit-schema");
+const SymbolTable = @import("symbol_table.zig").SymbolTable;
 
 pub const Scope = union(ScopeTag) {
     authority: void,
@@ -17,6 +18,11 @@ pub const Scope = union(ScopeTag) {
             },
             .publicKey => |key| .{ .public_key = @bitCast(key) }, // FIXME: should we check for negativity?
         };
+    }
+
+    pub fn convert(scope: Scope, _: *const SymbolTable, _: *SymbolTable) !Scope {
+        //
+        return scope;
     }
 };
 

@@ -97,6 +97,11 @@ pub const Expression = struct {
 
         return stack.items[0];
     }
+
+    pub fn convert(expression: Expression, _: *const SymbolTable, _: *SymbolTable) !Expression {
+        //
+        return expression;
+    }
 };
 
 const OpKind = enum(u8) {

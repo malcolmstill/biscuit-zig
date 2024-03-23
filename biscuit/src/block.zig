@@ -20,7 +20,7 @@ pub const Block = struct {
         return .{
             .version = 0,
             .context = "",
-            .symbols = SymbolTable.init(allocator),
+            .symbols = SymbolTable.init("block", allocator),
             .facts = std.ArrayList(Fact).init(allocator),
             .rules = std.ArrayList(Rule).init(allocator),
             .checks = std.ArrayList(Check).init(allocator),

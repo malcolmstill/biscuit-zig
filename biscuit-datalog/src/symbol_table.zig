@@ -2,11 +2,13 @@ const std = @import("std");
 const mem = std.mem;
 
 pub const SymbolTable = struct {
+    name: []const u8,
     allocator: mem.Allocator,
     symbols: std.ArrayList([]const u8),
 
-    pub fn init(allocator: mem.Allocator) SymbolTable {
+    pub fn init(name: []const u8, allocator: mem.Allocator) SymbolTable {
         return .{
+            .name = name,
             .allocator = allocator,
             .symbols = std.ArrayList([]const u8).init(allocator),
         };
@@ -31,7 +33,11 @@ pub const SymbolTable = struct {
         // Otherwise we need to insert the new symbol
         try symbol_table.symbols.append(string);
 
-        return symbol_table.symbols.items.len - 1 + NON_DEFAULT_SYMBOLS_OFFSET;
+        const index = symbol_table.symbols.items.len - 1 + NON_DEFAULT_SYMBOLS_OFFSET;
+
+        std.debug.print("{s}: Inserting \"{s}\" at {}\n", .{ symbol_table.name, symbol, index });
+
+        return index;
     }
 
     pub fn get(symbol_table: *SymbolTable, symbol: []const u8) ?u64 {
@@ -49,13 +55,18 @@ pub const SymbolTable = struct {
     }
 
     pub fn getString(symbol_table: *const SymbolTable, sym_index: u64) ![]const u8 {
-        if (indexToDefault(sym_index)) |str| {
-            return str;
+        if (indexToDefault(sym_index)) |sym| {
+            std.debug.print("Found \"{s}\" at {} (default)\n", .{ sym, sym_index });
+            return sym;
         }
 
         if (sym_index >= NON_DEFAULT_SYMBOLS_OFFSET and sym_index < NON_DEFAULT_SYMBOLS_OFFSET + symbol_table.symbols.items.len) {
-            return symbol_table.symbols.items[sym_index - NON_DEFAULT_SYMBOLS_OFFSET];
+            const sym = symbol_table.symbols.items[sym_index - NON_DEFAULT_SYMBOLS_OFFSET];
+            std.debug.print("Found \"{s}\" at {}\n", .{ sym, sym_index });
+            return sym;
         }
+
+        std.debug.print("Existing sym index {} not found\n", .{sym_index});
 
         return error.SymbolNotFound;
     }

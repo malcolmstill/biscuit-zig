@@ -20,7 +20,7 @@ pub const Authorizer = struct {
             .checks = std.ArrayList(builder.Check).init(allocator),
             .biscuit = biscuit,
             .world = World.init(allocator),
-            .symbols = SymbolTable.init(allocator),
+            .symbols = SymbolTable.init("authorizer", allocator),
         };
     }
 
@@ -35,7 +35,7 @@ pub const Authorizer = struct {
     }
 
     pub fn addFact(authorizer: *Authorizer, input: []const u8) !void {
-        std.debug.print("addFact = \"{s}\"\n", .{input});
+        std.debug.print("authorizer.addFact = {s}\n", .{input});
         var parser = Parser.init(input);
 
         const fact = try parser.fact(authorizer.allocator);
@@ -78,12 +78,12 @@ pub const Authorizer = struct {
         // when mapped into the world it may have id 5.
         if (authorizer.biscuit) |biscuit| {
             for (biscuit.authority.facts.items) |fact| {
+                std.debug.print("Adding biscuit authority block fact to authorizer: {any}\n", .{fact});
                 try authorizer.world.addFact(try fact.convert(&biscuit.authority.symbols, &authorizer.symbols));
             }
 
             for (biscuit.authority.rules.items) |rule| {
-                // FIXME: remap rule
-                try authorizer.world.addRule(rule);
+                try authorizer.world.addRule(try rule.convert(&biscuit.authority.symbols, &authorizer.symbols));
             }
         }
 
@@ -104,7 +104,8 @@ pub const Authorizer = struct {
 
         // 4. Run checks in the biscuit's authority block
         if (authorizer.biscuit) |biscuit| {
-            for (biscuit.authority.checks.items) |check| {
+            for (biscuit.authority.checks.items) |c| {
+                const check = try c.convert(&biscuit.authority.symbols, &authorizer.symbols);
                 std.debug.print("{any}\n", .{check});
 
                 for (check.queries.items, 0..) |*query, check_id| {
@@ -118,7 +119,7 @@ pub const Authorizer = struct {
 
         // TODO: 5. run policies from the authorizer
 
-        // TODO: 6. Run checks in the biscuit's authority block
+        // 6. Run checks in the biscuit's other blocks
         if (authorizer.biscuit) |biscuit| {
             for (biscuit.blocks.items, 1..) |block, block_id| {
                 std.debug.print("block = {any}\n", .{block});

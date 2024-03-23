@@ -175,4 +175,30 @@ pub const Rule = struct {
             if (i < rule.body.items.len - 1) try writer.print(", ", .{});
         }
     }
+
+    // Convert datalog fact from old symbol space to new symbol space
+    pub fn convert(rule: Rule, old_symbols: *const SymbolTable, new_symbols: *SymbolTable) !Rule {
+        var body = try rule.body.clone();
+        var expressions = try rule.expressions.clone();
+        var scopes = try rule.scopes.clone();
+
+        for (body.items, 0..) |predicate, i| {
+            body.items[i] = try predicate.convert(old_symbols, new_symbols);
+        }
+
+        for (expressions.items, 0..) |expression, i| {
+            expressions.items[i] = try expression.convert(old_symbols, new_symbols);
+        }
+
+        for (scopes.items, 0..) |scope, i| {
+            scopes.items[i] = try scope.convert(old_symbols, new_symbols);
+        }
+
+        return .{
+            .head = try rule.head.convert(old_symbols, new_symbols),
+            .body = body,
+            .expressions = expressions,
+            .scopes = scopes,
+        };
+    }
 };
