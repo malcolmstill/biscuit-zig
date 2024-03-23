@@ -27,6 +27,7 @@ pub const Check = struct {
         for (check.queries.items) |*query| {
             query.deinit();
         }
+
         check.queries.deinit();
     }
 

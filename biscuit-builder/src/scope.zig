@@ -17,7 +17,7 @@ pub const Scope = struct {
     public_key: Ed25519.PublicKey,
 
     /// convert to datalog fact
-    pub fn convert(_: Scope) datalog.Scope {
+    pub fn convert(_: Scope, _: std.mem.Allocator, _: *datalog.SymbolTable) !datalog.Scope {
         unreachable;
     }
 };

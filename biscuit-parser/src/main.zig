@@ -81,6 +81,16 @@ pub const Parser = struct {
     pub fn term(parser: *Parser) !Term {
         const rst = parser.rest();
 
+        variable_blk: {
+            var term_parser = Parser.init(rst);
+
+            const value = term_parser.variable() catch break :variable_blk;
+
+            parser.offset += term_parser.offset;
+
+            return .{ .variable = value };
+        }
+
         string_blk: {
             var term_parser = Parser.init(rst);
 
@@ -148,15 +158,35 @@ pub const Parser = struct {
             try terms.append(trm);
 
             if (parser.peek()) |peeked| {
-                if (peeked != ',') break;
-            } else {
-                break;
+                if (peeked == ',') {
+                    parser.offset += 1;
+                    continue;
+                }
             }
+
+            break;
         }
 
         try parser.expect(')');
 
         return .{ .name = name, .terms = terms };
+    }
+
+    fn variable(parser: *Parser) ![]const u8 {
+        try parser.expect('$');
+
+        const start = parser.offset;
+
+        for (parser.rest()) |c| {
+            if (ziglyph.isAlphaNum(c) or c == '_') {
+                parser.offset += 1;
+                continue;
+            }
+
+            break;
+        }
+
+        return parser.input[start..parser.offset];
     }
 
     fn string(parser: *Parser) ![]const u8 {
@@ -188,7 +218,7 @@ pub const Parser = struct {
         return error.ExpectedBooleanTerm;
     }
 
-    pub fn check(parser: *Parser) !Check {
+    pub fn check(parser: *Parser, allocator: std.mem.Allocator) !Check {
         var kind: datalog.Check.Kind = undefined;
 
         if (std.mem.startsWith(u8, parser.rest(), "check if")) {
@@ -201,13 +231,41 @@ pub const Parser = struct {
             return error.UnexpectedCheckKind;
         }
 
-        const queries = try parser.checkBody();
+        const queries = try parser.checkBody(allocator);
 
         return .{ .kind = kind, .queries = queries };
     }
 
-    fn checkBody(_: *Parser) !std.ArrayList(Rule) {
-        unreachable;
+    fn checkBody(parser: *Parser, allocator: std.mem.Allocator) !std.ArrayList(Rule) {
+        var queries = std.ArrayList(Rule).init(allocator);
+
+        const required_body = try parser.ruleBody(allocator);
+
+        try queries.append(.{
+            .head = .{ .name = "query", .terms = std.ArrayList(Term).init(allocator) },
+            .body = required_body.predicates,
+            .expressions = required_body.expressions,
+            .scopes = required_body.scopes,
+            .variables = null,
+        });
+
+        while (true) {
+            parser.skipWhiteSpace();
+
+            if (!std.mem.startsWith(u8, parser.rest(), "or")) break;
+
+            const body = try parser.ruleBody(allocator);
+
+            try queries.append(.{
+                .head = .{ .name = "query", .terms = std.ArrayList(Term).init(allocator) },
+                .body = body.predicates,
+                .expressions = body.expressions,
+                .scopes = body.scopes,
+                .variables = null,
+            });
+        }
+
+        return queries;
     }
 
     pub fn rule(parser: *Parser, allocator: std.mem.Allocator) !Rule {
@@ -237,6 +295,7 @@ pub const Parser = struct {
 
         while (true) {
             parser.skipWhiteSpace();
+            std.debug.print("{s}: \"{s}\"\n", .{ @src().fn_name, parser.rest() });
 
             // Try parsing a predicate
             predicate_blk: {
@@ -251,7 +310,10 @@ pub const Parser = struct {
                 parser.skipWhiteSpace();
 
                 if (parser.peek()) |peeked| {
-                    if (peeked == ',') continue;
+                    if (peeked == ',') {
+                        parser.offset += 1;
+                        continue;
+                    }
                 }
             }
 
@@ -268,7 +330,10 @@ pub const Parser = struct {
                 parser.skipWhiteSpace();
 
                 if (parser.peek()) |peeked| {
-                    if (peeked == ',') continue;
+                    if (peeked == ',') {
+                        parser.offset += 1;
+                        continue;
+                    }
                 }
             }
 
@@ -349,28 +414,57 @@ pub const Parser = struct {
     }
 };
 
-test "parse fact predicate" {
-    const testing = std.testing;
-    const fact: []const u8 =
-        \\read(true)
-    ;
+// test "parse fact predicate" {
+//     const testing = std.testing;
+//     const input: []const u8 =
+//         \\read(true)
+//     ;
 
-    var parser = Parser.init(fact);
+//     var parser = Parser.init(input);
 
-    const f = try parser.factPredicate(testing.allocator);
-    defer f.deinit();
-    std.debug.print("{any}\n", .{f});
-}
+//     const r = try parser.factPredicate(testing.allocator);
+//     defer r.deinit();
+
+//     std.debug.print("{any}\n", .{r});
+// }
 
 test "parse rule body" {
     const testing = std.testing;
-    const rule_body: []const u8 =
+    const input: []const u8 =
         \\query(false) <- read(true), write(false)
     ;
 
-    var parser = Parser.init(rule_body);
+    var parser = Parser.init(input);
 
     const r = try parser.rule(testing.allocator);
+    defer r.deinit();
+
+    std.debug.print("{any}\n", .{r});
+}
+
+test "parse rule body with variables" {
+    const testing = std.testing;
+    const input: []const u8 =
+        \\query($0) <- read($0), write(false)
+    ;
+
+    var parser = Parser.init(input);
+
+    const r = try parser.rule(testing.allocator);
+    defer r.deinit();
+
+    std.debug.print("{any}\n", .{r});
+}
+
+test "parse check" {
+    const testing = std.testing;
+    const input: []const u8 =
+        \\check if right($0, $1), resource($0), operation($1)
+    ;
+
+    var parser = Parser.init(input);
+
+    const r = try parser.check(testing.allocator);
     defer r.deinit();
 
     std.debug.print("{any}\n", .{r});

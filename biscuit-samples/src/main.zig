@@ -90,7 +90,19 @@ pub fn validate(alloc: mem.Allocator, token: []const u8, public_key: std.crypto.
                                             }
                                         }
                                     },
-                                    .Authorizer => return error.NotImplemented,
+                                    .Authorizer => |expected_failed_authority_check| {
+                                        for (errors.items) |found_failed_check| {
+                                            switch (found_failed_check) {
+                                                .failed_block_check => return error.NotImplemented,
+                                                .failed_authority_check => |failed_block_check| {
+                                                    if (failed_block_check.check_id == expected_failed_authority_check.check_id) {
+                                                        // continue :blk;
+                                                        check_accounted_for = true;
+                                                    }
+                                                },
+                                            }
+                                        }
+                                    },
                                 }
 
                                 if (!check_accounted_for) return error.ExpectedFailedCheck;

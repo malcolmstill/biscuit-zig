@@ -48,7 +48,7 @@ pub const Authorizer = struct {
     pub fn addCheck(authorizer: *Authorizer, input: []const u8) !void {
         var parser = Parser.init(input);
 
-        const check = try parser.check();
+        const check = try parser.check(authorizer.allocator);
 
         try authorizer.checks.append(check);
     }
@@ -90,7 +90,17 @@ pub const Authorizer = struct {
         // 2. Run the world to generate all facts
         try authorizer.world.run(authorizer.symbols);
 
-        // TODO: 3. Run checks that have been added to this authorizer
+        //  3. Run checks that have been added to this authorizer
+        for (authorizer.checks.items) |c| {
+            const check = try c.convert(authorizer.allocator, &authorizer.symbols);
+
+            for (check.queries.items, 0..) |*query, check_id| {
+                const is_match = try authorizer.world.queryMatch(query, authorizer.symbols);
+
+                if (!is_match) try errors.append(.{ .failed_authority_check = .{ .check_id = check_id } });
+                std.debug.print("match {any} = {}\n", .{ query, is_match });
+            }
+        }
 
         // 4. Run checks in the biscuit's authority block
         if (authorizer.biscuit) |biscuit| {

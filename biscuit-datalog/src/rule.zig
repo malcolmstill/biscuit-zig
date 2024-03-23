@@ -22,16 +22,17 @@ pub const Rule = struct {
         const head = try Predicate.fromSchema(allocator, schema_rule.head orelse return error.NoHeadInRuleSchema);
 
         var body = std.ArrayList(Predicate).init(allocator);
+        var expressions = std.ArrayList(Expression).init(allocator);
+        var scopes = std.ArrayList(Scope).init(allocator);
+
         for (schema_rule.body.items) |predicate| {
             try body.append(try Predicate.fromSchema(allocator, predicate));
         }
 
-        var expressions = std.ArrayList(Expression).init(allocator);
         for (schema_rule.expressions.items) |expression| {
             try expressions.append(try Expression.fromSchema(allocator, expression));
         }
 
-        var scopes = std.ArrayList(Scope).init(allocator);
         for (schema_rule.scope.items) |scope| {
             try scopes.append(try Scope.fromSchema(scope));
         }
@@ -41,16 +42,17 @@ pub const Rule = struct {
 
     pub fn deinit(rule: *Rule) void {
         rule.head.deinit();
+
         for (rule.body.items) |*predicate| {
             predicate.deinit();
         }
-        rule.body.deinit();
 
         for (rule.expressions.items) |*expression| {
             expression.deinit();
         }
-        rule.expressions.deinit();
 
+        rule.body.deinit();
+        rule.expressions.deinit();
         rule.scopes.deinit();
     }
 
