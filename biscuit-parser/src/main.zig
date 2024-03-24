@@ -508,3 +508,7 @@ test "parse check" {
 
     std.debug.print("{any}\n", .{r});
 }
+
+test "Date" {
+    _ = @import("rfc3339.zig");
+}
