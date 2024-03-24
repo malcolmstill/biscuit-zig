@@ -19,6 +19,10 @@ pub const Rule = struct {
             predicate.deinit();
         }
 
+        for (rule.expressions.items) |*expression| {
+            expression.deinit();
+        }
+
         rule.body.deinit();
         rule.expressions.deinit();
         rule.scopes.deinit();
@@ -57,6 +61,13 @@ pub const Rule = struct {
         for (rule.body.items, 0..) |*predicate, i| {
             try writer.print("{any}", .{predicate.*});
             if (i < rule.body.items.len - 1) try writer.print(", ", .{});
+        }
+
+        if (rule.expressions.items.len > 0) try writer.print(", ", .{});
+
+        for (rule.expressions.items, 0..) |*expression, i| {
+            try writer.print("{any}", .{expression.*});
+            if (i < rule.expressions.items.len - 1) try writer.print(", ", .{});
         }
     }
 };

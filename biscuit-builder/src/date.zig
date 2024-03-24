@@ -118,7 +118,7 @@ pub const Date = struct {
         const date_year = @as(usize, @intCast(date.year));
 
         for (1970..date_year) |year| {
-            if (isLeapYear(year)) {
+            if (isLeapYear(usize, year)) {
                 total_days += 366;
             } else {
                 total_days += 365;
@@ -126,7 +126,7 @@ pub const Date = struct {
         }
 
         for (1..date.month) |month| {
-            total_days += daysInMonth(date_year, @as(u8, @intCast(month)));
+            total_days += daysInMonth(usize, date_year, @as(u8, @intCast(month)));
         }
 
         for (1..date.day) |_| {
@@ -141,28 +141,28 @@ pub const Date = struct {
 
         return total_seconds;
     }
+
+    pub fn isDayMonthYearValid(comptime T: type, year: T, month: u8, day: u8) bool {
+        return switch (month) {
+            // 30 days has september, april june and november
+            4, 6, 9, 11 => day <= 30,
+            1, 3, 5, 7, 8, 10, 12 => day <= 31,
+            2 => if (isLeapYear(T, year)) day <= 29 else day <= 28,
+            else => false,
+        };
+    }
 };
 
-pub fn isDayMonthYearValid(year: i32, month: u8, day: u8) bool {
-    return switch (month) {
-        // 30 days has september, april june and november
-        4, 6, 9, 11 => day <= 30,
-        1, 3, 5, 7, 8, 10, 12 => day <= 31,
-        2 => if (isLeapYear(year)) day <= 29 else day <= 28,
-        else => false,
-    };
-}
-
-pub fn daysInMonth(year: usize, month: u8) u8 {
+pub fn daysInMonth(comptime T: type, year: T, month: u8) u8 {
     return switch (month) {
         4, 6, 9, 11 => 30,
         1, 3, 5, 7, 8, 10, 12 => 31,
-        2 => if (isLeapYear(year)) 29 else 28,
+        2 => if (isLeapYear(T, year)) 29 else 28,
         else => unreachable,
     };
 }
 
-fn isLeapYear(year: usize) bool {
+fn isLeapYear(comptime T: type, year: T) bool {
     if (@mod(year, 400) == 0) return true;
     if (@mod(year, 100) == 0) return false;
     if (@mod(year, 4) == 0) return true;

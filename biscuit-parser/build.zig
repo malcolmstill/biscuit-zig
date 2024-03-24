@@ -22,7 +22,7 @@ pub fn build(b: *std.Build) void {
     const datalog = b.dependency("biscuit-datalog", .{ .target = target, .optimize = optimize });
 
     _ = b.addModule("biscuit-parser", .{
-        .root_source_file = .{ .path = "src/main.zig" },
+        .root_source_file = .{ .path = "src/parser.zig" },
         .imports = &.{
             .{ .name = "biscuit-schema", .module = schema.module("biscuit-schema") },
             .{ .name = "biscuit-format", .module = format.module("biscuit-format") },
@@ -35,7 +35,7 @@ pub fn build(b: *std.Build) void {
     // Creates a step for unit testing. This only builds the test executable
     // but does not run it.
     const lib_unit_tests = b.addTest(.{
-        .root_source_file = .{ .path = "src/main.zig" },
+        .root_source_file = .{ .path = "src/parser.zig" },
         .target = target,
         .optimize = optimize,
     });
