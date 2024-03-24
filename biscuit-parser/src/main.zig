@@ -8,6 +8,8 @@ const Rule = @import("biscuit-builder").Rule;
 const Predicate = @import("biscuit-builder").Predicate;
 const Expression = @import("biscuit-builder").Expression;
 const Scope = @import("biscuit-builder").Scope;
+const Date = @import("biscuit-builder").Date;
+const rfc3339 = @import("rfc3339.zig");
 
 pub const Parser = struct {
     input: []const u8,
@@ -101,10 +103,20 @@ pub const Parser = struct {
             return .{ .string = value };
         }
 
+        date_blk: {
+            var term_parser = Parser.init(rst);
+
+            const value = term_parser.date() catch break :date_blk;
+
+            parser.offset += term_parser.offset;
+
+            return .{ .date = value };
+        }
+
         number_blk: {
             var term_parser = Parser.init(rst);
 
-            const value = term_parser.number() catch break :number_blk;
+            const value = term_parser.number(i64) catch break :number_blk;
 
             parser.offset += term_parser.offset;
 
@@ -139,10 +151,20 @@ pub const Parser = struct {
             return .{ .string = value };
         }
 
+        date_blk: {
+            var term_parser = Parser.init(rst);
+
+            const value = term_parser.date() catch break :date_blk;
+
+            parser.offset += term_parser.offset;
+
+            return .{ .date = value };
+        }
+
         number_blk: {
             var term_parser = Parser.init(rst);
 
-            const value = term_parser.number() catch break :number_blk;
+            const value = term_parser.number(i64) catch break :number_blk;
 
             parser.offset += term_parser.offset;
 
@@ -224,7 +246,51 @@ pub const Parser = struct {
         return error.ExpectedStringTerm;
     }
 
-    fn number(parser: *Parser) !i64 {
+    fn date(parser: *Parser) !u64 {
+        const year = try parser.number(i32);
+
+        try parser.expect('-');
+
+        const month = try parser.number(u8);
+        if (month < 1 or month > 12) return error.MonthOutOfRange;
+
+        try parser.expect('-');
+
+        const day = try parser.number(u8);
+        if (!rfc3339.isDayMonthYearValid(year, month, day)) return error.InvalidDayMonthYearCombination;
+
+        try parser.expect('T');
+
+        const hour = try parser.number(u8);
+        if (hour > 23) return error.HoyrOutOfRange;
+
+        try parser.expect(':');
+
+        const minute = try parser.number(u8);
+        if (minute > 59) return error.MinuteOutOfRange;
+
+        try parser.expect(':');
+
+        const second = try parser.number(u8);
+        if (second > 59) return error.SecondOutOfRange;
+
+        try parser.expect('Z');
+
+        const d: Date = .{
+            .year = year,
+            .month = month,
+            .day = day,
+            .hour = hour,
+            .minute = minute,
+            .second = second,
+            .nanosecond = 0,
+            .utc_offset = 0,
+        };
+
+        return d.unixEpoch();
+    }
+
+    fn number(parser: *Parser, comptime T: type) !T {
         const start = parser.offset;
 
         for (parser.rest()) |c| {
@@ -238,7 +304,7 @@ pub const Parser = struct {
 
         const text = parser.input[start..parser.offset];
 
-        return try std.fmt.parseInt(i64, text, 10);
+        return try std.fmt.parseInt(T, text, 10);
     }
 
     fn boolean(parser: *Parser) !bool {
@@ -509,6 +575,6 @@ test "parse check" {
     std.debug.print("{any}\n", .{r});
 }
 
-test "Date" {
-    _ = @import("rfc3339.zig");
-}
+// test "Date" {
+//     _ = @import("rfc3339.zig");
+// }

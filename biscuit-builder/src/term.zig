@@ -1,11 +1,13 @@
 const std = @import("std");
 const datalog = @import("biscuit-datalog");
+const Date = @import("date.zig").Date;
 
 const TermTag = enum(u8) {
     variable,
     string,
     integer,
     bool,
+    date,
 };
 
 pub const Term = union(TermTag) {
@@ -13,6 +15,7 @@ pub const Term = union(TermTag) {
     string: []const u8,
     integer: i64,
     bool: bool,
+    date: u64,
 
     pub fn deinit(_: Term) void {}
 
@@ -22,6 +25,7 @@ pub const Term = union(TermTag) {
             .string => |s| .{ .string = try symbols.insert(s) },
             .integer => |n| .{ .integer = n },
             .bool => |b| .{ .bool = b },
+            .date => |d| .{ .date = d },
         };
     }
 
@@ -31,6 +35,7 @@ pub const Term = union(TermTag) {
             .string => |s| try writer.print("\"{s}\"", .{s}),
             .integer => |n| try writer.print("{}", .{n}),
             .bool => |b| if (b) try writer.print("true", .{}) else try writer.print("false", .{}),
+            .date => |n| try writer.print("{}", .{n}),
         }
     }
 };
