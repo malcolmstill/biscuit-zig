@@ -36,9 +36,9 @@ pub const Authorizer = struct {
 
     pub fn addFact(authorizer: *Authorizer, input: []const u8) !void {
         std.debug.print("authorizer.addFact = {s}\n", .{input});
-        var parser = Parser.init(input);
+        var parser = Parser.init(authorizer.allocator, input);
 
-        const fact = try parser.fact(authorizer.allocator);
+        const fact = try parser.fact();
 
         std.debug.print("fact = {any}\n", .{fact});
 
@@ -46,9 +46,9 @@ pub const Authorizer = struct {
     }
 
     pub fn addCheck(authorizer: *Authorizer, input: []const u8) !void {
-        var parser = Parser.init(input);
+        var parser = Parser.init(authorizer.allocator, input);
 
-        const check = try parser.check(authorizer.allocator);
+        const check = try parser.check();
 
         try authorizer.checks.append(check);
     }
