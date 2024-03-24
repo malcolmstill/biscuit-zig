@@ -64,7 +64,7 @@ pub const Expression = struct {
         var stack = std.ArrayList(Term).init(allocator);
         defer stack.deinit();
 
-        for (expr.ops) |op| {
+        for (expr.ops.items) |op| {
             switch (op) {
                 .value => |term| {
                     switch (term) {

@@ -120,7 +120,7 @@ pub const Rule = struct {
 
         // TODO: if body is empty stuff
 
-        var it = try Combinator.init(0, allocator, matched_variables, rule.body.items, facts, symbols);
+        var it = try Combinator.init(0, allocator, matched_variables, rule.body.items, rule.expressions.items, facts, symbols);
         defer it.deinit();
 
         blk: while (try it.next()) |*bindings| {
@@ -129,6 +129,8 @@ pub const Rule = struct {
             var predicate = try rule.head.cloneWithAllocator(allocator);
             defer predicate.deinit();
 
+            // Loop over terms in head predicate. Update all _variable_ terms with their value
+            // from the binding.
             for (predicate.terms.items, 0..) |head_term, i| {
                 const sym = if (head_term == .variable) head_term.variable else continue;
 
@@ -157,12 +159,13 @@ pub const Rule = struct {
     /// Note: whilst the combinator may return multiple valid matches, `findMatch` only requires a single match
     /// so stopping on the first `it.next()` that returns not-null is enough.
     pub fn findMatch(rule: *Rule, allocator: mem.Allocator, facts: *const Set(Fact), symbols: SymbolTable) !bool {
+        std.debug.print("\nrule.findMatch on {any}\n", .{rule});
         var arena = std.heap.ArenaAllocator.init(allocator);
         defer arena.deinit();
 
         const matched_variables = try MatchedVariables.init(arena.allocator(), rule);
 
-        var it = try Combinator.init(0, allocator, matched_variables, rule.body.items, facts, symbols);
+        var it = try Combinator.init(0, allocator, matched_variables, rule.body.items, rule.expressions.items, facts, symbols);
         defer it.deinit();
 
         return try it.next() != null;

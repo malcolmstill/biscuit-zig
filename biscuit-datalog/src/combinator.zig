@@ -5,6 +5,7 @@ const Fact = @import("fact.zig").Fact;
 const Predicate = @import("predicate.zig").Predicate;
 const Term = @import("term.zig").Term;
 const Set = @import("set.zig").Set;
+const Expression = @import("expression.zig").Expression;
 const MatchedVariables = @import("matched_variables.zig").MatchedVariables;
 const SymbolTable = @import("symbol_table.zig").SymbolTable;
 
@@ -53,12 +54,13 @@ pub const Combinator = struct {
     variables: MatchedVariables,
     next_combinator: ?*Combinator, // Current combinator for the next predicate
     predicates: []Predicate, // List of the predicates so we can generate new Combinators
+    expressions: []Expression,
     current_bindings: ?std.AutoHashMap(u64, Term) = null,
     facts: *const Set(Fact),
     fact_iterator: Set(Fact).Iterator,
     symbols: SymbolTable,
 
-    pub fn init(id: usize, allocator: mem.Allocator, variables: MatchedVariables, predicates: []Predicate, all_facts: *const Set(Fact), symbols: SymbolTable) !*Combinator {
+    pub fn init(id: usize, allocator: mem.Allocator, variables: MatchedVariables, predicates: []Predicate, expressions: []Expression, all_facts: *const Set(Fact), symbols: SymbolTable) !*Combinator {
         std.debug.print("Init combinator[{}]: predicates = {any}\n", .{ id, predicates });
         const c = try allocator.create(Combinator);
 
@@ -68,6 +70,7 @@ pub const Combinator = struct {
             .next_combinator = null,
             .facts = all_facts,
             .predicates = predicates,
+            .expressions = expressions,
             .variables = variables,
             .symbols = symbols,
             .fact_iterator = all_facts.iterator(),
@@ -87,6 +90,22 @@ pub const Combinator = struct {
             // Return from next combinator until expended
             if (combinator.next_combinator) |c| {
                 if (try c.next()) |vars| {
+                    const complete_vars = try vars.complete(combinator.allocator) orelse continue :blk;
+
+                    for (combinator.expressions) |expr| {
+                        std.debug.print("Evaluating {any}\n", .{expr});
+                        const result = try expr.evaluate(combinator.allocator, complete_vars, combinator.symbols);
+
+                        switch (result) {
+                            .bool => |b| if (b) {
+                                continue;
+                            } else {
+                                continue :blk;
+                            },
+                            else => continue :blk,
+                        }
+                    }
+
                     return vars;
                 } else {
                     c.deinit();
@@ -109,6 +128,8 @@ pub const Combinator = struct {
                 // Since we are pulling terms out of a fact, we know
                 // ahead of time that none of the terms will be variables.
                 const fact_term = fact.predicate.terms.items[i];
+                std.debug.assert(fact_term != .variable);
+
                 if (!(try vars.insert(sym, fact_term))) {
                     // We have already bound this variable to a different
                     // term, the current fact does work with previous
@@ -117,14 +138,14 @@ pub const Combinator = struct {
                 }
             }
 
-            // std.debug.print("len = {}\n", .{combinator.predicates[1..].len});
             const next_predicates = combinator.predicates[1..];
+
             if (next_predicates.len == 0) {
                 return vars;
             } else {
                 if (combinator.next_combinator) |c| c.deinit();
 
-                combinator.next_combinator = try Combinator.init(combinator.id + 1, combinator.allocator, vars, next_predicates, combinator.facts, combinator.symbols);
+                combinator.next_combinator = try Combinator.init(combinator.id + 1, combinator.allocator, vars, next_predicates, combinator.expressions, combinator.facts, combinator.symbols);
             }
         }
 
