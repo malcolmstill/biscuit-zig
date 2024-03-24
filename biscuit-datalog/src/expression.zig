@@ -102,6 +102,48 @@ pub const Expression = struct {
         //
         return expression;
     }
+
+    pub fn format(expression: Expression, comptime _: []const u8, _: std.fmt.FormatOptions, writer: anytype) !void {
+        for (expression.ops.items) |op| {
+            switch (op) {
+                .value => |v| try writer.print("{any}", .{v}),
+                .unary => |u| {
+                    switch (u) {
+                        .negate => try writer.print("neg", .{}),
+                        .parens => try writer.print("paren", .{}),
+                        .length => try writer.print("length", .{}),
+                    }
+                },
+                .binary => |b| {
+                    switch (b) {
+                        .less_than => try writer.print("<", .{}),
+                        .greater_than => try writer.print(">", .{}),
+                        .less_or_equal => try writer.print("<=", .{}),
+                        .greater_or_equal => try writer.print(">=", .{}),
+                        .equal => try writer.print("==", .{}),
+                        .contains => try writer.print("contains", .{}),
+                        .prefix => try writer.print("starts_with", .{}),
+                        .suffix => try writer.print("ends_with", .{}),
+                        .regex => try writer.print("matches", .{}),
+                        .add => try writer.print("+", .{}),
+                        .sub => try writer.print("-", .{}),
+                        .mul => try writer.print("*", .{}),
+                        .div => try writer.print("/", .{}),
+                        .@"and" => try writer.print("&&", .{}),
+                        .@"or" => try writer.print("||", .{}),
+                        .intersection => try writer.print("intersection", .{}),
+                        .@"union" => try writer.print("union", .{}),
+                        .bitwise_and => try writer.print("&", .{}),
+                        .bitwise_or => try writer.print("|", .{}),
+                        .bitwise_xor => try writer.print("^", .{}),
+                        .not_equal => try writer.print("!=", .{}),
+                    }
+                },
+            }
+
+            try writer.print(" ", .{});
+        }
+    }
 };
 
 const OpKind = enum(u8) {

@@ -90,22 +90,6 @@ pub const Combinator = struct {
             // Return from next combinator until expended
             if (combinator.next_combinator) |c| {
                 if (try c.next()) |vars| {
-                    const complete_vars = try vars.complete(combinator.allocator) orelse continue :blk;
-
-                    for (combinator.expressions) |expr| {
-                        std.debug.print("Evaluating {any}\n", .{expr});
-                        const result = try expr.evaluate(combinator.allocator, complete_vars, combinator.symbols);
-
-                        switch (result) {
-                            .bool => |b| if (b) {
-                                continue;
-                            } else {
-                                continue :blk;
-                            },
-                            else => continue :blk,
-                        }
-                    }
-
                     return vars;
                 } else {
                     c.deinit();
@@ -141,11 +125,34 @@ pub const Combinator = struct {
             const next_predicates = combinator.predicates[1..];
 
             if (next_predicates.len == 0) {
+                const complete_vars = try vars.complete(combinator.allocator) orelse continue :blk;
+
+                for (combinator.expressions) |expr| {
+                    const result = try expr.evaluate(combinator.allocator, complete_vars, combinator.symbols);
+
+                    switch (result) {
+                        .bool => |b| if (b) {
+                            continue;
+                        } else {
+                            continue :blk;
+                        },
+                        else => continue :blk,
+                    }
+                }
+
                 return vars;
             } else {
                 if (combinator.next_combinator) |c| c.deinit();
 
-                combinator.next_combinator = try Combinator.init(combinator.id + 1, combinator.allocator, vars, next_predicates, combinator.expressions, combinator.facts, combinator.symbols);
+                combinator.next_combinator = try Combinator.init(
+                    combinator.id + 1,
+                    combinator.allocator,
+                    vars,
+                    next_predicates,
+                    combinator.expressions,
+                    combinator.facts,
+                    combinator.symbols,
+                );
             }
         }
 

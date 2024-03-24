@@ -165,6 +165,12 @@ pub const Rule = struct {
 
         const matched_variables = try MatchedVariables.init(arena.allocator(), rule);
 
+        // if (rule.body.items.len == 0) {
+        //     for (rule.expressions.items) |expression| {
+        //         matched_variables.checkExpressions(rule.expressions.items)
+        //     }
+        // }
+
         var it = try Combinator.init(0, allocator, matched_variables, rule.body.items, rule.expressions.items, facts, symbols);
         defer it.deinit();
 
@@ -176,6 +182,13 @@ pub const Rule = struct {
         for (rule.body.items, 0..) |*predicate, i| {
             try writer.print("{any}", .{predicate.*});
             if (i < rule.body.items.len - 1) try writer.print(", ", .{});
+        }
+
+        if (rule.expressions.items.len > 0) try writer.print(", ", .{});
+
+        for (rule.expressions.items, 0..) |*expressions, i| {
+            try writer.print("{any}", .{expressions.*});
+            if (i < rule.expressions.items.len - 1) try writer.print(", ", .{});
         }
     }
 
