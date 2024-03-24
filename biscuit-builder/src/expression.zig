@@ -17,12 +17,14 @@ pub const Expression = union(ExpressionType) {
     const Unary = struct {
         op: UnaryOp,
         expression: *Expression,
+        allocator: std.mem.Allocator,
     };
 
     const Binary = struct {
         op: BinaryOp,
         left: *Expression,
         right: *Expression,
+        allocator: std.mem.Allocator,
     };
 
     pub const UnaryOp = enum {
@@ -62,37 +64,45 @@ pub const Expression = union(ExpressionType) {
 
     pub fn deinit(expression: *Expression) void {
         switch (expression.*) {
-            .value => |v| v.deinit(),
-            .unary => |u| u.expression.deinit(),
-            .binary => |b| {
+            .value => |v| {
+                v.deinit();
+            },
+            .unary => |*u| {
+                u.expression.deinit();
+
+                u.allocator.destroy(u.expression);
+            },
+            .binary => |*b| {
                 b.left.deinit();
                 b.right.deinit();
+
+                b.allocator.destroy(b.left);
+                b.allocator.destroy(b.right);
             },
         }
     }
 
-    pub fn initValue(allocator: std.mem.Allocator, term: Term) !*Expression {
-        const e = try allocator.create(Expression);
-
-        e.* = .{ .value = term };
-
-        return e;
+    pub fn value(term: Term) !Expression {
+        return .{ .value = term };
     }
 
-    pub fn initUnary(allocator: std.mem.Allocator, op: UnaryOp, expr: *Expression) !*Expression {
-        const e = try allocator.create(Expression);
+    pub fn unary(allocator: std.mem.Allocator, op: UnaryOp, expr: Expression) !Expression {
+        const expr_ptr = try allocator.create(Expression);
 
-        e.* = .{ .unary = .{ .op = op, .expression = expr } };
+        expr_ptr.* = expr;
 
-        return e;
+        return .{ .unary = .{ .op = op, .expression = expr_ptr, .allocator = allocator } };
     }
 
-    pub fn initBinary(allocator: std.mem.Allocator, op: BinaryOp, left: *Expression, right: *Expression) !*Expression {
-        const e = try allocator.create(Expression);
+    pub fn binary(allocator: std.mem.Allocator, op: BinaryOp, left: Expression, right: Expression) !Expression {
+        const left_ptr = try allocator.create(Expression);
+        errdefer allocator.destroy(left_ptr);
+        const right_ptr = try allocator.create(Expression);
 
-        e.* = .{ .binary = .{ .op = op, .left = left, .right = right } };
+        left_ptr.* = left;
+        right_ptr.* = right;
 
-        return e;
+        return .{ .binary = .{ .op = op, .left = left_ptr, .right = right_ptr, .allocator = allocator } };
     }
 
     pub fn format(expression: Expression, comptime _: []const u8, _: std.fmt.FormatOptions, writer: anytype) !void {

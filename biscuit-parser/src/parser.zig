@@ -430,7 +430,7 @@ pub const Parser = struct {
 
                 parser.offset += expression_parser.offset;
 
-                try expressions.append(e.*);
+                try expressions.append(e);
 
                 parser.skipWhiteSpace();
 
@@ -460,7 +460,7 @@ pub const Parser = struct {
         return .{ .predicates = predicates, .expressions = expressions, .scopes = scopes };
     }
 
-    fn expression(parser: *Parser) ParserError!*Expression {
+    fn expression(parser: *Parser) ParserError!Expression {
         std.debug.print("Attempting to parser {s}\n", .{parser.rest()});
         parser.skipWhiteSpace();
         const e = try parser.expr();
@@ -470,7 +470,7 @@ pub const Parser = struct {
         return e;
     }
 
-    fn expr(parser: *Parser) ParserError!*Expression {
+    fn expr(parser: *Parser) ParserError!Expression {
         std.debug.print("[{s}]\n", .{@src().fn_name});
         var e = try parser.expr1();
 
@@ -487,13 +487,13 @@ pub const Parser = struct {
             const e2 = try parser.expr1();
             std.debug.print("[{s}] e2 = {any}\n", .{ @src().fn_name, e2 });
 
-            e = try Expression.initBinary(parser.allocator, op, e, e2);
+            e = try Expression.binary(parser.allocator, op, e, e2);
         }
 
         return e;
     }
 
-    fn expr1(parser: *Parser) ParserError!*Expression {
+    fn expr1(parser: *Parser) ParserError!Expression {
         std.debug.print("[{s}]\n", .{@src().fn_name});
         var e = try parser.expr2();
 
@@ -510,13 +510,13 @@ pub const Parser = struct {
             const e2 = try parser.expr2();
             std.debug.print("[{s}] e2 = {any}\n", .{ @src().fn_name, e2 });
 
-            e = try Expression.initBinary(parser.allocator, op, e, e2);
+            e = try Expression.binary(parser.allocator, op, e, e2);
         }
 
         return e;
     }
 
-    fn expr2(parser: *Parser) ParserError!*Expression {
+    fn expr2(parser: *Parser) ParserError!Expression {
         std.debug.print("[{s}]\n", .{@src().fn_name});
         var e = try parser.expr3();
 
@@ -533,13 +533,13 @@ pub const Parser = struct {
             const e2 = try parser.expr3();
             std.debug.print("[{s}] e2 = {any}\n", .{ @src().fn_name, e2 });
 
-            e = try Expression.initBinary(parser.allocator, op, e, e2);
+            e = try Expression.binary(parser.allocator, op, e, e2);
         }
 
         return e;
     }
 
-    fn expr3(parser: *Parser) ParserError!*Expression {
+    fn expr3(parser: *Parser) ParserError!Expression {
         std.debug.print("[{s}]\n", .{@src().fn_name});
         var e = try parser.expr4();
 
@@ -556,13 +556,13 @@ pub const Parser = struct {
             const e2 = try parser.expr4();
             std.debug.print("[{s}] e2 = {any}\n", .{ @src().fn_name, e2 });
 
-            e = try Expression.initBinary(parser.allocator, op, e, e2);
+            e = try Expression.binary(parser.allocator, op, e, e2);
         }
 
         return e;
     }
 
-    fn expr4(parser: *Parser) ParserError!*Expression {
+    fn expr4(parser: *Parser) ParserError!Expression {
         std.debug.print("[{s}]\n", .{@src().fn_name});
         var e = try parser.expr5();
 
@@ -579,13 +579,13 @@ pub const Parser = struct {
             const e2 = try parser.expr5();
             std.debug.print("[{s}] e2 = {any}\n", .{ @src().fn_name, e2 });
 
-            e = try Expression.initBinary(parser.allocator, op, e, e2);
+            e = try Expression.binary(parser.allocator, op, e, e2);
         }
 
         return e;
     }
 
-    fn expr5(parser: *Parser) ParserError!*Expression {
+    fn expr5(parser: *Parser) ParserError!Expression {
         std.debug.print("[{s}]\n", .{@src().fn_name});
         var e = try parser.expr6();
 
@@ -603,13 +603,13 @@ pub const Parser = struct {
 
             std.debug.print("[{s}] e2 = {any}\n", .{ @src().fn_name, e2 });
 
-            e = try Expression.initBinary(parser.allocator, op, e, e2);
+            e = try Expression.binary(parser.allocator, op, e, e2);
         }
 
         return e;
     }
 
-    fn expr6(parser: *Parser) ParserError!*Expression {
+    fn expr6(parser: *Parser) ParserError!Expression {
         std.debug.print("[{s}]\n", .{@src().fn_name});
         var e = try parser.expr7();
 
@@ -626,13 +626,13 @@ pub const Parser = struct {
             const e2 = try parser.expr7();
             std.debug.print("[{s}] e2 = {any}\n", .{ @src().fn_name, e2 });
 
-            e = try Expression.initBinary(parser.allocator, op, e, e2);
+            e = try Expression.binary(parser.allocator, op, e, e2);
         }
 
         return e;
     }
 
-    fn expr7(parser: *Parser) ParserError!*Expression {
+    fn expr7(parser: *Parser) ParserError!Expression {
         std.debug.print("[{s}]\n", .{@src().fn_name});
         const e1 = try parser.exprTerm();
 
@@ -666,7 +666,7 @@ pub const Parser = struct {
 
         parser.skipWhiteSpace();
 
-        return try Expression.initBinary(parser.allocator, op, e1, e2);
+        return try Expression.binary(parser.allocator, op, e1, e2);
     }
 
     fn binaryOp0(parser: *Parser) ParserError!Expression.BinaryOp {
@@ -796,7 +796,7 @@ pub const Parser = struct {
         return error.UnexpectedOp;
     }
 
-    fn exprTerm(parser: *Parser) ParserError!*Expression {
+    fn exprTerm(parser: *Parser) ParserError!Expression {
         // Try to parse unary
         unary_blk: {
             var unary_parser = Parser.init(parser.allocator, parser.rest());
@@ -811,10 +811,10 @@ pub const Parser = struct {
         // Otherwise we expect term
         const term1 = try parser.term();
 
-        return try Expression.initValue(parser.allocator, term1);
+        return try Expression.value(term1);
     }
 
-    fn unary(parser: *Parser) ParserError!*Expression {
+    fn unary(parser: *Parser) ParserError!Expression {
         parser.skipWhiteSpace();
 
         if (parser.peek()) |c| {
@@ -824,7 +824,7 @@ pub const Parser = struct {
 
                 const e = try parser.expr();
 
-                return try Expression.initUnary(parser.allocator, .negate, e);
+                return try Expression.unary(parser.allocator, .negate, e);
             }
 
             if (c == '(') {
@@ -832,17 +832,17 @@ pub const Parser = struct {
             }
         }
 
-        var e: *Expression = undefined;
+        var e: Expression = undefined;
         if (parser.term()) |t1| {
             parser.skipWhiteSpace();
-            e = try Expression.initValue(parser.allocator, t1);
+            e = try Expression.value(t1);
         } else |_| {
             e = try parser.unaryParens();
             parser.skipWhiteSpace();
         }
 
         if (parser.expectString(".length()")) |_| {
-            return try Expression.initUnary(parser.allocator, .length, e);
+            return try Expression.unary(parser.allocator, .length, e);
         } else |_| {
             return error.UnexpectedToken;
         }
@@ -850,7 +850,7 @@ pub const Parser = struct {
         return error.UnexpectedToken;
     }
 
-    fn unaryParens(parser: *Parser) ParserError!*Expression {
+    fn unaryParens(parser: *Parser) ParserError!Expression {
         try parser.expectString("(");
 
         parser.skipWhiteSpace();
@@ -861,7 +861,7 @@ pub const Parser = struct {
 
         try parser.expectString(")");
 
-        return try Expression.initUnary(parser.allocator, .parens, e);
+        return try Expression.unary(parser.allocator, .parens, e);
     }
 
     fn scope(_: *Parser, _: std.mem.Allocator) !Scope {
