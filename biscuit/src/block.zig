@@ -16,7 +16,7 @@ pub const Block = struct {
     rules: std.ArrayList(Rule),
     checks: std.ArrayList(Check),
 
-    pub fn init(allocator: std.mem.Allocator) !Block {
+    pub fn init(allocator: std.mem.Allocator) Block {
         return .{
             .version = 0,
             .context = "",
@@ -28,12 +28,12 @@ pub const Block = struct {
     }
 
     /// Given a blocks contents as bytes, derserialize into runtime block
-    pub fn fromBytes(allocator: std.mem.Allocator, data: []const u8) !Block {
+    pub fn fromBytes(allocator: std.mem.Allocator, data: []const u8, symbols: *SymbolTable) !Block {
         std.debug.print("Block.fromBytes\n", .{});
         const decoded_block = try schema.decodeBlock(allocator, data);
         defer decoded_block.deinit();
 
-        var block = try init(allocator);
+        var block = init(allocator);
         errdefer block.deinit();
 
         const version = decoded_block.version orelse return error.ExpectedVersion;
@@ -44,6 +44,7 @@ pub const Block = struct {
 
         for (decoded_block.symbols.items) |symbol| {
             _ = try block.symbols.insert(symbol.getSlice());
+            _ = try symbols.insert(symbol.getSlice());
         }
 
         for (decoded_block.facts_v2.items) |fact| {

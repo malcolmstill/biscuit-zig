@@ -105,7 +105,7 @@ pub const Authorizer = struct {
         // 4. Run checks in the biscuit's authority block
         if (authorizer.biscuit) |biscuit| {
             for (biscuit.authority.checks.items) |c| {
-                const check = try c.convert(&biscuit.authority.symbols, &authorizer.symbols);
+                const check = try c.convert(&biscuit.symbols, &authorizer.symbols);
                 std.debug.print("{any}\n", .{check});
 
                 for (check.queries.items, 0..) |*query, check_id| {
@@ -123,13 +123,17 @@ pub const Authorizer = struct {
         if (authorizer.biscuit) |biscuit| {
             for (biscuit.blocks.items, 1..) |block, block_id| {
                 std.debug.print("block = {any}\n", .{block});
+
                 for (block.checks.items, 0..) |c, check_id| {
-                    const check = try c.convert(&block.symbols, &authorizer.symbols);
+                    const check = try c.convert(&biscuit.symbols, &authorizer.symbols);
+
                     std.debug.print("check = {any}\n", .{check});
+
                     for (check.queries.items) |*query| {
                         const is_match = try authorizer.world.queryMatch(query, authorizer.symbols);
 
                         if (!is_match) try errors.append(.{ .failed_block_check = .{ .block_id = block_id, .check_id = check_id } });
+
                         std.debug.print("match {any} = {}\n", .{ query, is_match });
                     }
                 }

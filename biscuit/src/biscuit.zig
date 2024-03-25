@@ -3,6 +3,7 @@ const mem = std.mem;
 const Ed25519 = std.crypto.sign.Ed25519;
 const Authorizer = @import("authorizer.zig").Authorizer;
 const Block = @import("block.zig").Block;
+const SymbolTable = @import("biscuit-datalog").SymbolTable;
 const World = @import("biscuit-datalog").world.World;
 const SerializedBiscuit = @import("biscuit-format").serialized_biscuit.SerializedBiscuit;
 
@@ -10,18 +11,20 @@ pub const Biscuit = struct {
     serialized: SerializedBiscuit,
     authority: Block,
     blocks: std.ArrayList(Block),
-    symbols: std.ArrayList([]const u8),
+    symbols: SymbolTable,
 
     pub fn fromBytes(allocator: mem.Allocator, token_bytes: []const u8, public_key: Ed25519.PublicKey) !Biscuit {
         var serialized = try SerializedBiscuit.fromBytes(allocator, token_bytes, public_key);
         errdefer serialized.deinit();
 
-        const authority = try Block.fromBytes(allocator, serialized.authority.block);
+        var symbols = SymbolTable.init("biscuit", allocator);
+
+        const authority = try Block.fromBytes(allocator, serialized.authority.block, &symbols);
         std.debug.print("authority block =\n{any}\n", .{authority});
 
         var blocks = std.ArrayList(Block).init(allocator);
         for (serialized.blocks.items) |b| {
-            const block = try Block.fromBytes(allocator, b.block);
+            const block = try Block.fromBytes(allocator, b.block, &symbols);
             std.debug.print("non-authority block =\n{any}\n", .{block});
             try blocks.append(block);
         }
@@ -30,7 +33,7 @@ pub const Biscuit = struct {
             .serialized = serialized,
             .authority = authority,
             .blocks = blocks,
-            .symbols = std.ArrayList([]const u8).init(allocator),
+            .symbols = symbols,
         };
     }
 
