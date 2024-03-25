@@ -4,14 +4,18 @@ const Set = @import("set.zig").Set;
 const Scope = @import("scope.zig").Scope;
 
 pub const Origin = struct {
-    block_ids: Set(usize),
+    block_ids: std.AutoHashMap(usize, void),
 
     pub fn init(allocator: mem.Allocator) Origin {
-        return .{ .block_ids = Set(usize).init(allocator) };
+        return .{ .block_ids = std.AutoHashMap(usize, void).init(allocator) };
     }
 
-    pub fn insert(origin: *Origin, block_id: usize) void {
-        origin.block_ids.add(block_id);
+    pub fn deinit(origin: *Origin) void {
+        origin.block_ids.deinit();
+    }
+
+    pub fn insert(origin: *Origin, block_id: usize) !void {
+        try origin.block_ids.put(block_id, {});
     }
 
     pub fn @"union"(origin: Origin, other: Origin) Origin {
@@ -31,9 +35,13 @@ pub const TrustedOrigins = struct {
         return .{ .origin = Origin.init(allocator) };
     }
 
+    pub fn deinit(trusted_origins: *TrustedOrigins) void {
+        trusted_origins.origin.block_ids.deinit();
+    }
+
     /// Return a TrustedOrigins default of trusting the authority block (0)
     /// and the authorizer (max int).
-    pub fn defaultOrigins(allocator: mem.Allocator) TrustedOrigins {
+    pub fn defaultOrigins(allocator: mem.Allocator) !TrustedOrigins {
         var trusted_origins = TrustedOrigins.init(allocator);
 
         try trusted_origins.origin.insert(0); // Authority block?

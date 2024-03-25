@@ -298,13 +298,13 @@ test {
     const t1: Term = .{ .integer = 10 };
     const t2: Term = .{ .integer = 22 };
 
-    try testing.expectEqual(@as(Term, .{ .bool = false }), try Binary.equal.evaluate(t1, t2, SymbolTable.init(testing.allocator)));
-    try testing.expectEqual(@as(Term, .{ .bool = true }), try Binary.equal.evaluate(t1, t1, SymbolTable.init(testing.allocator)));
+    try testing.expectEqual(@as(Term, .{ .bool = false }), try Binary.equal.evaluate(t1, t2, SymbolTable.init("test", testing.allocator)));
+    try testing.expectEqual(@as(Term, .{ .bool = true }), try Binary.equal.evaluate(t1, t1, SymbolTable.init("test", testing.allocator)));
 
-    try testing.expectEqual(@as(Term, .{ .integer = 32 }), try Binary.add.evaluate(t1, t2, SymbolTable.init(testing.allocator)));
-    try testing.expectEqual(@as(Term, .{ .integer = 220 }), try Binary.mul.evaluate(t1, t2, SymbolTable.init(testing.allocator)));
+    try testing.expectEqual(@as(Term, .{ .integer = 32 }), try Binary.add.evaluate(t1, t2, SymbolTable.init("test", testing.allocator)));
+    try testing.expectEqual(@as(Term, .{ .integer = 220 }), try Binary.mul.evaluate(t1, t2, SymbolTable.init("test", testing.allocator)));
 
-    var symbols = SymbolTable.init(testing.allocator);
+    var symbols = SymbolTable.init("test", testing.allocator);
     defer symbols.deinit();
 
     const s = .{ .string = try symbols.insert("prefix_middle_suffix") };
@@ -323,7 +323,7 @@ test {
 // test "negate" {
 //     const testing = std.testing;
 
-//     var symbols = SymbolTable.init(testing.allocator);
+//     var symbols = SymbolTable.init("test", testing.allocator);
 //     defer symbols.deinit();
 
 //     _ = try symbols.insert("test1");

@@ -142,7 +142,7 @@ const default_symbols = std.ComptimeStringMap(u64, .{
 test {
     const testing = std.testing;
 
-    var st = SymbolTable.init(testing.allocator);
+    var st = SymbolTable.init("test", testing.allocator);
     defer st.deinit();
 
     try testing.expectEqual(@as(?u64, 0), st.get("read"));
