@@ -4,7 +4,9 @@ const mem = std.mem;
 const Fact = @import("fact.zig").Fact;
 const Predicate = @import("predicate.zig").Predicate;
 const Term = @import("term.zig").Term;
-const Set = @import("set.zig").Set;
+const FactSet = @import("fact_set.zig").FactSet;
+const Origin = @import("origin.zig").Origin;
+const TrustedOrigins = @import("origin.zig").TrustedOrigins;
 const Expression = @import("expression.zig").Expression;
 const MatchedVariables = @import("matched_variables.zig").MatchedVariables;
 const SymbolTable = @import("symbol_table.zig").SymbolTable;
@@ -56,11 +58,12 @@ pub const Combinator = struct {
     predicates: []Predicate, // List of the predicates so we can generate new Combinators
     expressions: []Expression,
     current_bindings: ?std.AutoHashMap(u64, Term) = null,
-    facts: *const Set(Fact),
-    fact_iterator: Set(Fact).Iterator,
+    facts: *const FactSet,
+    trusted_fact_iterator: FactSet.TrustedIterator,
     symbols: SymbolTable,
+    trusted_origins: TrustedOrigins,
 
-    pub fn init(id: usize, allocator: mem.Allocator, variables: MatchedVariables, predicates: []Predicate, expressions: []Expression, all_facts: *const Set(Fact), symbols: SymbolTable) !*Combinator {
+    pub fn init(id: usize, allocator: mem.Allocator, variables: MatchedVariables, predicates: []Predicate, expressions: []Expression, all_facts: *const FactSet, symbols: SymbolTable, trusted_origins: TrustedOrigins) !*Combinator {
         std.debug.print("Init combinator[{}]: predicates = {any}\n", .{ id, predicates });
         const c = try allocator.create(Combinator);
 
@@ -73,7 +76,8 @@ pub const Combinator = struct {
             .expressions = expressions,
             .variables = variables,
             .symbols = symbols,
-            .fact_iterator = all_facts.iterator(),
+            .trusted_fact_iterator = all_facts.trustedIterator(trusted_origins),
+            .trusted_origins = trusted_origins,
         };
 
         return c;
@@ -84,13 +88,15 @@ pub const Combinator = struct {
         combinator.allocator.destroy(combinator);
     }
 
+    // QUESTION: is the return value guaranteed to be complete? I.e. each variable has been matched with some non-variable term?
     /// next returns the next _valid_ combination of variable bindings
-    pub fn next(combinator: *Combinator) !?MatchedVariables {
+    pub fn next(combinator: *Combinator) !?struct { Origin, MatchedVariables } {
         blk: while (true) {
+            std.debug.print("next[{}]\n", .{combinator.id});
             // Return from next combinator until expended
             if (combinator.next_combinator) |c| {
-                if (try c.next()) |vars| {
-                    return vars;
+                if (try c.next()) |origin_vars| {
+                    return origin_vars;
                 } else {
                     c.deinit();
                     combinator.next_combinator = null;
@@ -98,7 +104,14 @@ pub const Combinator = struct {
                 }
             }
 
-            const fact = combinator.fact_iterator.next() orelse return null;
+            // Lookup the next (trusted) fact
+            const origin_fact = combinator.trusted_fact_iterator.next() orelse {
+                std.debug.print("combinator[{}] trusted fact iterator exhausted\n", .{combinator.id});
+                return null;
+            };
+            const origin = origin_fact.origin.*;
+            const fact = origin_fact.fact.*;
+
             // Only consider facts that match the current predicate
             if (!fact.matchPredicate(combinator.predicates[0])) continue;
             std.debug.print("combinator[{}]: fact = {any}\n", .{ combinator.id, fact });
@@ -140,7 +153,7 @@ pub const Combinator = struct {
                     }
                 }
 
-                return vars;
+                return .{ origin, vars };
             } else {
                 if (combinator.next_combinator) |c| c.deinit();
 
@@ -152,6 +165,7 @@ pub const Combinator = struct {
                     combinator.expressions,
                     combinator.facts,
                     combinator.symbols,
+                    combinator.trusted_origins,
                 );
             }
         }

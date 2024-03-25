@@ -11,6 +11,8 @@ pub const symbol_table = @import("symbol_table.zig");
 pub const SymbolTable = @import("symbol_table.zig").SymbolTable;
 pub const Term = @import("term.zig").Term;
 pub const Check = @import("check.zig").Check;
+pub const Origin = @import("origin.zig").Origin;
+pub const TrustedOrigins = @import("origin.zig").TrustedOrigins;
 pub const world = @import("world.zig");
 
 test {

@@ -4,6 +4,7 @@ const meta = std.meta;
 const schema = @import("biscuit-schema");
 const Set = @import("set.zig").Set;
 const Fact = @import("fact.zig").Fact;
+const FactSet = @import("fact_set.zig").FactSet;
 const Predicate = @import("predicate.zig").Predicate;
 const Term = @import("term.zig").Term;
 const SymbolTable = @import("symbol_table.zig").SymbolTable;
@@ -11,6 +12,7 @@ const MatchedVariables = @import("matched_variables.zig").MatchedVariables;
 const Combinator = @import("combinator.zig").Combinator;
 const Scope = @import("scope.zig").Scope;
 const Expression = @import("expression.zig").Expression;
+const TrustedOrigins = @import("origin.zig").TrustedOrigins;
 
 pub const Rule = struct {
     head: Predicate,
@@ -111,7 +113,7 @@ pub const Rule = struct {
     /// ```
     ///
     /// ...and we add it to the set of facts (the set will take care of deduplication)
-    pub fn apply(rule: *Rule, allocator: mem.Allocator, facts: *const Set(Fact), new_facts: *Set(Fact), symbols: SymbolTable) !void {
+    pub fn apply(rule: *const Rule, allocator: mem.Allocator, origin_id: u64, facts: *const FactSet, new_facts: *FactSet, symbols: SymbolTable, trusted_origins: TrustedOrigins) !void {
         var arena = std.heap.ArenaAllocator.init(allocator);
         defer arena.deinit();
 
@@ -120,10 +122,13 @@ pub const Rule = struct {
 
         // TODO: if body is empty stuff
 
-        var it = try Combinator.init(0, allocator, matched_variables, rule.body.items, rule.expressions.items, facts, symbols);
+        var it = try Combinator.init(0, allocator, matched_variables, rule.body.items, rule.expressions.items, facts, symbols, trusted_origins);
         defer it.deinit();
 
-        blk: while (try it.next()) |*bindings| {
+        blk: while (try it.next()) |*origin_bindings| {
+            const origin = origin_bindings[0];
+            const bindings = origin_bindings[1];
+
             // TODO: Describe why clonedWithAllocator? More generally, describe in comment the overall
             // lifetimes / memory allocation approach during evaluation.
             var predicate = try rule.head.cloneWithAllocator(allocator);
@@ -142,14 +147,17 @@ pub const Rule = struct {
             const fact = Fact.init(predicate);
             std.debug.print("adding new fact = {any}\n", .{fact});
 
+            var new_origin = try origin.clone();
+            try new_origin.insert(origin_id);
+
             // Skip adding fact if we already have generated it. Because the
             // Set will clobber duplicate facts we'll lose a reference when
             // inserting a duplicate and then when we loop over the set to
             // deinit the facts we'll miss some. This ensures that the facts
             // can be freed purely from the Set.
-            if (new_facts.contains(fact)) continue;
+            if (new_facts.contains(new_origin, fact)) continue;
 
-            try new_facts.add(try fact.clone());
+            try new_facts.add(new_origin, try fact.clone());
         }
     }
 
@@ -158,7 +166,7 @@ pub const Rule = struct {
     ///
     /// Note: whilst the combinator may return multiple valid matches, `findMatch` only requires a single match
     /// so stopping on the first `it.next()` that returns not-null is enough.
-    pub fn findMatch(rule: *Rule, allocator: mem.Allocator, facts: *const Set(Fact), symbols: SymbolTable) !bool {
+    pub fn findMatch(rule: *Rule, allocator: mem.Allocator, facts: *const FactSet, symbols: SymbolTable, trusted_origins: TrustedOrigins) !bool {
         std.debug.print("\nrule.findMatch on {any}\n", .{rule});
         var arena = std.heap.ArenaAllocator.init(allocator);
         defer arena.deinit();
@@ -171,7 +179,7 @@ pub const Rule = struct {
         //     }
         // }
 
-        var it = try Combinator.init(0, allocator, matched_variables, rule.body.items, rule.expressions.items, facts, symbols);
+        var it = try Combinator.init(0, allocator, matched_variables, rule.body.items, rule.expressions.items, facts, symbols, trusted_origins);
         defer it.deinit();
 
         return try it.next() != null;

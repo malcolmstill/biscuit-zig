@@ -31,7 +31,7 @@ const Term = @import("term.zig").Term;
 pub const MatchedVariables = struct {
     variables: std.AutoHashMap(u32, ?Term),
 
-    pub fn init(allocator: mem.Allocator, rule: *Rule) !MatchedVariables {
+    pub fn init(allocator: mem.Allocator, rule: *const Rule) !MatchedVariables {
         var variables = std.AutoHashMap(u32, ?Term).init(allocator);
 
         // Add all variables in predicates in the rule's body to variable set

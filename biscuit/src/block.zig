@@ -4,6 +4,7 @@ const schema = @import("biscuit-schema");
 const Fact = @import("biscuit-datalog").fact.Fact;
 const Rule = @import("biscuit-datalog").rule.Rule;
 const Check = @import("biscuit-datalog").check.Check;
+const Scope = @import("biscuit-datalog").Scope;
 const SymbolTable = @import("biscuit-datalog").symbol_table.SymbolTable;
 const MIN_SCHEMA_VERSION = format.serialized_biscuit.MIN_SCHEMA_VERSION;
 const MAX_SCHEMA_VERSION = format.serialized_biscuit.MAX_SCHEMA_VERSION;
@@ -15,6 +16,7 @@ pub const Block = struct {
     facts: std.ArrayList(Fact),
     rules: std.ArrayList(Rule),
     checks: std.ArrayList(Check),
+    scopes: std.ArrayList(Scope),
 
     pub fn init(allocator: std.mem.Allocator) Block {
         return .{
@@ -24,7 +26,20 @@ pub const Block = struct {
             .facts = std.ArrayList(Fact).init(allocator),
             .rules = std.ArrayList(Rule).init(allocator),
             .checks = std.ArrayList(Check).init(allocator),
+            .scopes = std.ArrayList(Scope).init(allocator),
         };
+    }
+
+    pub fn deinit(block: *Block) void {
+        for (block.checks.items) |*check| check.deinit();
+        for (block.rules.items) |*rule| rule.deinit();
+        for (block.facts.items) |*fact| fact.deinit();
+
+        block.checks.deinit();
+        block.rules.deinit();
+        block.facts.deinit();
+        block.scopes.deinit();
+        block.symbols.deinit();
     }
 
     /// Given a blocks contents as bytes, derserialize into runtime block
@@ -33,7 +48,7 @@ pub const Block = struct {
         const decoded_block = try schema.decodeBlock(allocator, data);
         defer decoded_block.deinit();
 
-        var block = init(allocator);
+        var block = Block.init(allocator);
         errdefer block.deinit();
 
         const version = decoded_block.version orelse return error.ExpectedVersion;
@@ -60,17 +75,6 @@ pub const Block = struct {
         }
 
         return block;
-    }
-
-    pub fn deinit(block: *Block) void {
-        for (block.checks.items) |*check| check.deinit();
-        for (block.rules.items) |*rule| rule.deinit();
-        for (block.facts.items) |*fact| fact.deinit();
-
-        block.checks.deinit();
-        block.rules.deinit();
-        block.facts.deinit();
-        block.symbols.deinit();
     }
 
     pub fn format(block: Block, comptime _: []const u8, _: std.fmt.FormatOptions, writer: anytype) !void {
