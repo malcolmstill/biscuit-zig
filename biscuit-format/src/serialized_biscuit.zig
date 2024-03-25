@@ -19,7 +19,7 @@ pub const SerializedBiscuit = struct {
     ///
     /// This decodes the toplevel-level biscuit format from protobuf and verifies
     /// the token.
-    pub fn initFromBytes(allocator: mem.Allocator, bytes: []const u8, public_key: Ed25519.PublicKey) !SerializedBiscuit {
+    pub fn fromBytes(allocator: mem.Allocator, bytes: []const u8, public_key: Ed25519.PublicKey) !SerializedBiscuit {
         const b = try schema.decodeBiscuit(allocator, bytes);
         errdefer b.deinit();
 
@@ -139,7 +139,7 @@ test {
         const bytes = try decode.urlSafeBase64ToBytes(allocator, token);
         defer allocator.free(bytes);
 
-        var b = try SerializedBiscuit.initFromBytes(allocator, bytes, public_key);
+        var b = try SerializedBiscuit.fromBytes(allocator, bytes, public_key);
         defer b.deinit();
     }
 }

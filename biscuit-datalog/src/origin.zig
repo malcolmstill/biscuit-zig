@@ -31,7 +31,19 @@ pub const TrustedOrigins = struct {
         return .{ .origin = Origin.init(allocator) };
     }
 
-    pub fn initFromScopes(
+    /// Return a TrustedOrigins default of trusting the authority block (0)
+    /// and the authorizer (max int).
+    pub fn defaultOrigins(allocator: mem.Allocator) TrustedOrigins {
+        var trusted_origins = TrustedOrigins.init(allocator);
+
+        try trusted_origins.origin.insert(0); // Authority block?
+        try trusted_origins.origin.insert(std.math.maxInt(u64));
+
+        return trusted_origins;
+    }
+
+    /// Given a rule (rule scopes) generate
+    pub fn fromScopes(
         allocator: mem.Allocator,
         rule_scopes: []const Scope,
         default_origins: TrustedOrigins,
@@ -44,30 +56,34 @@ pub const TrustedOrigins = struct {
         if (rule_scopes.len == 0) {
             var origins = default_origins.clone();
 
-            origins.insert(current_block);
-            origins.insert(max_int);
+            try origins.insert(current_block);
+            try origins.insert(max_int);
 
             return origins;
         }
 
-        var origins = Origin.init(allocator);
-        origins.insert(max_int);
-        origins.insert(current_block);
+        var trusted_origins = TrustedOrigins.init(allocator);
+        trusted_origins.origin.insert(max_int);
+        trusted_origins.origin.insert(current_block);
 
         for (rule_scopes) |scope| {
             switch (scope) {
-                .authority => origins.insert(0),
+                .authority => trusted_origins.origin.insert(0),
                 .previous => {
                     if (current_block == max_int) continue;
-                    // TODO: extend
+
+                    for (0..current_block + 1) |i| {
+                        try trusted_origins.origins.insert(i);
+                    }
                 },
                 .public_key => |public_key_id| {
                     _ = public_key_id;
-                    // TODO: extend
+
+                    @panic("Unimplemented");
                 },
             }
         }
 
-        return .{ .origin = origins };
+        return trusted_origins;
     }
 };

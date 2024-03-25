@@ -123,7 +123,8 @@ pub const Authorizer = struct {
         if (authorizer.biscuit) |biscuit| {
             for (biscuit.blocks.items, 1..) |block, block_id| {
                 std.debug.print("block = {any}\n", .{block});
-                for (block.checks.items, 0..) |check, check_id| {
+                for (block.checks.items, 0..) |c, check_id| {
+                    const check = try c.convert(&block.symbols, &authorizer.symbols);
                     std.debug.print("check = {any}\n", .{check});
                     for (check.queries.items) |*query| {
                         const is_match = try authorizer.world.queryMatch(query, authorizer.symbols);

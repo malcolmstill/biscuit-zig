@@ -12,16 +12,16 @@ pub const Biscuit = struct {
     blocks: std.ArrayList(Block),
     symbols: std.ArrayList([]const u8),
 
-    pub fn initFromBytes(allocator: mem.Allocator, token_bytes: []const u8, public_key: Ed25519.PublicKey) !Biscuit {
-        var serialized = try SerializedBiscuit.initFromBytes(allocator, token_bytes, public_key);
+    pub fn fromBytes(allocator: mem.Allocator, token_bytes: []const u8, public_key: Ed25519.PublicKey) !Biscuit {
+        var serialized = try SerializedBiscuit.fromBytes(allocator, token_bytes, public_key);
         errdefer serialized.deinit();
 
-        const authority = try Block.initFromBytes(allocator, serialized.authority.block);
+        const authority = try Block.fromBytes(allocator, serialized.authority.block);
         std.debug.print("authority block =\n{any}\n", .{authority});
 
         var blocks = std.ArrayList(Block).init(allocator);
         for (serialized.blocks.items) |b| {
-            const block = try Block.initFromBytes(allocator, b.block);
+            const block = try Block.fromBytes(allocator, b.block);
             std.debug.print("non-authority block =\n{any}\n", .{block});
             try blocks.append(block);
         }
@@ -74,7 +74,7 @@ test {
         const bytes = try decode.urlSafeBase64ToBytes(allocator, token);
         defer allocator.free(bytes);
 
-        var b = try Biscuit.initFromBytes(allocator, bytes, public_key);
+        var b = try Biscuit.fromBytes(allocator, bytes, public_key);
         defer b.deinit();
 
         var a = b.authorizer(allocator);
@@ -105,7 +105,7 @@ test "Tokens that should fail to validate" {
         const bytes = try decode.urlSafeBase64ToBytes(allocator, token);
         defer allocator.free(bytes);
 
-        var b = try Biscuit.initFromBytes(allocator, bytes, public_key);
+        var b = try Biscuit.fromBytes(allocator, bytes, public_key);
         defer b.deinit();
 
         var a = b.authorizer(allocator);

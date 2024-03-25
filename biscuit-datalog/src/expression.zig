@@ -98,9 +98,18 @@ pub const Expression = struct {
         return stack.items[0];
     }
 
-    pub fn convert(expression: Expression, _: *const SymbolTable, _: *SymbolTable) !Expression {
-        //
-        return expression;
+    pub fn convert(expression: Expression, old_symbols: *const SymbolTable, new_symbols: *SymbolTable) !Expression {
+        std.debug.print("Converting expression\n", .{});
+        const ops = try expression.ops.clone();
+
+        for (ops.items, 0..) |op, i| {
+            ops.items[i] = switch (op) {
+                .value => |trm| .{ .value = try trm.convert(old_symbols, new_symbols) },
+                else => op,
+            };
+        }
+
+        return .{ .ops = ops };
     }
 
     pub fn format(expression: Expression, comptime _: []const u8, _: std.fmt.FormatOptions, writer: anytype) !void {

@@ -128,7 +128,7 @@ pub fn validate(alloc: mem.Allocator, token: []const u8, public_key: std.crypto.
 }
 
 pub fn runValidation(alloc: mem.Allocator, token: []const u8, public_key: std.crypto.sign.Ed25519.PublicKey, authorizer_code: []const u8, errors: *std.ArrayList(AuthorizerError)) !void {
-    var b = try Biscuit.initFromBytes(alloc, token, public_key);
+    var b = try Biscuit.fromBytes(alloc, token, public_key);
     defer b.deinit();
 
     var a = b.authorizer(alloc);

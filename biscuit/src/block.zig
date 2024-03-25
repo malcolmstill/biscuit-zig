@@ -28,7 +28,8 @@ pub const Block = struct {
     }
 
     /// Given a blocks contents as bytes, derserialize into runtime block
-    pub fn initFromBytes(allocator: std.mem.Allocator, data: []const u8) !Block {
+    pub fn fromBytes(allocator: std.mem.Allocator, data: []const u8) !Block {
+        std.debug.print("Block.fromBytes\n", .{});
         const decoded_block = try schema.decodeBlock(allocator, data);
         defer decoded_block.deinit();
 
