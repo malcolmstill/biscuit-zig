@@ -60,6 +60,10 @@ pub fn Set(comptime K: type) type {
             return set.inner.keyIterator();
         }
 
+        pub fn ptrIterator(set: *Self) InnerSet.KeyIterator {
+            return set.inner.keyIterator();
+        }
+
         pub fn add(set: *Self, value: K) !void {
             try set.inner.put(value, {});
         }

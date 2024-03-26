@@ -7,6 +7,7 @@ const Fact = @import("fact.zig").Fact;
 const FactSet = @import("fact_set.zig").FactSet;
 const Predicate = @import("predicate.zig").Predicate;
 const Term = @import("term.zig").Term;
+const Origin = @import("origin.zig").Origin;
 const SymbolTable = @import("symbol_table.zig").SymbolTable;
 const MatchedVariables = @import("matched_variables.zig").MatchedVariables;
 const Combinator = @import("combinator.zig").Combinator;
@@ -126,8 +127,8 @@ pub const Rule = struct {
         defer it.deinit();
 
         blk: while (try it.next()) |*origin_bindings| {
-            const origin = origin_bindings[0];
-            const bindings = origin_bindings[1];
+            const origin: Origin = origin_bindings[0];
+            const bindings: MatchedVariables = origin_bindings[1];
 
             // TODO: Describe why clonedWithAllocator? More generally, describe in comment the overall
             // lifetimes / memory allocation approach during evaluation.
@@ -155,7 +156,6 @@ pub const Rule = struct {
             // inserting a duplicate and then when we loop over the set to
             // deinit the facts we'll miss some. This ensures that the facts
             // can be freed purely from the Set.
-            // FIXME: if we continue I think we have to deinit new_origin
             if (new_facts.contains(new_origin, fact)) {
                 new_origin.deinit();
                 continue;

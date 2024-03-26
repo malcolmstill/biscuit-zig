@@ -6,10 +6,7 @@ pub const RuleSet = struct {
     rules: std.AutoHashMap(TrustedOrigins, std.ArrayList(OriginRule)),
     allocator: std.mem.Allocator,
 
-    const OriginRule = struct {
-        origin: u64,
-        rule: Rule,
-    };
+    const OriginRule = struct { u64, Rule };
 
     pub fn init(allocator: std.mem.Allocator) RuleSet {
         return .{
@@ -30,13 +27,11 @@ pub const RuleSet = struct {
     }
 
     pub fn add(rule_set: *RuleSet, origin: u64, scope: TrustedOrigins, rule: Rule) !void {
-        const origin_rule = .{ .origin = origin, .rule = rule };
-
         if (rule_set.rules.getEntry(scope)) |entry| {
-            try entry.value_ptr.append(origin_rule);
+            try entry.value_ptr.append(.{ origin, rule });
         } else {
             var list = std.ArrayList(OriginRule).init(rule_set.allocator);
-            try list.append(origin_rule);
+            try list.append(.{ origin, rule });
 
             try rule_set.rules.put(scope, list);
         }

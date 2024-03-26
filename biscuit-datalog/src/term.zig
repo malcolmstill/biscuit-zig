@@ -50,11 +50,11 @@ pub const Term = union(TermKind) {
             .string => |id| .{ .string = try new_symbols.insert(try old_symbols.getString(id)) },
             .integer, .bool, .date, .bytes => term,
             .set => |s| blk: {
-                var set: Set(Term) = try s.clone();
+                var set = Set(Term).init(s.alloc);
 
-                var it = set.iterator();
-                while (it.next()) |trm_ptr| {
-                    trm_ptr.* = try trm_ptr.*.convert(old_symbols, new_symbols);
+                var it = s.iterator();
+                while (it.next()) |term_ptr| {
+                    try set.add(try term_ptr.convert(old_symbols, new_symbols));
                 }
 
                 break :blk .{ .set = set };

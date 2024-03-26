@@ -62,8 +62,8 @@ pub const World = struct {
                     const set = origin_set.value_ptr;
 
                     for (set.items) |*origin_rule| {
-                        const rule = origin_rule.rule;
-                        const origin_id = origin_rule.origin;
+                        const origin_id: u64 = origin_rule[0];
+                        const rule: Rule = origin_rule[1];
 
                         try rule.apply(world.allocator, origin_id, &world.fact_set, &new_fact_sets, symbols, trusted_origins);
                     }
@@ -72,9 +72,15 @@ pub const World = struct {
 
             var it = new_fact_sets.iterator();
             while (it.next()) |origin_fact| {
-                const origin = origin_fact.origin.*;
+                const existing_origin = origin_fact.origin.*;
                 const fact = origin_fact.fact.*;
-                if (world.fact_set.contains(origin, fact)) continue;
+
+                var origin = try existing_origin.clone();
+
+                if (world.fact_set.contains(origin, fact)) {
+                    origin.deinit();
+                    continue;
+                }
 
                 try world.fact_set.add(origin, try fact.cloneWithAllocator(world.allocator));
             }
