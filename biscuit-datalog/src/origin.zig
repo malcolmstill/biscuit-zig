@@ -15,13 +15,13 @@ pub const Origin = struct {
         return .{ .block_ids = std.AutoHashMap(usize, void).init(allocator) };
     }
 
-    // pub fn initWithId(allocator: mem.Allocator, block_id: usize) !Origin {
-    //     var block_ids = std.AutoHashMap(usize, void).init(allocator);
+    pub fn initWithId(allocator: mem.Allocator, block_id: usize) !Origin {
+        var block_ids = std.AutoHashMap(usize, void).init(allocator);
 
-    //     try block_ids.put(block_id, {});
+        try block_ids.put(block_id, {});
 
-    //     return .{ .block_ids = block_ids };
-    // }
+        return .{ .block_ids = block_ids };
+    }
 
     pub fn deinit(origin: *Origin) void {
         origin.block_ids.deinit();

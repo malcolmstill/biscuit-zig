@@ -99,7 +99,7 @@ pub const Expression = struct {
     }
 
     pub fn convert(expression: Expression, old_symbols: *const SymbolTable, new_symbols: *SymbolTable) !Expression {
-        std.debug.print("Converting expression\n", .{});
+        // std.debug.print("Converting expression\n", .{});
         const ops = try expression.ops.clone();
 
         for (ops.items, 0..) |op, i| {

@@ -126,7 +126,6 @@ pub const Rule = struct {
         defer it.deinit();
 
         blk: while (try it.next()) |*origin_bindings| {
-            std.debug.print("HERE\n", .{});
             const origin = origin_bindings[0];
             const bindings = origin_bindings[1];
 

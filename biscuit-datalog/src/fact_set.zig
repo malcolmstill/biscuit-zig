@@ -42,7 +42,7 @@ pub const FactSet = struct {
         var it = fact_set.sets.iterator();
 
         while (it.next()) |origin_facts| {
-            origin_facts.key_ptr.deinit();
+            origin_facts.key_ptr.deinit(); // Okay, in practice this is also giving us incorrect alignment issues
             origin_facts.value_ptr.deinit();
         }
 
@@ -68,7 +68,7 @@ pub const FactSet = struct {
         }
     };
 
-    pub fn iterator(fact_set: FactSet) Iterator {
+    pub fn iterator(fact_set: *const FactSet) Iterator {
         return .{ .set_it = fact_set.sets.iterator() };
     }
 
@@ -89,16 +89,18 @@ pub const FactSet = struct {
                     std.debug.assert(it.origin_fact_it == null);
 
                     const origin_set = it.set_it.next() orelse return null;
-                    const origin = origin_set.key_ptr;
+
+                    const set_ptr: *Set(Fact) = origin_set.value_ptr;
+                    const origin: *Origin = origin_set.key_ptr;
 
                     // If we don't trust the origin of this set, we start the loop again
-                    if (!it.trusted_origins.containsAll(origin.*)) continue;
+                    if (!it.trusted_origins.containsAll(origin)) continue;
 
                     defer std.debug.assert(it.origin_fact_it != null);
 
                     it.origin_fact_it = .{
                         .origin = origin,
-                        .fact_it = origin_set.value_ptr.iterator(),
+                        .fact_it = set_ptr.iterator(), // Is this iterator taking
                     };
                 }
             }
@@ -106,13 +108,12 @@ pub const FactSet = struct {
     };
 
     /// Return an iterator over facts that match the trusted origin.
-    pub fn trustedIterator(fact_set: FactSet, trusted_origins: TrustedOrigins) TrustedIterator {
-        std.debug.print("Making trusted iterator\n", .{});
+    pub fn trustedIterator(fact_set: *const FactSet, trusted_origins: TrustedOrigins) TrustedIterator {
         return .{ .set_it = fact_set.sets.iterator(), .trusted_origins = trusted_origins };
     }
 
     /// Return the total number of facts in the fact set
-    pub fn count(fact_set: *FactSet) usize {
+    pub fn count(fact_set: *const FactSet) usize {
         var n: usize = 0;
 
         var it = fact_set.sets.valueIterator();
@@ -123,6 +124,9 @@ pub const FactSet = struct {
         return n;
     }
 
+    /// Add fact with origin to fact set.
+    ///
+    /// Takes ownership of (i.e. will free) origin and fact
     pub fn add(fact_set: *FactSet, origin: Origin, fact: Fact) !void {
         if (fact_set.sets.getEntry(origin)) |entry| {
             try entry.value_ptr.add(fact);
@@ -141,7 +145,7 @@ pub const FactSet = struct {
     }
 };
 
-test "FactSet" {
+test "FactSet trustedIterator" {
     const testing = std.testing;
     const Term = @import("term.zig").Term;
 
@@ -149,49 +153,48 @@ test "FactSet" {
     defer fs.deinit();
 
     var origin = Origin.init(testing.allocator);
-
     try origin.insert(0);
 
+    var origin2 = Origin.init(testing.allocator);
+    try origin2.insert(1);
+
     const fact: Fact = .{ .predicate = .{ .name = 2123, .terms = std.ArrayList(Term).init(testing.allocator) } };
+    const fact2: Fact = .{ .predicate = .{ .name = 2123, .terms = std.ArrayList(Term).init(testing.allocator) } };
 
     try fs.add(origin, fact);
+    try fs.add(origin2, fact2);
 
     try testing.expect(fs.sets.contains(origin));
+    try testing.expect(fs.sets.contains(origin2));
 
-    // FIXME: no longer inifinite loops, but it.set_it.next() panics on alignment. This suggests (?)
-    // we are operating on some copy of the iterator? Or hashmap?
+    // With a non-trusted iterator we expect 2 facts
     {
+        var count: usize = 0;
+
         var it = fs.iterator();
         while (it.next()) |origin_fact| {
-            std.debug.print("origin = {any}, fact = {any}\n", .{ origin_fact.origin, origin_fact.fact });
+            defer count += 1;
+
             try testing.expectEqual(fact.predicate.name, origin_fact.fact.predicate.name);
         }
+
+        try testing.expectEqual(2, count);
     }
-}
 
-test "FactSet 2" {
-    const testing = std.testing;
-    const Term = @import("term.zig").Term;
-
-    var fs = FactSet.init(testing.allocator);
-    defer fs.deinit();
-
-    var origin = Origin.init(testing.allocator);
-
-    try origin.insert(0);
-
-    const fact: Fact = .{ .predicate = .{ .name = 2123, .terms = std.ArrayList(Term).init(testing.allocator) } };
-
-    try fs.add(origin, fact);
-
-    try testing.expect(fs.sets.contains(origin));
-    const first_set = fs.sets.getEntry(origin) orelse return error.ExpectedSet;
-
+    // With a trusted iterator only trusting [0] we only expect a single fact
     {
-        var it = first_set.value_ptr.iterator();
+        var trusted_origins = try TrustedOrigins.defaultOrigins(testing.allocator);
+        defer trusted_origins.deinit();
 
-        while (it.next()) |iterated_fact| {
-            try testing.expectEqual(fact.predicate.name, iterated_fact.predicate.name);
+        var count: usize = 0;
+
+        var it = fs.trustedIterator(trusted_origins);
+        while (it.next()) |origin_fact| {
+            defer count += 1;
+
+            try testing.expectEqual(fact.predicate.name, origin_fact.fact.predicate.name);
         }
+
+        try testing.expectEqual(1, count);
     }
 }

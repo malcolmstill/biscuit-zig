@@ -56,17 +56,17 @@ pub const SymbolTable = struct {
 
     pub fn getString(symbol_table: *const SymbolTable, sym_index: u64) ![]const u8 {
         if (indexToDefault(sym_index)) |sym| {
-            std.debug.print("Found \"{s}\" at {} (default)\n", .{ sym, sym_index });
+            // std.debug.print("Found \"{s}\" at {} (default)\n", .{ sym, sym_index });
             return sym;
         }
 
         if (sym_index >= NON_DEFAULT_SYMBOLS_OFFSET and sym_index < NON_DEFAULT_SYMBOLS_OFFSET + symbol_table.symbols.items.len) {
             const sym = symbol_table.symbols.items[sym_index - NON_DEFAULT_SYMBOLS_OFFSET];
-            std.debug.print("Found \"{s}\" at {}\n", .{ sym, sym_index });
+            // std.debug.print("Found \"{s}\" at {}\n", .{ sym, sym_index });
             return sym;
         }
 
-        std.debug.print("Existing sym index {} not found\n", .{sym_index});
+        // std.debug.print("Existing sym index {} not found\n", .{sym_index});
 
         return error.SymbolNotFound;
     }

@@ -64,8 +64,6 @@ pub const Combinator = struct {
     trusted_origins: TrustedOrigins,
 
     pub fn init(id: usize, allocator: mem.Allocator, variables: MatchedVariables, predicates: []Predicate, expressions: []Expression, all_facts: *const FactSet, symbols: SymbolTable, trusted_origins: TrustedOrigins) Combinator {
-        std.debug.print("Init combinator[{}]: predicates = {any}\n", .{ id, predicates });
-
         return .{
             .id = id,
             .allocator = allocator,
@@ -88,11 +86,7 @@ pub const Combinator = struct {
     // QUESTION: is the return value guaranteed to be complete? I.e. each variable has been matched with some non-variable term?
     /// next returns the next _valid_ combination of variable bindings
     pub fn next(combinator: *Combinator) !?struct { Origin, MatchedVariables } {
-        defer std.debug.print("returning from combinator {}\n", .{combinator.id});
-
-        var iterations: usize = 0;
-        blk: while (iterations < 1000) : (iterations += 1) {
-            std.debug.print("next[{}]\n", .{combinator.id});
+        blk: while (true) {
             // Return from next combinator until expended
             if (combinator.next_combinator) |c| {
                 if (try c.next()) |origin_vars| {
@@ -107,17 +101,13 @@ pub const Combinator = struct {
             }
 
             // Lookup the next (trusted) fact
-            const origin_fact = combinator.trusted_fact_iterator.next() orelse {
-                std.debug.print("combinator[{}] trusted fact iterator exhausted\n", .{combinator.id});
-                return null;
-            };
+            const origin_fact = combinator.trusted_fact_iterator.next() orelse return null;
 
             const origin = origin_fact.origin.*;
             const fact = origin_fact.fact.*;
 
             // Only consider facts that match the current predicate
             if (!fact.matchPredicate(combinator.predicates[0])) continue;
-            std.debug.print("combinator[{}]: fact = {any}\n", .{ combinator.id, fact });
 
             var vars: MatchedVariables = try combinator.variables.clone();
 

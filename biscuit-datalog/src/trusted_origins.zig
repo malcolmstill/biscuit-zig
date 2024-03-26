@@ -81,11 +81,13 @@ pub const TrustedOrigins = struct {
     }
 
     /// Check that TrustedOrigins contain _all_ origin ids in fact_origin
-    pub fn containsAll(trusted_origins: TrustedOrigins, fact_origin: Origin) bool {
+    pub fn containsAll(trusted_origins: *TrustedOrigins, fact_origin: *Origin) bool {
         var origin_it = fact_origin.block_ids.keyIterator();
 
-        while (origin_it.next()) |origin_id| {
-            if (trusted_origins.origin.block_ids.contains(origin_id.*)) continue;
+        while (origin_it.next()) |origin_id_ptr| {
+            const origin_id = origin_id_ptr.*;
+
+            if (trusted_origins.origin.block_ids.contains(origin_id)) continue;
 
             return false;
         }
@@ -93,3 +95,17 @@ pub const TrustedOrigins = struct {
         return true;
     }
 };
+
+test "Trusted origin" {
+    const testing = std.testing;
+
+    var to = try TrustedOrigins.defaultOrigins(testing.allocator);
+    defer to.deinit();
+
+    var o = Origin.init(testing.allocator);
+    defer o.deinit();
+
+    try o.insert(22);
+
+    _ = to.containsAll(&o);
+}

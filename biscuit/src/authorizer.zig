@@ -70,8 +70,7 @@ pub const Authorizer = struct {
 
         std.debug.print("fact = {any}\n", .{fact});
 
-        var origin = Origin.init(authorizer.allocator);
-        try origin.insert(Origin.AuthorizerId);
+        const origin = try Origin.initWithId(authorizer.allocator, Origin.AuthorizerId);
 
         try authorizer.world.addFact(origin, try fact.convert(authorizer.allocator, &authorizer.symbols));
     }
@@ -111,8 +110,7 @@ pub const Authorizer = struct {
         if (authorizer.biscuit) |biscuit| {
             for (biscuit.authority.facts.items) |authority_fact| {
                 const fact = try authority_fact.convert(&biscuit.symbols, &authorizer.symbols);
-                var origin = Origin.init(authorizer.allocator);
-                try origin.insert(0);
+                const origin = try Origin.initWithId(authorizer.allocator, 0);
 
                 try authorizer.world.addFact(origin, fact);
             }
@@ -144,9 +142,7 @@ pub const Authorizer = struct {
             for (biscuit.blocks.items, 1..) |block, block_id| {
                 for (block.facts.items) |block_fact| {
                     const fact = try block_fact.convert(&biscuit.symbols, &authorizer.symbols);
-
-                    var origin = Origin.init(authorizer.allocator);
-                    try origin.insert(block_id);
+                    const origin = try Origin.initWithId(authorizer.allocator, block_id);
 
                     try authorizer.world.addFact(origin, fact);
                 }

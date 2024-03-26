@@ -231,6 +231,7 @@ pub const Parser = struct {
         return parser.input[start..parser.offset];
     }
 
+    // FIXME: properly implement string parsing
     fn string(parser: *Parser) ![]const u8 {
         try parser.expect('"');
 
