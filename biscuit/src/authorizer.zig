@@ -110,7 +110,7 @@ pub const Authorizer = struct {
         // when mapped into the world it may have id 5.
         if (authorizer.biscuit) |biscuit| {
             for (biscuit.authority.facts.items) |authority_fact| {
-                const fact = try authority_fact.convert(&biscuit.authority.symbols, &authorizer.symbols);
+                const fact = try authority_fact.convert(&biscuit.symbols, &authorizer.symbols);
                 var origin = Origin.init(authorizer.allocator);
                 try origin.insert(0);
 
@@ -127,7 +127,7 @@ pub const Authorizer = struct {
 
             for (biscuit.authority.rules.items) |authority_rule| {
                 // Map from biscuit symbol space to authorizer symbol space
-                const rule = try authority_rule.convert(&biscuit.authority.symbols, &authorizer.symbols);
+                const rule = try authority_rule.convert(&biscuit.symbols, &authorizer.symbols);
 
                 // A authority block's rule trusts
                 const rule_trusted_origins = try TrustedOrigins.fromScopes(
@@ -160,7 +160,7 @@ pub const Authorizer = struct {
                 );
 
                 for (block.rules.items) |block_rule| {
-                    const rule = try block_rule.convert(&biscuit.authority.symbols, &authorizer.symbols);
+                    const rule = try block_rule.convert(&biscuit.symbols, &authorizer.symbols);
 
                     const block_rule_trusted_origins = try TrustedOrigins.fromScopes(
                         authorizer.allocator,

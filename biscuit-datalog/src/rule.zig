@@ -122,10 +122,11 @@ pub const Rule = struct {
 
         // TODO: if body is empty stuff
 
-        var it = try Combinator.init(0, allocator, matched_variables, rule.body.items, rule.expressions.items, facts, symbols, trusted_origins);
+        var it = Combinator.init(0, allocator, matched_variables, rule.body.items, rule.expressions.items, facts, symbols, trusted_origins);
         defer it.deinit();
 
         blk: while (try it.next()) |*origin_bindings| {
+            std.debug.print("HERE\n", .{});
             const origin = origin_bindings[0];
             const bindings = origin_bindings[1];
 
@@ -179,7 +180,7 @@ pub const Rule = struct {
         //     }
         // }
 
-        var it = try Combinator.init(0, allocator, matched_variables, rule.body.items, rule.expressions.items, facts, symbols, trusted_origins);
+        var it = Combinator.init(0, allocator, matched_variables, rule.body.items, rule.expressions.items, facts, symbols, trusted_origins);
         defer it.deinit();
 
         return try it.next() != null;

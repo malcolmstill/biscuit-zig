@@ -1,5 +1,7 @@
 const std = @import("std");
 const mem = std.mem;
+const Wyhash = std.hash.Wyhash;
+
 const Set = @import("set.zig").Set;
 const Scope = @import("scope.zig").Scope;
 
@@ -54,85 +56,24 @@ pub const Origin = struct {
     pub fn isSuperset(origin: Origin, other: Origin) Origin {
         return origin.block_ids.isSuperset(other.block_ids);
     }
-};
 
-/// TrustedOrigin represents the set of origins trusted by a particular rule
-pub const TrustedOrigins = struct {
-    origin: Origin,
+    pub fn hash(origin: Origin, hasher: anytype) void {
+        var h: usize = 0;
 
-    pub fn init(allocator: mem.Allocator) TrustedOrigins {
-        return .{ .origin = Origin.init(allocator) };
-    }
-
-    pub fn deinit(trusted_origins: *TrustedOrigins) void {
-        trusted_origins.origin.block_ids.deinit();
-    }
-
-    pub fn clone(trusted_origins: *const TrustedOrigins) !TrustedOrigins {
-        return .{ .origin = try trusted_origins.origin.clone() };
-    }
-
-    /// Return a TrustedOrigins default of trusting the authority block (0)
-    /// and the authorizer (max int).
-    pub fn defaultOrigins(allocator: mem.Allocator) !TrustedOrigins {
-        var trusted_origins = TrustedOrigins.init(allocator);
-
-        try trusted_origins.origin.insert(0); // Authority block?
-        try trusted_origins.origin.insert(std.math.maxInt(u64));
-
-        return trusted_origins;
-    }
-
-    /// Given a rule (rule scopes) generate
-    pub fn fromScopes(
-        allocator: mem.Allocator,
-        rule_scopes: []const Scope,
-        default_origins: TrustedOrigins,
-        current_block: usize,
-        public_key_to_block_id: std.AutoHashMap(usize, std.ArrayList(usize)),
-    ) !TrustedOrigins {
-        _ = public_key_to_block_id;
-
-        if (rule_scopes.len == 0) {
-            var trusted_origins = try default_origins.clone();
-
-            try trusted_origins.origin.insert(current_block);
-            try trusted_origins.origin.insert(Origin.AuthorizerId);
-
-            return trusted_origins;
+        var it = origin.block_ids.keyIterator();
+        while (it.next()) |block_id| {
+            h ^= block_id.*;
         }
 
-        var trusted_origins = TrustedOrigins.init(allocator);
-        try trusted_origins.origin.insert(Origin.AuthorizerId);
-        try trusted_origins.origin.insert(current_block);
-
-        for (rule_scopes) |scope| {
-            switch (scope) {
-                .authority => try trusted_origins.origin.insert(0),
-                .previous => {
-                    if (current_block == Origin.AuthorizerId) continue;
-
-                    for (0..current_block + 1) |i| {
-                        try trusted_origins.origin.insert(i);
-                    }
-                },
-                .public_key => |public_key_id| {
-                    _ = public_key_id;
-
-                    @panic("Unimplemented");
-                },
-            }
-        }
-
-        return trusted_origins;
+        std.hash.autoHash(hasher, h);
     }
 
-    /// Check that TrustedOrigins contain _all_ origin ids in fact_origin
-    pub fn containsAll(trusted_origins: TrustedOrigins, fact_origin: Origin) bool {
-        var origin_it = fact_origin.block_ids.keyIterator();
+    pub fn eql(a: Origin, b: Origin) bool {
+        if (a.block_ids.count() != b.block_ids.count()) return false;
 
-        while (origin_it.next()) |origin_id| {
-            if (trusted_origins.origin.block_ids.contains(origin_id.*)) continue;
+        var a_it = a.block_ids.keyIterator();
+        while (a_it.next()) |a_block_id| {
+            if (b.block_ids.contains(a_block_id.*)) continue;
 
             return false;
         }
@@ -140,3 +81,13 @@ pub const TrustedOrigins = struct {
         return true;
     }
 };
+
+test "Origins" {
+    const testing = std.testing;
+
+    var origins = Origin.init(testing.allocator);
+    defer origins.deinit();
+
+    try origins.insert(12);
+    try origins.insert(13);
+}

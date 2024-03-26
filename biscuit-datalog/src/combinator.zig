@@ -63,11 +63,10 @@ pub const Combinator = struct {
     symbols: SymbolTable,
     trusted_origins: TrustedOrigins,
 
-    pub fn init(id: usize, allocator: mem.Allocator, variables: MatchedVariables, predicates: []Predicate, expressions: []Expression, all_facts: *const FactSet, symbols: SymbolTable, trusted_origins: TrustedOrigins) !*Combinator {
+    pub fn init(id: usize, allocator: mem.Allocator, variables: MatchedVariables, predicates: []Predicate, expressions: []Expression, all_facts: *const FactSet, symbols: SymbolTable, trusted_origins: TrustedOrigins) Combinator {
         std.debug.print("Init combinator[{}]: predicates = {any}\n", .{ id, predicates });
-        const c = try allocator.create(Combinator);
 
-        c.* = .{
+        return .{
             .id = id,
             .allocator = allocator,
             .next_combinator = null,
@@ -79,26 +78,29 @@ pub const Combinator = struct {
             .trusted_fact_iterator = all_facts.trustedIterator(trusted_origins),
             .trusted_origins = trusted_origins,
         };
-
-        return c;
     }
 
     pub fn deinit(combinator: *Combinator) void {
         combinator.variables.deinit();
-        combinator.allocator.destroy(combinator);
+        // combinator.allocator.destroy(combinator);
     }
 
     // QUESTION: is the return value guaranteed to be complete? I.e. each variable has been matched with some non-variable term?
     /// next returns the next _valid_ combination of variable bindings
     pub fn next(combinator: *Combinator) !?struct { Origin, MatchedVariables } {
-        blk: while (true) {
+        defer std.debug.print("returning from combinator {}\n", .{combinator.id});
+
+        var iterations: usize = 0;
+        blk: while (iterations < 1000) : (iterations += 1) {
             std.debug.print("next[{}]\n", .{combinator.id});
             // Return from next combinator until expended
             if (combinator.next_combinator) |c| {
                 if (try c.next()) |origin_vars| {
                     return origin_vars;
                 } else {
+                    // Deinit the existing combinator and free its memory
                     c.deinit();
+                    combinator.allocator.destroy(c);
                     combinator.next_combinator = null;
                     continue;
                 }
@@ -109,6 +111,7 @@ pub const Combinator = struct {
                 std.debug.print("combinator[{}] trusted fact iterator exhausted\n", .{combinator.id});
                 return null;
             };
+
             const origin = origin_fact.origin.*;
             const fact = origin_fact.fact.*;
 
@@ -155,9 +158,12 @@ pub const Combinator = struct {
 
                 return .{ origin, vars };
             } else {
+                std.debug.assert(combinator.next_combinator == null);
                 if (combinator.next_combinator) |c| c.deinit();
 
-                combinator.next_combinator = try Combinator.init(
+                const combinator_ptr = try combinator.allocator.create(Combinator);
+
+                combinator_ptr.* = Combinator.init(
                     combinator.id + 1,
                     combinator.allocator,
                     vars,
@@ -167,6 +173,8 @@ pub const Combinator = struct {
                     combinator.symbols,
                     combinator.trusted_origins,
                 );
+
+                combinator.next_combinator = combinator_ptr;
             }
         }
 
