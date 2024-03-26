@@ -67,8 +67,10 @@ pub const Origin = struct {
         var h: usize = 0;
 
         var it = origin.block_ids.keyIterator();
-        while (it.next()) |block_id| {
-            h ^= block_id.*;
+        while (it.next()) |block_id_ptr| {
+            const block_id = block_id_ptr.*;
+
+            h ^= block_id;
         }
 
         std.hash.autoHash(hasher, h);
