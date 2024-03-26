@@ -9,6 +9,7 @@ const Predicate = @import("biscuit-builder").Predicate;
 const Expression = @import("biscuit-builder").Expression;
 const Scope = @import("biscuit-builder").Scope;
 const Date = @import("biscuit-builder").Date;
+const Ed25519 = std.crypto.sign.Ed25519;
 
 pub const Parser = struct {
     input: []const u8,
@@ -397,7 +398,7 @@ pub const Parser = struct {
     pub fn ruleBody(parser: *Parser) !struct { predicates: std.ArrayList(Predicate), expressions: std.ArrayList(Expression), scopes: std.ArrayList(Scope) } {
         var predicates = std.ArrayList(Predicate).init(parser.allocator);
         var expressions = std.ArrayList(Expression).init(parser.allocator);
-        var scopes = std.ArrayList(Scope).init(parser.allocator);
+        var scps = std.ArrayList(Scope).init(parser.allocator);
 
         while (true) {
             parser.skipWhiteSpace();
@@ -448,17 +449,17 @@ pub const Parser = struct {
             break;
         }
 
-        scope_blk: {
+        scopes_blk: {
             var scope_parser = Parser.init(parser.allocator, parser.rest());
 
-            const s = scope_parser.scope(parser.allocator) catch break :scope_blk;
+            const s = scope_parser.scopes(parser.allocator) catch break :scopes_blk;
 
             parser.offset += scope_parser.offset;
 
-            try scopes.append(s);
+            scps = s;
         }
 
-        return .{ .predicates = predicates, .expressions = expressions, .scopes = scopes };
+        return .{ .predicates = predicates, .expressions = expressions, .scopes = scps };
     }
 
     fn expression(parser: *Parser) ParserError!Expression {
@@ -865,8 +866,68 @@ pub const Parser = struct {
         return try Expression.unary(parser.allocator, .parens, e);
     }
 
-    fn scope(_: *Parser, _: std.mem.Allocator) !Scope {
-        return error.Unimplemented;
+    fn scopes(parser: *Parser, allocator: std.mem.Allocator) !std.ArrayList(Scope) {
+        try parser.expectString("trusting");
+
+        parser.skipWhiteSpace();
+
+        var scps = std.ArrayList(Scope).init(allocator);
+
+        while (true) {
+            parser.skipWhiteSpace();
+
+            const scp = try parser.scope(allocator);
+
+            try scps.append(scp);
+
+            parser.skipWhiteSpace();
+
+            if (!parser.startsWith(",")) break;
+
+            try parser.expectString("'");
+        }
+
+        return scps;
+    }
+
+    fn scope(parser: *Parser, _: std.mem.Allocator) !Scope {
+        parser.skipWhiteSpace();
+
+        if (parser.startsWith("authority")) {
+            try parser.expectString("authority");
+
+            return .{ .authority = {} };
+        }
+
+        if (parser.startsWith("previous")) {
+            try parser.expectString("previous");
+
+            return .{ .previous = {} };
+        }
+
+        if (parser.startsWith("{")) {
+            try parser.expectString("{");
+
+            const parameter = parser.readName();
+
+            try parser.expectString("}");
+
+            return .{ .parameter = parameter };
+        }
+
+        return .{ .public_key = try parser.publicKey() };
+    }
+
+    fn publicKey(parser: *Parser) !Ed25519.PublicKey {
+        try parser.expectString("ed25519/");
+
+        const h = try parser.hex();
+
+        var out_buf: [Ed25519.PublicKey.encoded_length]u8 = undefined;
+
+        _ = try std.fmt.hexToBytes(out_buf[0..], h);
+
+        return try Ed25519.PublicKey.fromBytes(out_buf);
     }
 
     fn peek(parser: *Parser) ?u8 {
@@ -904,6 +965,22 @@ pub const Parser = struct {
         if (peeked == char) return error.DisallowedChar;
     }
 
+    fn hex(parser: *Parser) ![]const u8 {
+        const start = parser.offset;
+
+        for (parser.rest()) |c| {
+            if (ziglyph.isHexDigit(c)) {
+                parser.offset += 1;
+                continue;
+            }
+
+            break;
+        }
+
+        return parser.input[start..parser.offset];
+    }
+
+    // FIXME: this should error?
     fn readName(parser: *Parser) []const u8 {
         const start = parser.offset;
 

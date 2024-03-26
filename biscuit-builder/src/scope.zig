@@ -12,9 +12,11 @@ const ScopeKind = enum(u8) {
     parameter,
 };
 
-pub const Scope = struct {
-    kind: ScopeKind,
+pub const Scope = union {
+    authority: void,
+    previous: void,
     public_key: Ed25519.PublicKey,
+    parameter: []const u8,
 
     /// convert to datalog fact
     pub fn convert(_: Scope, _: std.mem.Allocator, _: *datalog.SymbolTable) !datalog.Scope {

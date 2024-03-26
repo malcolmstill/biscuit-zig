@@ -69,5 +69,12 @@ pub const Rule = struct {
             try writer.print("{any}", .{expression.*});
             if (i < rule.expressions.items.len - 1) try writer.print(", ", .{});
         }
+
+        if (rule.expressions.items.len > 0) try writer.print(", ", .{});
+
+        for (rule.scopes.items, 0..) |*scopes, i| {
+            try writer.print("{any}", .{scopes.*});
+            if (i < rule.scopes.items.len - 1) try writer.print(", ", .{});
+        }
     }
 };
