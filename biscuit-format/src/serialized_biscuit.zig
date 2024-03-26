@@ -71,6 +71,8 @@ pub const SerializedBiscuit = struct {
 
         // Verify the authority block's signature
         {
+            if (serialized_biscuit.authority.external_signature != null) return error.AuthorityBlockMustNotHaveExternalSignature;
+
             var verifier = try serialized_biscuit.authority.signature.verifier(pk);
 
             verifier.update(serialized_biscuit.authority.block);
@@ -84,13 +86,28 @@ pub const SerializedBiscuit = struct {
 
         // Verify the other blocks' signatures
         for (serialized_biscuit.blocks.items) |*block| {
-            var verifier = try block.signature.verifier(pk);
+            // Verify the block signature
+            {
+                var verifier = try block.signature.verifier(pk);
 
-            verifier.update(block.block);
-            verifier.update(&block.algorithmBuf());
-            verifier.update(&block.public_key.bytes);
+                verifier.update(block.block);
+                if (block.external_signature) |external_signature| {
+                    verifier.update(&external_signature.signature.toBytes());
+                }
+                verifier.update(&block.algorithmBuf());
+                verifier.update(&block.public_key.bytes);
 
-            try verifier.verify();
+                try verifier.verify();
+            }
+
+            // Verify the external signature (where one exists)
+            if (block.external_signature) |external_signature| {
+                var external_verifier = try external_signature.signature.verifier(external_signature.public_key);
+                external_verifier.update(block.block);
+                external_verifier.update(&block.algorithm2Buf());
+                external_verifier.update(&pk.bytes);
+                try external_verifier.verify();
+            }
 
             pk = block.public_key;
         }

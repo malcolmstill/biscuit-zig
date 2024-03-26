@@ -32,6 +32,10 @@ pub const SignedBlock = struct {
             const required_block_external_key = ext_sig.publicKey orelse return error.ExpectedExternalPublicKey;
             const block_external_public_key = required_block_external_key.key.getSlice();
 
+            const algo = required_block_external_key.algorithm;
+
+            std.debug.print("ALGORITHM = {}\n", .{algo});
+
             if (block_external_signature.len != Ed25519.Signature.encoded_length) return error.IncorrectBlockExternalSignatureLength;
             if (block_external_public_key.len != Ed25519.PublicKey.encoded_length) return error.IncorrectBlockExternalPublicKeyLength;
 
@@ -58,6 +62,13 @@ pub const SignedBlock = struct {
     pub fn algorithmBuf(signed_block: *SignedBlock) [4]u8 {
         var buf: [4]u8 = undefined;
         std.mem.writeInt(u32, buf[0..], @as(u32, @bitCast(@intFromEnum(signed_block.algorithm))), @import("builtin").cpu.arch.endian());
+        return buf;
+    }
+
+    // FIXME: we should take the algorithm from the appropriate key
+    pub fn algorithm2Buf(_: *SignedBlock) [4]u8 {
+        var buf: [4]u8 = undefined;
+        std.mem.writeInt(u32, buf[0..], @as(u32, 0), @import("builtin").cpu.arch.endian());
         return buf;
     }
 };
