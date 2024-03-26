@@ -175,18 +175,28 @@ pub const Rule = struct {
         var arena = std.heap.ArenaAllocator.init(allocator);
         defer arena.deinit();
 
-        const matched_variables = try MatchedVariables.init(arena.allocator(), rule);
+        const arena_allocator = arena.allocator();
 
-        // if (rule.body.items.len == 0) {
-        //     for (rule.expressions.items) |expression| {
-        //         matched_variables.checkExpressions(rule.expressions.items)
-        //     }
-        // }
+        if (rule.body.items.len == 0) {
+            const variables = std.AutoHashMap(u32, Term).init(allocator);
+            for (rule.expressions.items) |expr| {
+                const result = try expr.evaluate(arena_allocator, variables, symbols);
 
-        var it = Combinator.init(0, allocator, matched_variables, rule.body.items, rule.expressions.items, facts, symbols, trusted_origins);
-        defer it.deinit();
+                switch (result) {
+                    .bool => |b| if (b) continue else return false,
+                    else => return false,
+                }
+            }
 
-        return try it.next() != null;
+            return true;
+        } else {
+            const matched_variables = try MatchedVariables.init(arena_allocator, rule);
+
+            var it = Combinator.init(0, allocator, matched_variables, rule.body.items, rule.expressions.items, facts, symbols, trusted_origins);
+            defer it.deinit();
+
+            return try it.next() != null;
+        }
     }
 
     pub fn format(rule: Rule, comptime _: []const u8, _: std.fmt.FormatOptions, writer: anytype) !void {
