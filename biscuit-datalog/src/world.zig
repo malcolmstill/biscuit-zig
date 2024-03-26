@@ -6,7 +6,7 @@ const Rule = @import("rule.zig").Rule;
 
 const FactSet = @import("fact_set.zig").FactSet;
 const RuleSet = @import("rule_set.zig").RuleSet;
-const TrustedOrigins = @import("origin.zig").TrustedOrigins;
+const TrustedOrigins = @import("trusted_origins.zig").TrustedOrigins;
 const RunLimits = @import("run_limits.zig").RunLimits;
 const SymbolTable = @import("symbol_table.zig").SymbolTable;
 

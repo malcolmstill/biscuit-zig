@@ -12,7 +12,7 @@ const MatchedVariables = @import("matched_variables.zig").MatchedVariables;
 const Combinator = @import("combinator.zig").Combinator;
 const Scope = @import("scope.zig").Scope;
 const Expression = @import("expression.zig").Expression;
-const TrustedOrigins = @import("origin.zig").TrustedOrigins;
+const TrustedOrigins = @import("trusted_origins.zig").TrustedOrigins;
 
 pub const Rule = struct {
     head: Predicate,

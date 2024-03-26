@@ -1,6 +1,6 @@
 const std = @import("std");
 const Rule = @import("rule.zig").Rule;
-const TrustedOrigins = @import("origin.zig").TrustedOrigins;
+const TrustedOrigins = @import("trusted_origins.zig").TrustedOrigins;
 
 pub const RuleSet = struct {
     rules: std.AutoHashMap(TrustedOrigins, std.ArrayList(OriginRule)),

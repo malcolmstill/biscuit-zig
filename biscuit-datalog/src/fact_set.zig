@@ -3,7 +3,7 @@ const Wyhash = std.hash.Wyhash;
 const Fact = @import("fact.zig").Fact;
 const Set = @import("set.zig").Set;
 const Origin = @import("origin.zig").Origin;
-const TrustedOrigins = @import("origin.zig").TrustedOrigins;
+const TrustedOrigins = @import("trusted_origins.zig").TrustedOrigins;
 
 pub const FactSet = struct {
     sets: InnerMap,
@@ -15,7 +15,6 @@ pub const FactSet = struct {
         pub fn hash(ctx: Context, key: Origin) u64 {
             _ = ctx;
 
-            // We assume here there is a method `pub hash(set: K, hasher: anytype)` on type K.
             var hasher = Wyhash.init(0);
             key.hash(&hasher);
             return hasher.final();
@@ -56,25 +55,15 @@ pub const FactSet = struct {
 
         pub fn next(it: *Iterator) ?struct { origin: *Origin, fact: *Fact } {
             while (true) {
-                if (it.origin_fact_it) |origin_fact_it| {
-                    const origin = origin_fact_it.origin;
-                    var fact_it = origin_fact_it.fact_it;
+                if (it.origin_fact_it) |*origin_fact_it| {
+                    if (origin_fact_it.fact_it.next()) |fact| return .{ .origin = origin_fact_it.origin, .fact = fact };
 
-                    const fact = fact_it.next() orelse {
-                        it.origin_fact_it = null;
-                        continue;
-                    };
-
-                    return .{ .origin = origin, .fact = fact };
+                    it.origin_fact_it = null;
                 } else {
                     const origin_set = it.set_it.next() orelse return null;
 
                     it.origin_fact_it = .{ .origin = origin_set.key_ptr, .fact_it = origin_set.value_ptr.iterator() };
-
-                    continue;
                 }
-
-                unreachable;
             }
         }
     };
@@ -85,27 +74,17 @@ pub const FactSet = struct {
 
     pub const TrustedIterator = struct {
         trusted_origins: TrustedOrigins,
-        set_it: std.AutoHashMap(Origin, Set(Fact)).Iterator,
+        set_it: InnerMap.Iterator,
         origin_fact_it: ?struct { origin: *Origin, fact_it: Set(Fact).Iterator } = null,
 
         pub fn next(it: *TrustedIterator) ?struct { origin: *Origin, fact: *Fact } {
             while (true) {
-                std.debug.print("start\n", .{});
-                if (it.origin_fact_it) |origin_fact_it| {
-                    const origin = origin_fact_it.origin;
-                    var fact_it = origin_fact_it.fact_it;
+                if (it.origin_fact_it) |*origin_fact_it| {
+                    if (origin_fact_it.fact_it.next()) |fact| {
+                        return .{ .origin = origin_fact_it.origin, .fact = fact };
+                    }
 
-                    std.debug.print("Reading next fact for origin {any}\n", .{origin});
-                    const fact = fact_it.next() orelse {
-                        std.debug.print("no more facts in {any}\n", .{origin});
-                        it.origin_fact_it = null;
-
-                        std.debug.print("continue ultra\n", .{});
-                        continue;
-                    };
-
-                    std.debug.print("Gotta be here?\n", .{});
-                    return .{ .origin = origin, .fact = fact };
+                    it.origin_fact_it = null;
                 } else {
                     std.debug.assert(it.origin_fact_it == null);
 
@@ -113,23 +92,15 @@ pub const FactSet = struct {
                     const origin = origin_set.key_ptr;
 
                     // If we don't trust the origin of this set, we start the loop again
-                    if (!it.trusted_origins.containsAll(origin.*)) {
-                        std.debug.print("continue foxbat\n", .{});
-                        continue;
-                    }
+                    if (!it.trusted_origins.containsAll(origin.*)) continue;
+
                     defer std.debug.assert(it.origin_fact_it != null);
 
-                    std.debug.print("here\n", .{});
                     it.origin_fact_it = .{
                         .origin = origin,
                         .fact_it = origin_set.value_ptr.iterator(),
                     };
-
-                    std.debug.print("continue omega\n", .{});
-                    continue;
                 }
-
-                unreachable;
             }
         }
     };
@@ -178,42 +149,49 @@ test "FactSet" {
     defer fs.deinit();
 
     var origin = Origin.init(testing.allocator);
-    // defer origin.deinit(); Freed by fs.deinit();
 
     try origin.insert(0);
-
-    // var origin_equivalent = Origin.init(testing.allocator);
-    // defer origin_equivalent.deinit();
-
-    // try origin_equivalent.insert(0);
 
     const fact: Fact = .{ .predicate = .{ .name = 2123, .terms = std.ArrayList(Term).init(testing.allocator) } };
 
     try fs.add(origin, fact);
 
     try testing.expect(fs.sets.contains(origin));
-    // try testing.expect(fs.sets.contains(origin_equivalent));
 
-    // const first_set_equivalent = fs.sets.getEntry(origin_equivalent) orelse return error.ExpectedSet;
-    const first_set = fs.sets.getEntry(origin) orelse return error.ExpectedSet;
-    // std.debug.print("EQUIV set = {any} (equiv)\n", .{first_set_equivalent.value_ptr});
-
-    {
-        std.debug.print("set = {any}\n", .{first_set.value_ptr});
-        var it = first_set.value_ptr.iterator();
-
-        while (it.next()) |iterated_fact| {
-            // std.debug.print("fact = {any}\n", .{iterated_fact});
-            try testing.expectEqual(fact.predicate.name, iterated_fact.predicate.name);
-        }
-    }
-
-    // FIXME: this infinite loops
+    // FIXME: no longer inifinite loops, but it.set_it.next() panics on alignment. This suggests (?)
+    // we are operating on some copy of the iterator? Or hashmap?
     {
         var it = fs.iterator();
         while (it.next()) |origin_fact| {
             std.debug.print("origin = {any}, fact = {any}\n", .{ origin_fact.origin, origin_fact.fact });
             try testing.expectEqual(fact.predicate.name, origin_fact.fact.predicate.name);
+        }
+    }
+}
+
+test "FactSet 2" {
+    const testing = std.testing;
+    const Term = @import("term.zig").Term;
+
+    var fs = FactSet.init(testing.allocator);
+    defer fs.deinit();
+
+    var origin = Origin.init(testing.allocator);
+
+    try origin.insert(0);
+
+    const fact: Fact = .{ .predicate = .{ .name = 2123, .terms = std.ArrayList(Term).init(testing.allocator) } };
+
+    try fs.add(origin, fact);
+
+    try testing.expect(fs.sets.contains(origin));
+    const first_set = fs.sets.getEntry(origin) orelse return error.ExpectedSet;
+
+    {
+        var it = first_set.value_ptr.iterator();
+
+        while (it.next()) |iterated_fact| {
+            try testing.expectEqual(fact.predicate.name, iterated_fact.predicate.name);
         }
     }
 }
