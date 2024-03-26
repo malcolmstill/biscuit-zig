@@ -9,7 +9,7 @@ pub const Origin = struct {
     block_ids: std.AutoHashMap(usize, void),
 
     // Authorizer id is maximum int storable in u64
-    pub const AuthorizerId = std.math.maxInt(u64);
+    pub const AUTHORIZER_ID = std.math.maxInt(u64);
 
     pub fn init(allocator: mem.Allocator) Origin {
         return .{ .block_ids = std.AutoHashMap(usize, void).init(allocator) };
@@ -31,8 +31,14 @@ pub const Origin = struct {
         var it = origin.block_ids.keyIterator();
 
         try writer.print("[", .{});
-        while (it.next()) |block_id| {
-            try writer.print("{}", .{block_id.*});
+        while (it.next()) |block_id_ptr| {
+            const block_id = block_id_ptr.*;
+
+            if (block_id == Origin.AUTHORIZER_ID) {
+                try writer.print("{s},", .{"Authorizer"});
+            } else {
+                try writer.print("{},", .{block_id});
+            }
         }
         try writer.print("]", .{});
     }
@@ -42,7 +48,7 @@ pub const Origin = struct {
     }
 
     // pub fn authorizer(allocator: mem.Allocator) !Origin {
-    //     return try Origin.initWithId(allocator, AuthorizerId);
+    //     return try Origin.initWithId(allocator, AUTHORIZER_ID);
     // }
 
     pub fn insert(origin: *Origin, block_id: usize) !void {

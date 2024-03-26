@@ -56,7 +56,7 @@ pub const Authorizer = struct {
             authorizer.allocator,
             authorizer.scopes.items,
             try TrustedOrigins.defaultOrigins(authorizer.allocator),
-            Origin.AuthorizerId,
+            Origin.AUTHORIZER_ID,
             authorizer.public_key_to_block_id,
         );
     }
@@ -70,7 +70,7 @@ pub const Authorizer = struct {
 
         std.debug.print("fact = {any}\n", .{fact});
 
-        const origin = try Origin.initWithId(authorizer.allocator, Origin.AuthorizerId);
+        const origin = try Origin.initWithId(authorizer.allocator, Origin.AUTHORIZER_ID);
 
         try authorizer.world.addFact(origin, try fact.convert(authorizer.allocator, &authorizer.symbols));
     }
@@ -99,7 +99,7 @@ pub const Authorizer = struct {
     /// 5. _authorizer_: Run the _authorizer's_ policies
     /// 6. _biscuit_ (where it exists): run the checks from all the non-authority blocks
     pub fn authorize(authorizer: *Authorizer, errors: *std.ArrayList(AuthorizerError)) !void {
-        std.debug.print("authorizing biscuit:\n", .{});
+        std.debug.print("\nAuthorizing biscuit:\n", .{});
         // 1.
         // Load facts and rules from authority block into world. Our block's facts
         // will have a particular symbol table that we map into the symvol table
@@ -184,7 +184,7 @@ pub const Authorizer = struct {
                     authorizer.allocator,
                     query.scopes.items,
                     try authorizer.authorizerTrustedOrigins(),
-                    Origin.AuthorizerId,
+                    Origin.AUTHORIZER_ID,
                     authorizer.public_key_to_block_id,
                 );
 

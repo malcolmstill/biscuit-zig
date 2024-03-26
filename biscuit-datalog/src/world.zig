@@ -46,8 +46,8 @@ pub const World = struct {
     }
 
     pub fn runWithLimits(world: *World, symbols: SymbolTable, limits: RunLimits) !void {
-        std.debug.print("runWithLimits\n", .{});
-        for (0..limits.max_iterations) |_| {
+        for (0..limits.max_iterations) |iteration| {
+            std.debug.print("\nrunWithLimits[{}]\n", .{iteration});
             const starting_fact_count = world.fact_set.count();
 
             var new_fact_sets = FactSet.init(world.allocator);
@@ -94,12 +94,12 @@ pub const World = struct {
 
     /// Add fact with origin to world
     pub fn addFact(world: *World, origin: Origin, fact: Fact) !void {
-        std.debug.print("world: adding fact = {any} ({any}) \n", .{ fact, origin });
+        std.debug.print("\nworld: adding fact = {any} ({any}) \n", .{ fact, origin });
         try world.fact_set.add(origin, fact);
     }
 
     pub fn addRule(world: *World, origin_id: usize, scope: TrustedOrigins, rule: Rule) !void {
-        std.debug.print("world: adding rule = {any} ({}, {any})\n", .{ rule, origin_id, scope });
+        std.debug.print("\nworld: adding rule = {any} ({}, {any})\n", .{ rule, origin_id, scope });
         try world.rule_set.add(origin_id, scope, rule);
     }
 

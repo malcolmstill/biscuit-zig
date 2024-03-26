@@ -35,7 +35,7 @@ pub const SymbolTable = struct {
 
         const index = symbol_table.symbols.items.len - 1 + NON_DEFAULT_SYMBOLS_OFFSET;
 
-        std.debug.print("{s}: Inserting \"{s}\" at {}\n", .{ symbol_table.name, symbol, index });
+        // std.debug.print("{s}: Inserting \"{s}\" at {}\n", .{ symbol_table.name, symbol, index });
 
         return index;
     }

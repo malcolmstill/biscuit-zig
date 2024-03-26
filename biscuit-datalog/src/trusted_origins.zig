@@ -26,7 +26,7 @@ pub const TrustedOrigins = struct {
         var trusted_origins = TrustedOrigins.init(allocator);
 
         try trusted_origins.origin.insert(0);
-        try trusted_origins.origin.insert(Origin.AuthorizerId);
+        try trusted_origins.origin.insert(Origin.AUTHORIZER_ID);
 
         return trusted_origins;
     }
@@ -47,7 +47,7 @@ pub const TrustedOrigins = struct {
     ) !TrustedOrigins {
         var trusted_origins = TrustedOrigins.init(allocator);
         try trusted_origins.origin.insert(current_block);
-        try trusted_origins.origin.insert(Origin.AuthorizerId);
+        try trusted_origins.origin.insert(Origin.AUTHORIZER_ID);
 
         if (rule_scopes.len == 0) {
             var it = default_origins.origin.block_ids.keyIterator();
@@ -60,7 +60,7 @@ pub const TrustedOrigins = struct {
                 switch (scope) {
                     .authority => try trusted_origins.origin.insert(0),
                     .previous => {
-                        if (current_block == Origin.AuthorizerId) continue;
+                        if (current_block == Origin.AUTHORIZER_ID) continue;
 
                         for (0..current_block + 1) |i| {
                             try trusted_origins.origin.insert(i);
@@ -93,6 +93,10 @@ pub const TrustedOrigins = struct {
         }
 
         return true;
+    }
+
+    pub fn format(trusted_origins: TrustedOrigins, comptime _: []const u8, _: std.fmt.FormatOptions, writer: anytype) !void {
+        try writer.print("trusting {any}", .{trusted_origins.origin});
     }
 };
 

@@ -117,7 +117,7 @@ pub const Rule = struct {
         var arena = std.heap.ArenaAllocator.init(allocator);
         defer arena.deinit();
 
-        std.debug.print("\n\nrule = {any}\n", .{rule});
+        std.debug.print("\n\napplying rule = {any}\n", .{rule});
         const matched_variables = try MatchedVariables.init(arena.allocator(), rule);
 
         // TODO: if body is empty stuff
@@ -145,16 +145,17 @@ pub const Rule = struct {
             }
 
             const fact = Fact.init(predicate);
-            std.debug.print("adding new fact = {any}\n", .{fact});
 
             var new_origin = try origin.clone();
             try new_origin.insert(origin_id);
 
+            std.debug.print("\nadding new fact {any} with origin {any}\n", .{ fact, new_origin });
             // Skip adding fact if we already have generated it. Because the
             // Set will clobber duplicate facts we'll lose a reference when
             // inserting a duplicate and then when we loop over the set to
             // deinit the facts we'll miss some. This ensures that the facts
             // can be freed purely from the Set.
+            // FIXME: if we continue I think we have to deinit new_origin
             if (new_facts.contains(new_origin, fact)) continue;
 
             try new_facts.add(new_origin, try fact.clone());
