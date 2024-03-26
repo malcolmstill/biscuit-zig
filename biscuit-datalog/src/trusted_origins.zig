@@ -6,18 +6,20 @@ const Origin = @import("origin.zig").Origin;
 
 /// TrustedOrigin represents the set of origins trusted by a particular rule
 pub const TrustedOrigins = struct {
-    origin: Origin,
+    ids: InnerSet,
+
+    const InnerSet = std.AutoHashMap(usize, void);
 
     pub fn init(allocator: mem.Allocator) TrustedOrigins {
-        return .{ .origin = Origin.init(allocator) };
+        return .{ .ids = InnerSet.init(allocator) };
     }
 
     pub fn deinit(trusted_origins: *TrustedOrigins) void {
-        trusted_origins.origin.block_ids.deinit();
+        trusted_origins.ids.deinit();
     }
 
     pub fn clone(trusted_origins: *const TrustedOrigins) !TrustedOrigins {
-        return .{ .origin = try trusted_origins.origin.clone() };
+        return .{ .ids = try trusted_origins.ids.clone() };
     }
 
     /// Return a TrustedOrigins default of trusting the authority block (0)
@@ -25,8 +27,8 @@ pub const TrustedOrigins = struct {
     pub fn defaultOrigins(allocator: mem.Allocator) !TrustedOrigins {
         var trusted_origins = TrustedOrigins.init(allocator);
 
-        try trusted_origins.origin.insert(0);
-        try trusted_origins.origin.insert(Origin.AUTHORIZER_ID);
+        try trusted_origins.insert(0);
+        try trusted_origins.insert(Origin.AUTHORIZER_ID);
 
         return trusted_origins;
     }
@@ -46,31 +48,31 @@ pub const TrustedOrigins = struct {
         public_key_to_block_id: std.AutoHashMap(usize, std.ArrayList(usize)),
     ) !TrustedOrigins {
         var trusted_origins = TrustedOrigins.init(allocator);
-        try trusted_origins.origin.insert(current_block);
-        try trusted_origins.origin.insert(Origin.AUTHORIZER_ID);
+        try trusted_origins.insert(current_block);
+        try trusted_origins.insert(Origin.AUTHORIZER_ID);
 
         if (rule_scopes.len == 0) {
-            var it = default_origins.origin.block_ids.keyIterator();
+            var it = default_origins.ids.keyIterator();
 
             while (it.next()) |block_id| {
-                try trusted_origins.origin.insert(block_id.*);
+                try trusted_origins.insert(block_id.*);
             }
         } else {
             for (rule_scopes) |scope| {
                 switch (scope) {
-                    .authority => try trusted_origins.origin.insert(0),
+                    .authority => try trusted_origins.insert(0),
                     .previous => {
                         if (current_block == Origin.AUTHORIZER_ID) continue;
 
                         for (0..current_block + 1) |i| {
-                            try trusted_origins.origin.insert(i);
+                            try trusted_origins.insert(i);
                         }
                     },
                     .public_key => |public_key_id| {
                         const block_id_list = public_key_to_block_id.get(public_key_id) orelse continue;
 
                         for (block_id_list.items) |block_id| {
-                            try trusted_origins.origin.insert(block_id);
+                            try trusted_origins.insert(block_id);
                         }
                     },
                 }
@@ -87,7 +89,7 @@ pub const TrustedOrigins = struct {
         while (origin_it.next()) |origin_id_ptr| {
             const origin_id = origin_id_ptr.*;
 
-            if (trusted_origins.origin.block_ids.contains(origin_id)) continue;
+            if (trusted_origins.ids.contains(origin_id)) continue;
 
             return false;
         }
@@ -96,7 +98,23 @@ pub const TrustedOrigins = struct {
     }
 
     pub fn format(trusted_origins: TrustedOrigins, comptime _: []const u8, _: std.fmt.FormatOptions, writer: anytype) !void {
-        try writer.print("trusting {any}", .{trusted_origins.origin});
+        var it = trusted_origins.ids.keyIterator();
+
+        try writer.print("trusting [", .{});
+        while (it.next()) |id_ptr| {
+            const id = id_ptr.*;
+
+            if (id == Origin.AUTHORIZER_ID) {
+                try writer.print("{s},", .{"Authorizer"});
+            } else {
+                try writer.print("{},", .{id});
+            }
+        }
+        try writer.print("]", .{});
+    }
+
+    pub fn insert(trusted_origins: *TrustedOrigins, block_id: usize) !void {
+        try trusted_origins.ids.put(block_id, {});
     }
 };
 
