@@ -118,6 +118,7 @@ pub fn validate(alloc: mem.Allocator, token: []const u8, public_key: std.crypto.
                     },
                 },
                 .Execution => runValidation(alloc, token, public_key, authorizer_code, &errors) catch |err| switch (err) {
+                    error.Overflow => return,
                     else => return err,
                 },
             }
