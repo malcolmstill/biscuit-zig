@@ -21,6 +21,7 @@ pub const Rule = struct {
     expressions: std.ArrayList(Expression),
     scopes: std.ArrayList(Scope),
 
+    /// Make datalog rule from protobuf rule
     pub fn fromSchema(allocator: std.mem.Allocator, schema_rule: schema.RuleV2) !Rule {
         const head = try Predicate.fromSchema(allocator, schema_rule.head orelse return error.NoHeadInRuleSchema);
 
@@ -171,7 +172,7 @@ pub const Rule = struct {
     /// Note: whilst the combinator may return multiple valid matches, `findMatch` only requires a single match
     /// so stopping on the first `it.next()` that returns not-null is enough.
     pub fn findMatch(rule: *Rule, allocator: mem.Allocator, facts: *const FactSet, symbols: SymbolTable, trusted_origins: TrustedOrigins) !bool {
-        std.debug.print("\nrule.findMatch on {any}\n", .{rule});
+        std.debug.print("\nrule.findMatch on {any} ({any})\n", .{ rule, trusted_origins });
         var arena = std.heap.ArenaAllocator.init(allocator);
         defer arena.deinit();
 
@@ -208,9 +209,16 @@ pub const Rule = struct {
 
         if (rule.expressions.items.len > 0) try writer.print(", ", .{});
 
-        for (rule.expressions.items, 0..) |*expressions, i| {
-            try writer.print("{any}", .{expressions.*});
+        for (rule.expressions.items, 0..) |*expression, i| {
+            try writer.print("{any}", .{expression.*});
             if (i < rule.expressions.items.len - 1) try writer.print(", ", .{});
+        }
+
+        if (rule.scopes.items.len > 0) try writer.print(", ", .{});
+
+        for (rule.scopes.items, 0..) |*scope, i| {
+            try writer.print("{any}", .{scope.*});
+            if (i < rule.scopes.items.len - 1) try writer.print(", ", .{});
         }
     }
 

@@ -12,14 +12,19 @@ const ScopeKind = enum(u8) {
     parameter,
 };
 
-pub const Scope = union {
+pub const Scope = union(ScopeKind) {
     authority: void,
     previous: void,
     public_key: Ed25519.PublicKey,
     parameter: []const u8,
 
     /// convert to datalog fact
-    pub fn convert(_: Scope, _: std.mem.Allocator, _: *datalog.SymbolTable) !datalog.Scope {
-        unreachable;
+    pub fn convert(scope: Scope, _: std.mem.Allocator, symbols: *datalog.SymbolTable) !datalog.Scope {
+        return switch (scope) {
+            .authority => .{ .authority = {} },
+            .previous => .{ .previous = {} },
+            .public_key => |pk| .{ .public_key = try symbols.insert(&pk.bytes) },
+            .parameter => unreachable,
+        };
     }
 };

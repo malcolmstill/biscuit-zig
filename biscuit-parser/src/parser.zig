@@ -923,6 +923,8 @@ pub const Parser = struct {
 
         const h = try parser.hex();
 
+        std.debug.print("publickey = {s}\n", .{h});
+
         var out_buf: [Ed25519.PublicKey.encoded_length]u8 = undefined;
 
         _ = try std.fmt.hexToBytes(out_buf[0..], h);

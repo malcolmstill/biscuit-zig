@@ -24,6 +24,14 @@ pub const Scope = union(ScopeTag) {
         //
         return scope;
     }
+
+    pub fn format(scope: Scope, comptime _: []const u8, _: std.fmt.FormatOptions, writer: anytype) !void {
+        switch (scope) {
+            .authority => try writer.print("authority", .{}),
+            .previous => try writer.print("previous", .{}),
+            .public_key => |public_key| try writer.print("public key {}", .{public_key}),
+        }
+    }
 };
 
 const ScopeTag = enum(u8) {

@@ -82,11 +82,12 @@ pub const TrustedOrigins = struct {
         return trusted_origins;
     }
 
-    /// Check that TrustedOrigins contain _all_ origin ids in fact_origin
+    /// Check that TrustedOrigins contai (at least) _all_ origin ids in fact_origin. In
+    /// other words, check that the facts origins are a subset of the trusted origins.
     pub fn containsAll(trusted_origins: *TrustedOrigins, fact_origin: *Origin) bool {
-        var origin_it = fact_origin.block_ids.keyIterator();
+        var it = fact_origin.block_ids.keyIterator();
 
-        while (origin_it.next()) |origin_id_ptr| {
+        while (it.next()) |origin_id_ptr| {
             const origin_id = origin_id_ptr.*;
 
             if (trusted_origins.ids.contains(origin_id)) continue;
