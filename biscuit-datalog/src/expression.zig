@@ -1,6 +1,7 @@
 const std = @import("std");
 const mem = std.mem;
 const schema = @import("biscuit-schema");
+const Regex = @import("regex").Regex;
 const Term = @import("term.zig").Term;
 const SymbolTable = @import("symbol_table.zig").SymbolTable;
 
@@ -86,7 +87,7 @@ pub const Expression = struct {
                     const right = stack.popOrNull() orelse return error.StackUnderflow;
                     const left = stack.popOrNull() orelse return error.StackUnderflow;
 
-                    const result = try binary_op.evaluate(left, right, symbols);
+                    const result = try binary_op.evaluate(allocator, left, right, symbols);
 
                     try stack.append(result);
                 },
@@ -206,7 +207,7 @@ const Binary = enum {
     bitwise_xor,
     not_equal,
 
-    pub fn evaluate(expr: Binary, left: Term, right: Term, symbols: SymbolTable) !Term {
+    pub fn evaluate(expr: Binary, allocator: std.mem.Allocator, left: Term, right: Term, symbols: SymbolTable) !Term {
         // Integer operands
         if (left == .integer and right == .integer) {
             const i = left.integer;
@@ -235,7 +236,7 @@ const Binary = enum {
             return switch (expr) {
                 .prefix => .{ .bool = mem.startsWith(u8, sl, sr) },
                 .suffix => .{ .bool = mem.endsWith(u8, sl, sr) },
-                .regex => return error.RegexUnimplemented,
+                .regex => .{ .bool = try match(allocator, sr, sl) },
                 .contains => .{ .bool = mem.containsAtLeast(u8, sl, 1, sr) },
                 .add => return error.StringConcatNotImplemented,
                 .equal => .{ .bool = mem.eql(u8, sl, sr) },
@@ -291,6 +292,12 @@ const Binary = enum {
         return error.UnexpectedExpression;
     }
 };
+
+fn match(allocator: std.mem.Allocator, regex: []const u8, string: []const u8) !bool {
+    var re = try Regex.compile(allocator, regex);
+
+    return re.match(string);
+}
 
 test {
     const testing = std.testing;

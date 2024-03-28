@@ -17,12 +17,14 @@ pub fn build(b: *std.Build) void {
 
     const schema = b.dependency("biscuit_schema", .{ .target = target, .optimize = optimize });
     const format = b.dependency("biscuit_format", .{ .target = target, .optimize = optimize });
+    const regex = b.dependency("regex", .{ .target = target, .optimize = optimize });
 
     _ = b.addModule("biscuit-datalog", .{
         .root_source_file = .{ .path = "src/main.zig" },
         .imports = &.{
             .{ .name = "biscuit-schema", .module = schema.module("biscuit-schema") },
             .{ .name = "biscuit-format", .module = format.module("biscuit-format") },
+            .{ .name = "regex", .module = regex.module("regex") },
         },
     });
 
@@ -35,6 +37,7 @@ pub fn build(b: *std.Build) void {
     });
     lib_unit_tests.root_module.addImport("biscuit-schema", schema.module("biscuit-schema"));
     lib_unit_tests.root_module.addImport("biscuit-format", format.module("biscuit-format"));
+    lib_unit_tests.root_module.addImport("regex", regex.module("regex"));
 
     const run_lib_unit_tests = b.addRunArtifact(lib_unit_tests);
 
