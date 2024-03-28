@@ -70,8 +70,8 @@ pub const Authorizer = struct {
             while (it.next()) |block_ids| {
                 block_ids.deinit();
             }
+            authorizer.public_key_to_block_id.deinit();
         }
-        authorizer.policies.deinit();
     }
 
     pub fn authorizerTrustedOrigins(authorizer: *Authorizer) !TrustedOrigins {
