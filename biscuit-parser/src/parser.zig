@@ -9,6 +9,7 @@ const Predicate = @import("biscuit-builder").Predicate;
 const Expression = @import("biscuit-builder").Expression;
 const Scope = @import("biscuit-builder").Scope;
 const Date = @import("biscuit-builder").Date;
+const Policy = @import("biscuit-builder").Policy;
 const Ed25519 = std.crypto.sign.Ed25519;
 
 pub const Parser = struct {
@@ -321,6 +322,24 @@ pub const Parser = struct {
         }
 
         return error.ExpectedBooleanTerm;
+    }
+
+    pub fn policy(parser: *Parser) !Policy {
+        var kind: Policy.Kind = undefined;
+
+        if (std.mem.startsWith(u8, parser.rest(), "allow if")) {
+            parser.offset += "allow if".len;
+            kind = .allow;
+        } else if (std.mem.startsWith(u8, parser.rest(), "deny if")) {
+            parser.offset += "deny if".len;
+            kind = .deny;
+        } else {
+            return error.UnexpectedPolicyKind;
+        }
+
+        const queries = try parser.checkBody();
+
+        return .{ .kind = kind, .queries = queries };
     }
 
     pub fn check(parser: *Parser) !Check {

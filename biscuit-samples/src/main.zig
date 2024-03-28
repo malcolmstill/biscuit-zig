@@ -81,6 +81,8 @@ pub fn validate(alloc: mem.Allocator, token: []const u8, public_key: std.crypto.
                                     .Block => |expected_failed_block_check| {
                                         for (errors.items) |found_failed_check| {
                                             switch (found_failed_check) {
+                                                .no_matching_policy => continue,
+                                                .denied_by_policy => continue,
                                                 .failed_block_check => |failed_block_check| {
                                                     if (failed_block_check.block_id == expected_failed_block_check.block_id and failed_block_check.check_id == expected_failed_block_check.check_id) {
                                                         // continue :blk;
@@ -94,6 +96,8 @@ pub fn validate(alloc: mem.Allocator, token: []const u8, public_key: std.crypto.
                                     .Authorizer => |expected_failed_authority_check| {
                                         for (errors.items) |found_failed_check| {
                                             switch (found_failed_check) {
+                                                .no_matching_policy => continue,
+                                                .denied_by_policy => continue,
                                                 .failed_block_check => return error.NotImplemented,
                                                 .failed_authority_check => |failed_block_check| {
                                                     if (failed_block_check.check_id == expected_failed_authority_check.check_id) {
@@ -143,7 +147,7 @@ pub fn runValidation(alloc: mem.Allocator, token: []const u8, public_key: std.cr
         if (std.mem.startsWith(u8, text, "check if") or std.mem.startsWith(u8, text, "check all")) {
             try a.addCheck(text);
         } else if (std.mem.startsWith(u8, text, "allow if") or std.mem.startsWith(u8, text, "deny if")) {
-            // try a.addPolicy(text);
+            try a.addPolicy(text);
         } else if (std.mem.startsWith(u8, text, "revocation_id")) {
             //
         } else {
@@ -151,5 +155,8 @@ pub fn runValidation(alloc: mem.Allocator, token: []const u8, public_key: std.cr
         }
     }
 
-    try a.authorize(errors);
+    _ = a.authorize(errors) catch |err| {
+        std.debug.print("Authorization failed with errors: {any}\n", .{errors.items});
+        return err;
+    };
 }

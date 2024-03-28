@@ -161,7 +161,7 @@ const OpKind = enum(u8) {
     binary,
 };
 
-const Op = union(OpKind) {
+pub const Op = union(OpKind) {
     value: Term,
     unary: Unary,
     binary: Binary,

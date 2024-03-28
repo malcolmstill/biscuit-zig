@@ -9,10 +9,12 @@ const SymbolTable = @import("biscuit-datalog").symbol_table.SymbolTable;
 const Scope = @import("biscuit-datalog").Scope;
 const Parser = @import("biscuit-parser").Parser;
 const builder = @import("biscuit-builder");
+const PolicyResult = @import("biscuit-builder").PolicyResult;
 
 pub const Authorizer = struct {
     allocator: mem.Allocator,
     checks: std.ArrayList(builder.Check),
+    policies: std.ArrayList(builder.Policy),
     biscuit: ?Biscuit,
     world: World,
     symbols: SymbolTable,
@@ -23,6 +25,7 @@ pub const Authorizer = struct {
         return .{
             .allocator = allocator,
             .checks = std.ArrayList(builder.Check).init(allocator),
+            .policies = std.ArrayList(builder.Policy).init(allocator),
             .biscuit = biscuit,
             .world = World.init(allocator),
             .symbols = SymbolTable.init("authorizer", allocator),
@@ -40,6 +43,11 @@ pub const Authorizer = struct {
             check.deinit();
         }
         authorizer.checks.deinit();
+
+        for (authorizer.policies.items) |policy| {
+            policy.deinit();
+        }
+        authorizer.policies.deinit();
     }
 
     pub fn authorizerTrustedOrigins(authorizer: *Authorizer) !TrustedOrigins {
@@ -75,6 +83,15 @@ pub const Authorizer = struct {
         try authorizer.checks.append(check);
     }
 
+    /// Add policy from string to authorizer
+    pub fn addPolicy(authorizer: *Authorizer, input: []const u8) !void {
+        var parser = Parser.init(authorizer.allocator, input);
+
+        const policy = try parser.policy();
+
+        try authorizer.policies.append(policy);
+    }
+
     /// authorize
     ///
     /// authorize the Authorizer
@@ -89,7 +106,7 @@ pub const Authorizer = struct {
     /// 4. _biscuit_ (where it exists): run the authority block's checks
     /// 5. _authorizer_: Run the _authorizer's_ policies
     /// 6. _biscuit_ (where it exists): run the checks from all the non-authority blocks
-    pub fn authorize(authorizer: *Authorizer, errors: *std.ArrayList(AuthorizerError)) !void {
+    pub fn authorize(authorizer: *Authorizer, errors: *std.ArrayList(AuthorizerError)) !usize {
         std.debug.print("\nAuthorizing biscuit:\n", .{});
         // 1.
         // Load facts and rules from authority block into world. Our block's facts
@@ -223,7 +240,40 @@ pub const Authorizer = struct {
             }
         }
 
-        // TODO: 5. run policies from the authorizer
+        // 5. run policies from the authorizer
+        const allowed_policy_id: ?usize = policy_blk: {
+            for (authorizer.policies.items) |policy| {
+                std.debug.print("authorizer policy = {any}\n", .{policy});
+
+                for (policy.queries.items, 0..) |*q, policy_id| {
+                    var query = try q.convert(authorizer.allocator, &authorizer.symbols);
+
+                    const rule_trusted_origins = try TrustedOrigins.fromScopes(
+                        authorizer.allocator,
+                        query.scopes.items,
+                        try authorizer.authorizerTrustedOrigins(),
+                        Origin.AUTHORIZER_ID,
+                        authorizer.public_key_to_block_id,
+                    );
+
+                    const is_match = try authorizer.world.queryMatch(&query, authorizer.symbols, rule_trusted_origins);
+                    std.debug.print("match {any} = {}\n", .{ query, is_match });
+
+                    if (is_match) {
+                        switch (policy.kind) {
+                            .allow => break :policy_blk policy_id,
+                            .deny => {
+                                try errors.append(.{ .denied_by_policy = .{ .deny_policy_id = policy_id } });
+                                break :policy_blk null;
+                            },
+                        }
+                    }
+                }
+            }
+
+            try errors.append(.{ .no_matching_policy = {} });
+            break :policy_blk null;
+        };
 
         // 6. Run checks in the biscuit's other blocks
         if (authorizer.biscuit) |biscuit| {
@@ -265,17 +315,24 @@ pub const Authorizer = struct {
             }
         }
 
-        // FIXME: return logic
-        if (errors.items.len > 0) return error.AuthorizationFailed;
+        if (allowed_policy_id) |policy_id| {
+            if (errors.items.len == 0) return policy_id;
+        }
+
+        return error.AuthorizationFailed;
     }
 };
 
 const AuthorizerErrorKind = enum(u8) {
+    no_matching_policy,
+    denied_by_policy,
     failed_authority_check,
     failed_block_check,
 };
 
 pub const AuthorizerError = union(AuthorizerErrorKind) {
+    no_matching_policy: void,
+    denied_by_policy: struct { deny_policy_id: usize },
     failed_authority_check: struct { check_id: usize },
     failed_block_check: struct { block_id: usize, check_id: usize },
 };

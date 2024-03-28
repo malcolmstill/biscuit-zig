@@ -3,6 +3,7 @@ pub const Fact = @import("fact.zig").Fact;
 pub const predicate = @import("predicate.zig");
 pub const Predicate = @import("predicate.zig").Predicate;
 pub const Expression = @import("expression.zig").Expression;
+pub const Op = @import("expression.zig").Op;
 pub const Scope = @import("scope.zig").Scope;
 pub const rule = @import("rule.zig");
 pub const Rule = @import("rule.zig").Rule;
