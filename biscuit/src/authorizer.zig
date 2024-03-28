@@ -223,7 +223,7 @@ pub const Authorizer = struct {
 
         // 2. Run the world to generate all facts
         std.debug.print("\nGENERATING NEW FACTS\n", .{});
-        try authorizer.world.run(authorizer.symbols);
+        try authorizer.world.run(&authorizer.symbols);
         std.debug.print("\nEND GENERATING NEW FACTS\n", .{});
 
         //  3. Run checks that have been added to this authorizer
@@ -242,8 +242,8 @@ pub const Authorizer = struct {
                 );
 
                 const is_match = switch (check.kind) {
-                    .one => try authorizer.world.queryMatch(query, authorizer.symbols, rule_trusted_origins),
-                    .all => try authorizer.world.queryMatchAll(query, authorizer.symbols, rule_trusted_origins),
+                    .one => try authorizer.world.queryMatch(query, &authorizer.symbols, rule_trusted_origins),
+                    .all => try authorizer.world.queryMatchAll(query, &authorizer.symbols, rule_trusted_origins),
                 };
 
                 if (!is_match) try errors.append(.{ .failed_authorizer_check = .{ .check_id = check_id } });
@@ -262,11 +262,11 @@ pub const Authorizer = struct {
                 authorizer.public_key_to_block_id,
             );
 
-            for (biscuit.authority.checks.items) |c| {
+            for (biscuit.authority.checks.items, 0..) |c, check_id| {
                 const check = try c.convert(&biscuit.symbols, &authorizer.symbols);
-                std.debug.print("{any}\n", .{check});
+                std.debug.print("{}: {any}\n", .{ check_id, check });
 
-                for (check.queries.items, 0..) |*query, check_id| {
+                for (check.queries.items) |*query| {
                     const rule_trusted_origins = try TrustedOrigins.fromScopes(
                         authorizer.allocator,
                         query.scopes.items,
@@ -276,8 +276,8 @@ pub const Authorizer = struct {
                     );
 
                     const is_match = switch (check.kind) {
-                        .one => try authorizer.world.queryMatch(query, authorizer.symbols, rule_trusted_origins),
-                        .all => try authorizer.world.queryMatchAll(query, authorizer.symbols, rule_trusted_origins),
+                        .one => try authorizer.world.queryMatch(query, &authorizer.symbols, rule_trusted_origins),
+                        .all => try authorizer.world.queryMatchAll(query, &authorizer.symbols, rule_trusted_origins),
                     };
 
                     if (!is_match) try errors.append(.{ .failed_block_check = .{ .block_id = 0, .check_id = check_id } });
@@ -302,7 +302,7 @@ pub const Authorizer = struct {
                         authorizer.public_key_to_block_id,
                     );
 
-                    const is_match = try authorizer.world.queryMatch(&query, authorizer.symbols, rule_trusted_origins);
+                    const is_match = try authorizer.world.queryMatch(&query, &authorizer.symbols, rule_trusted_origins);
                     std.debug.print("match {any} = {}\n", .{ query, is_match });
 
                     if (is_match) {
@@ -349,8 +349,8 @@ pub const Authorizer = struct {
                         );
 
                         const is_match = switch (check.kind) {
-                            .one => try authorizer.world.queryMatch(query, authorizer.symbols, rule_trusted_origins),
-                            .all => try authorizer.world.queryMatchAll(query, authorizer.symbols, rule_trusted_origins),
+                            .one => try authorizer.world.queryMatch(query, &authorizer.symbols, rule_trusted_origins),
+                            .all => try authorizer.world.queryMatchAll(query, &authorizer.symbols, rule_trusted_origins),
                         };
 
                         if (!is_match) try errors.append(.{ .failed_block_check = .{ .block_id = block_id, .check_id = check_id } });

@@ -41,11 +41,11 @@ pub const World = struct {
         world.fact_set.deinit();
     }
 
-    pub fn run(world: *World, symbols: SymbolTable) !void {
+    pub fn run(world: *World, symbols: *SymbolTable) !void {
         try world.runWithLimits(symbols, .{});
     }
 
-    pub fn runWithLimits(world: *World, symbols: SymbolTable, limits: RunLimits) !void {
+    pub fn runWithLimits(world: *World, symbols: *SymbolTable, limits: RunLimits) !void {
         for (0..limits.max_iterations) |iteration| {
             std.debug.print("\nrunWithLimits[{}]\n", .{iteration});
             const starting_fact_count = world.fact_set.count();
@@ -109,11 +109,11 @@ pub const World = struct {
         try world.rule_set.add(origin_id, scope, rule);
     }
 
-    pub fn queryMatch(world: *World, rule: *Rule, symbols: SymbolTable, trusted_origins: TrustedOrigins) !bool {
+    pub fn queryMatch(world: *World, rule: *Rule, symbols: *SymbolTable, trusted_origins: TrustedOrigins) !bool {
         return rule.findMatch(world.allocator, &world.fact_set, symbols, trusted_origins);
     }
 
-    pub fn queryMatchAll(world: *World, rule: *Rule, symbols: SymbolTable, trusted_origins: TrustedOrigins) !bool {
+    pub fn queryMatchAll(world: *World, rule: *Rule, symbols: *SymbolTable, trusted_origins: TrustedOrigins) !bool {
         return rule.checkMatchAll(world.allocator, &world.fact_set, symbols, trusted_origins);
     }
 };

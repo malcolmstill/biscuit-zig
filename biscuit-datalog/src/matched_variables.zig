@@ -117,7 +117,7 @@ pub const MatchedVariables = struct {
         matchced_variables: *const MatchedVariables,
         allocator: std.mem.Allocator,
         expressions: []Expression,
-        symbols: SymbolTable,
+        symbols: *SymbolTable,
     ) !bool {
         const variables = try matchced_variables.complete(allocator) orelse return error.IncompleteVariables;
 

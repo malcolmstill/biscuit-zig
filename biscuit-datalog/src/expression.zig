@@ -61,7 +61,7 @@ pub const Expression = struct {
         expression.ops.deinit();
     }
 
-    pub fn evaluate(expr: Expression, allocator: mem.Allocator, values: std.AutoHashMap(u32, Term), symbols: SymbolTable) !Term {
+    pub fn evaluate(expr: Expression, allocator: mem.Allocator, values: std.AutoHashMap(u32, Term), symbols: *SymbolTable) !Term {
         var stack = std.ArrayList(Term).init(allocator);
         defer stack.deinit();
 
@@ -173,7 +173,7 @@ const Unary = enum {
     parens,
     length,
 
-    pub fn evaluate(expr: Unary, value: Term, symbols: SymbolTable) !Term {
+    pub fn evaluate(expr: Unary, value: Term, symbols: *SymbolTable) !Term {
         _ = symbols; // Different type instead of SymbolTable
         //
         return switch (expr) {
@@ -207,7 +207,7 @@ const Binary = enum {
     bitwise_xor,
     not_equal,
 
-    pub fn evaluate(expr: Binary, allocator: std.mem.Allocator, left: Term, right: Term, symbols: SymbolTable) !Term {
+    pub fn evaluate(expr: Binary, allocator: std.mem.Allocator, left: Term, right: Term, symbols: *SymbolTable) !Term {
         // Integer operands
         if (left == .integer and right == .integer) {
             const i = left.integer;
@@ -238,7 +238,7 @@ const Binary = enum {
                 .suffix => .{ .bool = mem.endsWith(u8, sl, sr) },
                 .regex => .{ .bool = try match(allocator, sr, sl) },
                 .contains => .{ .bool = mem.containsAtLeast(u8, sl, 1, sr) },
-                .add => return error.StringConcatNotImplemented,
+                .add => .{ .string = try symbols.insert(try concat(allocator, sl, sr)) },
                 .equal => .{ .bool = mem.eql(u8, sl, sr) },
                 .not_equal => .{ .bool = !mem.eql(u8, sl, sr) },
                 else => return error.UnexpectedOperationForStringOperands,
@@ -296,7 +296,11 @@ const Binary = enum {
 fn match(allocator: std.mem.Allocator, regex: []const u8, string: []const u8) !bool {
     var re = try Regex.compile(allocator, regex);
 
-    return re.match(string);
+    return re.partialMatch(string);
+}
+
+fn concat(allocator: std.mem.Allocator, left: []const u8, right: []const u8) ![]const u8 {
+    return try std.mem.concat(allocator, u8, &[_][]const u8{ left, right });
 }
 
 test {

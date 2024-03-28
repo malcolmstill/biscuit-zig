@@ -115,7 +115,7 @@ pub const Rule = struct {
     /// ```
     ///
     /// ...and we add it to the set of facts (the set will take care of deduplication)
-    pub fn apply(rule: *const Rule, allocator: mem.Allocator, origin_id: u64, facts: *const FactSet, new_facts: *FactSet, symbols: SymbolTable, trusted_origins: TrustedOrigins) !void {
+    pub fn apply(rule: *const Rule, allocator: mem.Allocator, origin_id: u64, facts: *const FactSet, new_facts: *FactSet, symbols: *SymbolTable, trusted_origins: TrustedOrigins) !void {
         var arena = std.heap.ArenaAllocator.init(allocator);
         defer arena.deinit();
 
@@ -173,7 +173,7 @@ pub const Rule = struct {
     ///
     /// Note: whilst the combinator may return multiple valid matches, `findMatch` only requires a single match
     /// so stopping on the first `it.next()` that returns not-null is enough.
-    pub fn findMatch(rule: *Rule, allocator: mem.Allocator, facts: *const FactSet, symbols: SymbolTable, trusted_origins: TrustedOrigins) !bool {
+    pub fn findMatch(rule: *Rule, allocator: mem.Allocator, facts: *const FactSet, symbols: *SymbolTable, trusted_origins: TrustedOrigins) !bool {
         std.debug.print("\nrule.findMatch on {any} ({any})\n", .{ rule, trusted_origins });
         var arena = std.heap.ArenaAllocator.init(allocator);
         defer arena.deinit();
@@ -208,7 +208,7 @@ pub const Rule = struct {
         }
     }
 
-    pub fn checkMatchAll(rule: *Rule, allocator: mem.Allocator, facts: *const FactSet, symbols: SymbolTable, trusted_origins: TrustedOrigins) !bool {
+    pub fn checkMatchAll(rule: *Rule, allocator: mem.Allocator, facts: *const FactSet, symbols: *SymbolTable, trusted_origins: TrustedOrigins) !bool {
         std.debug.print("\nrule.checkMatchAll on {any} ({any})\n", .{ rule, trusted_origins });
         var arena = std.heap.ArenaAllocator.init(allocator);
         defer arena.deinit();
@@ -252,11 +252,15 @@ pub const Rule = struct {
             if (i < rule.body.items.len - 1) try writer.print(", ", .{});
         }
 
-        if (rule.expressions.items.len > 0) try writer.print(", ", .{});
+        if (rule.expressions.items.len > 0) {
+            try writer.print(", [", .{});
 
-        for (rule.expressions.items, 0..) |*expression, i| {
-            try writer.print("{any}", .{expression.*});
-            if (i < rule.expressions.items.len - 1) try writer.print(", ", .{});
+            for (rule.expressions.items, 0..) |*expression, i| {
+                try writer.print("{any}", .{expression.*});
+                if (i < rule.expressions.items.len - 1) try writer.print(", ", .{});
+            }
+
+            try writer.print("]", .{});
         }
 
         if (rule.scopes.items.len > 0) try writer.print(", ", .{});

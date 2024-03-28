@@ -60,10 +60,10 @@ pub const Combinator = struct {
     current_bindings: ?std.AutoHashMap(u64, Term) = null,
     facts: *const FactSet,
     trusted_fact_iterator: FactSet.TrustedIterator,
-    symbols: SymbolTable,
+    symbols: *SymbolTable,
     trusted_origins: TrustedOrigins,
 
-    pub fn init(id: usize, allocator: mem.Allocator, variables: MatchedVariables, predicates: []Predicate, expressions: []Expression, all_facts: *const FactSet, symbols: SymbolTable, trusted_origins: TrustedOrigins) Combinator {
+    pub fn init(id: usize, allocator: mem.Allocator, variables: MatchedVariables, predicates: []Predicate, expressions: []Expression, all_facts: *const FactSet, symbols: *SymbolTable, trusted_origins: TrustedOrigins) Combinator {
         return .{
             .id = id,
             .allocator = allocator,
