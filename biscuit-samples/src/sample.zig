@@ -62,9 +62,10 @@ pub const Result = union(enum) {
 const World = struct {
     facts: []FactOrigin,
     rules: []RuleOrigin,
-    checks: [][]const u8,
+    checks: []CheckOrigin,
     policies: [][]const u8,
 };
 
-const FactOrigin = struct { []const u8, []?usize };
-const RuleOrigin = struct { []const u8, usize };
+const FactOrigin = struct { facts: [][]const u8, origin: []?usize };
+const RuleOrigin = struct { origin: usize, rules: [][]const u8 };
+const CheckOrigin = struct { origin: usize, checks: [][]const u8 };
