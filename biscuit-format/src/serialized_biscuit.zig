@@ -15,6 +15,7 @@ pub const SerializedBiscuit = struct {
     proof: Proof,
     // root_key_id: ?u64,
 
+    // FIXME: should this take a SymbolTable?
     /// Initialise a SerializedBiscuit from the token's bytes and root public key.
     ///
     /// This decodes the toplevel-level biscuit format from protobuf and verifies
@@ -22,6 +23,8 @@ pub const SerializedBiscuit = struct {
     pub fn fromBytes(allocator: mem.Allocator, bytes: []const u8, public_key: Ed25519.PublicKey) !SerializedBiscuit {
         const b = try schema.decodeBiscuit(allocator, bytes);
         errdefer b.deinit();
+
+        // FIXME: Add textual public keys to symbols
 
         const authority = try SignedBlock.fromDecodedBlock(b.authority orelse return error.ExpectedAuthorityBlock);
         const proof = try Proof.fromDecodedProof(b.proof orelse return error.ExpectedProof);

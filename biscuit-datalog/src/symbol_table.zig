@@ -1,16 +1,20 @@
 const std = @import("std");
 const mem = std.mem;
 
+const Ed25519 = std.crypto.sign.Ed25519;
+
 pub const SymbolTable = struct {
     name: []const u8,
     allocator: mem.Allocator,
     symbols: std.ArrayList([]const u8),
+    public_keys: std.ArrayList(Ed25519.PublicKey),
 
     pub fn init(name: []const u8, allocator: mem.Allocator) SymbolTable {
         return .{
             .name = name,
             .allocator = allocator,
             .symbols = std.ArrayList([]const u8).init(allocator),
+            .public_keys = std.ArrayList(Ed25519.PublicKey).init(allocator),
         };
     }
 
@@ -19,6 +23,8 @@ pub const SymbolTable = struct {
             symbol_table.allocator.free(symbol);
         }
         symbol_table.symbols.deinit();
+
+        symbol_table.public_keys.deinit();
     }
 
     pub fn insert(symbol_table: *SymbolTable, symbol: []const u8) !u64 {
@@ -52,6 +58,21 @@ pub const SymbolTable = struct {
         }
 
         return null;
+    }
+
+    pub fn insertPublicKey(symbol_table: *SymbolTable, public_key: Ed25519.PublicKey) !u64 {
+        for (symbol_table.public_keys.items, 0..) |k, i| {
+            if (std.mem.eql(u8, &k.bytes, &public_key.bytes)) return i;
+        }
+
+        try symbol_table.public_keys.append(public_key);
+        return symbol_table.public_keys.items.len - 1;
+    }
+
+    pub fn getPublicKey(symbol_table: *SymbolTable, index: usize) !Ed25519.PublicKey {
+        if (index >= symbol_table.public_keys.items.len) return error.NoSuchPublicKey;
+
+        return symbol_table.public_keys.items[index];
     }
 
     pub fn getString(symbol_table: *const SymbolTable, sym_index: u64) ![]const u8 {

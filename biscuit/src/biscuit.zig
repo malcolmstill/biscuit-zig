@@ -12,21 +12,63 @@ pub const Biscuit = struct {
     authority: Block,
     blocks: std.ArrayList(Block),
     symbols: SymbolTable,
+    public_key_to_block_id: std.AutoHashMap(usize, std.ArrayList(usize)),
 
-    pub fn fromBytes(allocator: mem.Allocator, token_bytes: []const u8, public_key: Ed25519.PublicKey) !Biscuit {
-        var serialized = try SerializedBiscuit.fromBytes(allocator, token_bytes, public_key);
+    pub fn fromBytes(allocator: mem.Allocator, token_bytes: []const u8, root_public_key: Ed25519.PublicKey) !Biscuit {
+        var serialized = try SerializedBiscuit.fromBytes(allocator, token_bytes, root_public_key);
         errdefer serialized.deinit();
+
+        // For each block we will temporarily store the external public key (where it exists).
+        var block_external_keys = try std.ArrayList(?Ed25519.PublicKey).initCapacity(allocator, 1 + serialized.blocks.items.len);
+        defer block_external_keys.deinit();
+        defer std.debug.assert(block_external_keys.items.len == 1 + serialized.blocks.items.len);
 
         var symbols = SymbolTable.init("biscuit", allocator);
 
         const authority = try Block.fromBytes(allocator, serialized.authority.block, &symbols);
+        for (authority.public_keys.items) |public_key| {
+            _ = try symbols.insertPublicKey(public_key);
+        }
+        try block_external_keys.append(null);
         std.debug.print("authority block =\n{any}\n", .{authority});
 
         var blocks = std.ArrayList(Block).init(allocator);
         for (serialized.blocks.items) |b| {
             const block = try Block.fromBytes(allocator, b.block, &symbols);
             std.debug.print("non-authority block =\n{any}\n", .{block});
+
+            const external_key = if (b.external_signature) |external_signature| external_signature.public_key else null;
+            try block_external_keys.append(external_key);
+
+            for (block.public_keys.items) |public_key| {
+                _ = try symbols.insertPublicKey(public_key);
+            }
+
             try blocks.append(block);
+        }
+
+        // Build map from public key (rather the symbol index associated with the public key) to block id.
+        // Multiple blocks may be signed by the same external key and so the mapping is from the public
+        // key to a list of block ids.
+        var public_key_to_block_id = std.AutoHashMap(usize, std.ArrayList(usize)).init(allocator);
+        for (block_external_keys.items, 0..) |block_external_key, block_id| {
+            const key = block_external_key orelse continue;
+
+            const key_index = try symbols.insertPublicKey(key);
+            if (public_key_to_block_id.getPtr(key_index)) |list_ptr| {
+                try list_ptr.append(block_id);
+            } else {
+                var list = std.ArrayList(usize).init(allocator);
+                try list.append(block_id);
+                try public_key_to_block_id.put(key_index, list);
+            }
+        }
+
+        {
+            var it = public_key_to_block_id.iterator();
+            while (it.next()) |entry| {
+                std.debug.print("public_key_to_block_id: public key id = {}, block_ids = {any}\n", .{ entry.key_ptr.*, entry.value_ptr.items });
+            }
         }
 
         return .{
@@ -34,6 +76,7 @@ pub const Biscuit = struct {
             .authority = authority,
             .blocks = blocks,
             .symbols = symbols,
+            .public_key_to_block_id = public_key_to_block_id,
         };
     }
 
@@ -43,6 +86,14 @@ pub const Biscuit = struct {
         }
         biscuit.blocks.deinit();
         biscuit.authority.deinit();
+
+        // FIXME: think about lifetimes for public_key_to_block_id
+        var it = biscuit.public_key_to_block_id.valueIterator();
+        while (it.next()) |block_ids| {
+            block_ids.deinit();
+        }
+        biscuit.public_key_to_block_id.deinit();
+
         biscuit.serialized.deinit();
     }
 

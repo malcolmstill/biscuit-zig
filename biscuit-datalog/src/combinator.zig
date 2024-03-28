@@ -103,6 +103,8 @@ pub const Combinator = struct {
             // Lookup the next (trusted) fact
             const origin_fact = combinator.trusted_fact_iterator.next() orelse return null;
 
+            std.debug.print("next trusted fact: {any}\n", .{origin_fact.fact});
+
             const origin = origin_fact.origin.*;
             const fact = origin_fact.fact.*;
 

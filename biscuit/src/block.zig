@@ -1,4 +1,5 @@
 const std = @import("std");
+const Ed25519 = std.crypto.sign.Ed25519;
 const format = @import("biscuit-format");
 const schema = @import("biscuit-schema");
 const Fact = @import("biscuit-datalog").fact.Fact;
@@ -12,11 +13,12 @@ const MAX_SCHEMA_VERSION = format.serialized_biscuit.MAX_SCHEMA_VERSION;
 pub const Block = struct {
     version: u32,
     context: []const u8,
-    symbols: SymbolTable,
+    symbols: SymbolTable, // Do we need symbol table here? When we deserialize a biscuit we build up a complete symbol table for the entire biscuit. So what is the purpose?
     facts: std.ArrayList(Fact),
     rules: std.ArrayList(Rule),
     checks: std.ArrayList(Check),
     scopes: std.ArrayList(Scope),
+    public_keys: std.ArrayList(Ed25519.PublicKey),
 
     pub fn init(allocator: std.mem.Allocator) Block {
         return .{
@@ -27,6 +29,7 @@ pub const Block = struct {
             .rules = std.ArrayList(Rule).init(allocator),
             .checks = std.ArrayList(Check).init(allocator),
             .scopes = std.ArrayList(Scope).init(allocator),
+            .public_keys = std.ArrayList(Ed25519.PublicKey).init(allocator),
         };
     }
 
@@ -39,6 +42,7 @@ pub const Block = struct {
         block.rules.deinit();
         block.facts.deinit();
         block.scopes.deinit();
+        block.public_keys.deinit();
         block.symbols.deinit();
     }
 
@@ -74,6 +78,14 @@ pub const Block = struct {
             try block.checks.append(try Check.fromSchema(allocator, check));
         }
 
+        for (decoded_block.publicKeys.items) |public_key| {
+            var pubkey_buf: [Ed25519.PublicKey.encoded_length]u8 = undefined;
+            @memcpy(&pubkey_buf, public_key.key.getSlice());
+
+            const key = try Ed25519.PublicKey.fromBytes(pubkey_buf);
+            try block.public_keys.append(key);
+        }
+
         return block;
     }
 
@@ -100,6 +112,11 @@ pub const Block = struct {
         try writer.print("  checks:\n", .{});
         for (block.checks.items, 0..) |check, i| {
             try writer.print("    [{}]: {any}\n", .{ i, check });
+        }
+
+        try writer.print("  public keys:\n", .{});
+        for (block.public_keys.items, 0..) |public_key, i| {
+            try writer.print("    [{}]: {x}\n", .{ i, public_key.bytes });
         }
 
         return;

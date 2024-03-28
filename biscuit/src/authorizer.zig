@@ -26,7 +26,7 @@ pub const Authorizer = struct {
             .biscuit = biscuit,
             .world = World.init(allocator),
             .symbols = SymbolTable.init("authorizer", allocator),
-            .public_key_to_block_id = std.AutoHashMap(usize, std.ArrayList(usize)).init(allocator),
+            .public_key_to_block_id = biscuit.public_key_to_block_id, // FIXME: are we okay to just copy here?
             .scopes = std.ArrayList(Scope).init(allocator),
         };
     }
@@ -40,15 +40,6 @@ pub const Authorizer = struct {
             check.deinit();
         }
         authorizer.checks.deinit();
-
-        {
-            var it = authorizer.public_key_to_block_id.iterator();
-            while (it.next()) |entry| {
-                entry.value_ptr.deinit();
-            }
-
-            authorizer.public_key_to_block_id.deinit();
-        }
     }
 
     pub fn authorizerTrustedOrigins(authorizer: *Authorizer) !TrustedOrigins {

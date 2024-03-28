@@ -69,7 +69,8 @@ pub const TrustedOrigins = struct {
                         }
                     },
                     .public_key => |public_key_id| {
-                        const block_id_list = public_key_to_block_id.get(public_key_id) orelse continue;
+                        // Once we have properly supported public keys put this back to continue (or maybe it should be an error)
+                        const block_id_list = public_key_to_block_id.get(public_key_id) orelse unreachable;
 
                         for (block_id_list.items) |block_id| {
                             try trusted_origins.insert(block_id);
@@ -82,6 +83,7 @@ pub const TrustedOrigins = struct {
         return trusted_origins;
     }
 
+    // FIXME: this could have a way better name like `fn trustsFact`
     /// Check that TrustedOrigins contai (at least) _all_ origin ids in fact_origin. In
     /// other words, check that the facts origins are a subset of the trusted origins.
     pub fn containsAll(trusted_origins: *TrustedOrigins, fact_origin: *Origin) bool {
