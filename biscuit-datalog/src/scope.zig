@@ -20,9 +20,12 @@ pub const Scope = union(ScopeTag) {
         };
     }
 
-    pub fn convert(scope: Scope, _: *const SymbolTable, _: *SymbolTable) !Scope {
-        //
-        return scope;
+    pub fn convert(scope: Scope, old_symbols: *const SymbolTable, new_symbols: *SymbolTable) !Scope {
+        return switch (scope) {
+            .authority => .authority,
+            .previous => .previous,
+            .public_key => |index| .{ .public_key = try new_symbols.insertPublicKey(try old_symbols.getPublicKey(index)) },
+        };
     }
 
     pub fn format(scope: Scope, comptime _: []const u8, _: std.fmt.FormatOptions, writer: anytype) !void {

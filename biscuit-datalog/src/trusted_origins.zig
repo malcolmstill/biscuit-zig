@@ -69,8 +69,7 @@ pub const TrustedOrigins = struct {
                         }
                     },
                     .public_key => |public_key_id| {
-                        // Once we have properly supported public keys put this back to continue (or maybe it should be an error)
-                        const block_id_list = public_key_to_block_id.get(public_key_id) orelse unreachable;
+                        const block_id_list = public_key_to_block_id.get(public_key_id) orelse continue;
 
                         for (block_id_list.items) |block_id| {
                             try trusted_origins.insert(block_id);

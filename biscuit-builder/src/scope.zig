@@ -23,7 +23,7 @@ pub const Scope = union(ScopeKind) {
         return switch (scope) {
             .authority => .{ .authority = {} },
             .previous => .{ .previous = {} },
-            .public_key => |pk| .{ .public_key = try symbols.insert(&pk.bytes) },
+            .public_key => |pk| .{ .public_key = try symbols.insertPublicKey(pk) },
             .parameter => unreachable,
         };
     }

@@ -69,7 +69,7 @@ pub const SymbolTable = struct {
         return symbol_table.public_keys.items.len - 1;
     }
 
-    pub fn getPublicKey(symbol_table: *SymbolTable, index: usize) !Ed25519.PublicKey {
+    pub fn getPublicKey(symbol_table: *const SymbolTable, index: usize) !Ed25519.PublicKey {
         if (index >= symbol_table.public_keys.items.len) return error.NoSuchPublicKey;
 
         return symbol_table.public_keys.items[index];
