@@ -5,7 +5,7 @@ const Authorizer = @import("authorizer.zig").Authorizer;
 const Block = @import("block.zig").Block;
 const SymbolTable = @import("biscuit-datalog").SymbolTable;
 const World = @import("biscuit-datalog").world.World;
-const SerializedBiscuit = @import("biscuit-format").serialized_biscuit.SerializedBiscuit;
+const SerializedBiscuit = @import("biscuit-format").SerializedBiscuit;
 
 pub const Biscuit = struct {
     serialized: SerializedBiscuit,
@@ -23,26 +23,19 @@ pub const Biscuit = struct {
         defer block_external_keys.deinit();
         defer std.debug.assert(block_external_keys.items.len == 1 + serialized.blocks.items.len);
 
-        var symbols = SymbolTable.init("biscuit", allocator);
+        var token_symbols = SymbolTable.init("biscuit", allocator);
 
-        const authority = try Block.fromBytes(allocator, serialized.authority.block, &symbols);
-        for (authority.public_keys.items) |public_key| {
-            _ = try symbols.insertPublicKey(public_key);
-        }
+        const authority = try Block.fromBytes(allocator, serialized.authority, &token_symbols);
         try block_external_keys.append(null);
         std.debug.print("authority block =\n{any}\n", .{authority});
 
         var blocks = std.ArrayList(Block).init(allocator);
-        for (serialized.blocks.items) |b| {
-            const block = try Block.fromBytes(allocator, b.block, &symbols);
+        for (serialized.blocks.items) |signed_block| {
+            const block = try Block.fromBytes(allocator, signed_block, &token_symbols);
             std.debug.print("non-authority block =\n{any}\n", .{block});
 
-            const external_key = if (b.external_signature) |external_signature| external_signature.public_key else null;
+            const external_key = if (signed_block.external_signature) |external_signature| external_signature.public_key else null;
             try block_external_keys.append(external_key);
-
-            for (block.public_keys.items) |public_key| {
-                _ = try symbols.insertPublicKey(public_key);
-            }
 
             try blocks.append(block);
         }
@@ -54,7 +47,7 @@ pub const Biscuit = struct {
         for (block_external_keys.items, 0..) |block_external_key, block_id| {
             const key = block_external_key orelse continue;
 
-            const key_index = try symbols.insertPublicKey(key);
+            const key_index = try token_symbols.insertPublicKey(key);
             if (public_key_to_block_id.getPtr(key_index)) |list_ptr| {
                 try list_ptr.append(block_id);
             } else {
@@ -75,7 +68,7 @@ pub const Biscuit = struct {
             .serialized = serialized,
             .authority = authority,
             .blocks = blocks,
-            .symbols = symbols,
+            .symbols = token_symbols,
             .public_key_to_block_id = public_key_to_block_id,
         };
     }
@@ -97,8 +90,8 @@ pub const Biscuit = struct {
         biscuit.serialized.deinit();
     }
 
-    pub fn authorizer(biscuit: *Biscuit, allocator: std.mem.Allocator) Authorizer {
-        return Authorizer.init(allocator, biscuit.*);
+    pub fn authorizer(biscuit: *Biscuit, allocator: std.mem.Allocator) !Authorizer {
+        return try Authorizer.init(allocator, biscuit.*);
     }
 };
 

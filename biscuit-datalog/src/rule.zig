@@ -119,7 +119,7 @@ pub const Rule = struct {
         var arena = std.heap.ArenaAllocator.init(allocator);
         defer arena.deinit();
 
-        std.debug.print("\napplying rule:\n  {any}\n", .{rule});
+        std.debug.print("\napplying rule (from origin {}):\n  {any}\n", .{ origin_id, rule });
         const matched_variables = try MatchedVariables.init(arena.allocator(), rule);
 
         // TODO: if body is empty stuff

@@ -89,18 +89,18 @@ pub fn validate(alloc: mem.Allocator, token: []const u8, public_key: std.crypto.
                                                         check_accounted_for = true;
                                                     }
                                                 },
-                                                .failed_authority_check => return error.NotImplemented,
+                                                .failed_authorizer_check => return error.NotImplemented,
                                             }
                                         }
                                     },
-                                    .Authorizer => |expected_failed_authority_check| {
+                                    .Authorizer => |expected_failed_authorizer_check| {
                                         for (errors.items) |found_failed_check| {
                                             switch (found_failed_check) {
                                                 .no_matching_policy => continue,
                                                 .denied_by_policy => continue,
                                                 .failed_block_check => return error.NotImplemented,
-                                                .failed_authority_check => |failed_block_check| {
-                                                    if (failed_block_check.check_id == expected_failed_authority_check.check_id) {
+                                                .failed_authorizer_check => |failed_block_check| {
+                                                    if (failed_block_check.check_id == expected_failed_authorizer_check.check_id) {
                                                         // continue :blk;
                                                         check_accounted_for = true;
                                                     }
@@ -136,7 +136,7 @@ pub fn runValidation(alloc: mem.Allocator, token: []const u8, public_key: std.cr
     var b = try Biscuit.fromBytes(alloc, token, public_key);
     defer b.deinit();
 
-    var a = b.authorizer(alloc);
+    var a = try b.authorizer(alloc);
     defer a.deinit();
 
     var it = std.mem.split(u8, authorizer_code, ";");

@@ -1,14 +1,14 @@
 const std = @import("std");
 const Ed25519 = std.crypto.sign.Ed25519;
-const format = @import("biscuit-format");
+const SignedBlock = @import("biscuit-format").SignedBlock;
+const MIN_SCHEMA_VERSION = @import("biscuit-format").MIN_SCHEMA_VERSION;
+const MAX_SCHEMA_VERSION = @import("biscuit-format").MAX_SCHEMA_VERSION;
 const schema = @import("biscuit-schema");
 const Fact = @import("biscuit-datalog").fact.Fact;
 const Rule = @import("biscuit-datalog").rule.Rule;
 const Check = @import("biscuit-datalog").check.Check;
 const Scope = @import("biscuit-datalog").Scope;
 const SymbolTable = @import("biscuit-datalog").symbol_table.SymbolTable;
-const MIN_SCHEMA_VERSION = format.serialized_biscuit.MIN_SCHEMA_VERSION;
-const MAX_SCHEMA_VERSION = format.serialized_biscuit.MAX_SCHEMA_VERSION;
 
 pub const Block = struct {
     version: u32,
@@ -47,7 +47,8 @@ pub const Block = struct {
     }
 
     /// Given a blocks contents as bytes, derserialize into runtime block
-    pub fn fromBytes(allocator: std.mem.Allocator, data: []const u8, symbols: *SymbolTable) !Block {
+    pub fn fromBytes(allocator: std.mem.Allocator, signed_block: SignedBlock, token_symbols: *SymbolTable) !Block {
+        const data = signed_block.block;
         std.debug.print("Block.fromBytes\n", .{});
         const decoded_block = try schema.decodeBlock(allocator, data);
         defer decoded_block.deinit();
@@ -63,7 +64,16 @@ pub const Block = struct {
 
         for (decoded_block.symbols.items) |symbol| {
             _ = try block.symbols.insert(symbol.getSlice());
-            _ = try symbols.insert(symbol.getSlice());
+        }
+
+        // If we have an external signature we add the external public key that to the parent biscuit's symbols and we don't add the blocks symbols
+        // Otherwise add the blocks symbols to the biscuit's symbol table.
+        if (signed_block.external_signature) |external_signature| {
+            _ = try token_symbols.insertPublicKey(external_signature.public_key);
+        } else {
+            for (decoded_block.symbols.items) |symbol| {
+                _ = try token_symbols.insert(symbol.getSlice());
+            }
         }
 
         for (decoded_block.facts_v2.items) |fact| {
@@ -83,6 +93,8 @@ pub const Block = struct {
             @memcpy(&pubkey_buf, public_key.key.getSlice());
 
             const key = try Ed25519.PublicKey.fromBytes(pubkey_buf);
+
+            _ = try token_symbols.insertPublicKey(key);
             try block.public_keys.append(key);
         }
 

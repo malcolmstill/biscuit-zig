@@ -21,15 +21,31 @@ pub const Authorizer = struct {
     public_key_to_block_id: std.AutoHashMap(usize, std.ArrayList(usize)),
     scopes: std.ArrayList(Scope),
 
-    pub fn init(allocator: std.mem.Allocator, biscuit: Biscuit) Authorizer {
+    pub fn init(allocator: std.mem.Allocator, biscuit: Biscuit) !Authorizer {
+        var symbols = SymbolTable.init("authorizer", allocator);
+        var public_key_to_block_id = std.AutoHashMap(usize, std.ArrayList(usize)).init(allocator);
+
+        // Map public key symbols into authorizer symbols and public_key_to_block_id map
+        var it = biscuit.public_key_to_block_id.iterator();
+        while (it.next()) |entry| {
+            const biscuit_public_key_index = entry.key_ptr.*;
+            const block_ids = entry.value_ptr.*;
+
+            const public_key = try biscuit.symbols.getPublicKey(biscuit_public_key_index);
+
+            const authorizer_public_key_index = try symbols.insertPublicKey(public_key);
+
+            try public_key_to_block_id.put(authorizer_public_key_index, try block_ids.clone());
+        }
+
         return .{
             .allocator = allocator,
             .checks = std.ArrayList(builder.Check).init(allocator),
             .policies = std.ArrayList(builder.Policy).init(allocator),
             .biscuit = biscuit,
             .world = World.init(allocator),
-            .symbols = SymbolTable.init("authorizer", allocator),
-            .public_key_to_block_id = biscuit.public_key_to_block_id, // FIXME: are we okay to just copy here?
+            .symbols = symbols,
+            .public_key_to_block_id = public_key_to_block_id,
             .scopes = std.ArrayList(Scope).init(allocator),
         };
     }
@@ -46,6 +62,14 @@ pub const Authorizer = struct {
 
         for (authorizer.policies.items) |policy| {
             policy.deinit();
+        }
+        authorizer.policies.deinit();
+
+        {
+            var it = authorizer.public_key_to_block_id.valueIterator();
+            while (it.next()) |block_ids| {
+                block_ids.deinit();
+            }
         }
         authorizer.policies.deinit();
     }
@@ -108,6 +132,19 @@ pub const Authorizer = struct {
     /// 6. _biscuit_ (where it exists): run the checks from all the non-authority blocks
     pub fn authorize(authorizer: *Authorizer, errors: *std.ArrayList(AuthorizerError)) !usize {
         std.debug.print("\nAuthorizing biscuit:\n", .{});
+
+        std.debug.print("authorizer  public keys:\n", .{});
+        for (authorizer.symbols.public_keys.items, 0..) |pk, i| {
+            std.debug.print("  [{}]: {x}\n", .{ i, pk.bytes });
+        }
+
+        {
+            var it = authorizer.public_key_to_block_id.iterator();
+            while (it.next()) |entry| {
+                std.debug.print("public_key_to_block_id: public key id = {}, block_ids = {any}\n", .{ entry.key_ptr.*, entry.value_ptr.items });
+            }
+        }
+
         // 1.
         // Load facts and rules from authority block into world. Our block's facts
         // will have a particular symbol table that we map into the symvol table
@@ -116,6 +153,10 @@ pub const Authorizer = struct {
         // For example, the token may have a string "user123" which has id 12. But
         // when mapped into the world it may have id 5.
         if (authorizer.biscuit) |biscuit| {
+            std.debug.print("biscuit token public keys:\n", .{});
+            for (biscuit.symbols.public_keys.items, 0..) |pk, i| {
+                std.debug.print("  [{}]: {x}\n", .{ i, pk.bytes });
+            }
             for (biscuit.authority.facts.items) |authority_fact| {
                 const fact = try authority_fact.convert(&biscuit.symbols, &authorizer.symbols);
                 const origin = try Origin.initWithId(authorizer.allocator, 0);
@@ -165,6 +206,7 @@ pub const Authorizer = struct {
 
                 for (block.rules.items) |block_rule| {
                     const rule = try block_rule.convert(&biscuit.symbols, &authorizer.symbols);
+                    std.debug.print("block rule {any} CONVERTED to rule = {any}\n", .{ block_rule, rule });
 
                     const block_rule_trusted_origins = try TrustedOrigins.fromScopes(
                         authorizer.allocator,
@@ -180,9 +222,12 @@ pub const Authorizer = struct {
         }
 
         // 2. Run the world to generate all facts
+        std.debug.print("\nGENERATING NEW FACTS\n", .{});
         try authorizer.world.run(authorizer.symbols);
+        std.debug.print("\nEND GENERATING NEW FACTS\n", .{});
 
         //  3. Run checks that have been added to this authorizer
+        std.debug.print("\nAUTHORIZER CHECKS\n", .{});
         for (authorizer.checks.items) |c| {
             std.debug.print("authorizer check = {any}\n", .{c});
             const check = try c.convert(authorizer.allocator, &authorizer.symbols);
@@ -201,10 +246,11 @@ pub const Authorizer = struct {
                     .all => try authorizer.world.queryMatchAll(query, authorizer.symbols, rule_trusted_origins),
                 };
 
-                if (!is_match) try errors.append(.{ .failed_authority_check = .{ .check_id = check_id } });
+                if (!is_match) try errors.append(.{ .failed_authorizer_check = .{ .check_id = check_id } });
                 std.debug.print("match {any} = {}\n", .{ query, is_match });
             }
         }
+        std.debug.print("END AUTHORIZER CHECKS\n", .{});
 
         // 4. Run checks in the biscuit's authority block
         if (authorizer.biscuit) |biscuit| {
@@ -326,13 +372,13 @@ pub const Authorizer = struct {
 const AuthorizerErrorKind = enum(u8) {
     no_matching_policy,
     denied_by_policy,
-    failed_authority_check,
+    failed_authorizer_check,
     failed_block_check,
 };
 
 pub const AuthorizerError = union(AuthorizerErrorKind) {
     no_matching_policy: void,
     denied_by_policy: struct { deny_policy_id: usize },
-    failed_authority_check: struct { check_id: usize },
+    failed_authorizer_check: struct { check_id: usize },
     failed_block_check: struct { block_id: usize, check_id: usize },
 };

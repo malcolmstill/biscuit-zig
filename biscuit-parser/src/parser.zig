@@ -903,7 +903,7 @@ pub const Parser = struct {
 
             if (!parser.startsWith(",")) break;
 
-            try parser.expectString("'");
+            try parser.expectString(",");
         }
 
         return scps;

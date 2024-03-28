@@ -105,7 +105,7 @@ pub const World = struct {
     }
 
     pub fn addRule(world: *World, origin_id: usize, scope: TrustedOrigins, rule: Rule) !void {
-        std.debug.print("\nworld: adding rule = {any} ({}, {any})\n", .{ rule, origin_id, scope });
+        std.debug.print("\nworld: adding rule (origin {}) = {any} (trusts {any})\n", .{ origin_id, rule, scope });
         try world.rule_set.add(origin_id, scope, rule);
     }
 
