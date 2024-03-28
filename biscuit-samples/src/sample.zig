@@ -60,8 +60,11 @@ pub const Result = union(enum) {
 };
 
 const World = struct {
-    facts: [][]const u8,
-    rules: [][]const u8,
+    facts: []FactOrigin,
+    rules: []RuleOrigin,
     checks: [][]const u8,
     policies: [][]const u8,
 };
+
+const FactOrigin = struct { []const u8, []?usize };
+const RuleOrigin = struct { []const u8, usize };

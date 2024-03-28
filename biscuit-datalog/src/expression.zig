@@ -174,12 +174,17 @@ const Unary = enum {
     length,
 
     pub fn evaluate(expr: Unary, value: Term, symbols: *SymbolTable) !Term {
-        _ = symbols; // Different type instead of SymbolTable
-        //
         return switch (expr) {
             .negate => if (value == .bool) .{ .bool = !value.bool } else return error.UnexpectedTermInUnaryNegate,
             .parens => value,
-            else => error.UnexpectedUnaryTermCombination,
+            .length => .{
+                .integer = switch (value) {
+                    .string => |index| std.math.cast(i64, (try symbols.getString(index)).len) orelse return error.FailedToCaseInt,
+                    .bytes => |b| std.math.cast(i64, b.len) orelse return error.FailedToCaseInt,
+                    .set => |s| std.math.cast(i64, s.count()) orelse return error.FailedToCaseInt,
+                    else => return error.LengthNotSupportedOnValue,
+                },
+            },
         };
     }
 };
