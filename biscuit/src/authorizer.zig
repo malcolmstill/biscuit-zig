@@ -179,7 +179,10 @@ pub const Authorizer = struct {
                     authorizer.public_key_to_block_id,
                 );
 
-                const is_match = try authorizer.world.queryMatch(query, authorizer.symbols, rule_trusted_origins);
+                const is_match = switch (check.kind) {
+                    .one => try authorizer.world.queryMatch(query, authorizer.symbols, rule_trusted_origins),
+                    .all => try authorizer.world.queryMatchAll(query, authorizer.symbols, rule_trusted_origins),
+                };
 
                 if (!is_match) try errors.append(.{ .failed_authority_check = .{ .check_id = check_id } });
                 std.debug.print("match {any} = {}\n", .{ query, is_match });
@@ -209,7 +212,10 @@ pub const Authorizer = struct {
                         authorizer.public_key_to_block_id,
                     );
 
-                    const is_match = try authorizer.world.queryMatch(query, authorizer.symbols, rule_trusted_origins);
+                    const is_match = switch (check.kind) {
+                        .one => try authorizer.world.queryMatch(query, authorizer.symbols, rule_trusted_origins),
+                        .all => try authorizer.world.queryMatchAll(query, authorizer.symbols, rule_trusted_origins),
+                    };
 
                     if (!is_match) try errors.append(.{ .failed_block_check = .{ .block_id = 0, .check_id = check_id } });
                     std.debug.print("match {any} = {}\n", .{ query, is_match });
@@ -246,7 +252,10 @@ pub const Authorizer = struct {
                             authorizer.public_key_to_block_id,
                         );
 
-                        const is_match = try authorizer.world.queryMatch(query, authorizer.symbols, rule_trusted_origins);
+                        const is_match = switch (check.kind) {
+                            .one => try authorizer.world.queryMatch(query, authorizer.symbols, rule_trusted_origins),
+                            .all => try authorizer.world.queryMatchAll(query, authorizer.symbols, rule_trusted_origins),
+                        };
 
                         if (!is_match) try errors.append(.{ .failed_block_check = .{ .block_id = block_id, .check_id = check_id } });
 

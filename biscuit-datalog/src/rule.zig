@@ -131,6 +131,8 @@ pub const Rule = struct {
             const origin: Origin = origin_bindings[0];
             const bindings: MatchedVariables = origin_bindings[1];
 
+            if (!try bindings.evaluateExpressions(allocator, rule.expressions.items, symbols)) continue;
+
             // TODO: Describe why clonedWithAllocator? More generally, describe in comment the overall
             // lifetimes / memory allocation approach during evaluation.
             var predicate = try rule.head.cloneWithAllocator(allocator);
@@ -196,7 +198,50 @@ pub const Rule = struct {
             var it = Combinator.init(0, allocator, matched_variables, rule.body.items, rule.expressions.items, facts, symbols, trusted_origins);
             defer it.deinit();
 
-            return try it.next() != null;
+            while (try it.next()) |*origin_bindings| {
+                const bindings: MatchedVariables = origin_bindings[1];
+
+                if (try bindings.evaluateExpressions(arena_allocator, rule.expressions.items, symbols)) return true;
+            }
+
+            return false;
+        }
+    }
+
+    pub fn checkMatchAll(rule: *Rule, allocator: mem.Allocator, facts: *const FactSet, symbols: SymbolTable, trusted_origins: TrustedOrigins) !bool {
+        std.debug.print("\nrule.checkMatchAll on {any} ({any})\n", .{ rule, trusted_origins });
+        var arena = std.heap.ArenaAllocator.init(allocator);
+        defer arena.deinit();
+
+        const arena_allocator = arena.allocator();
+
+        if (rule.body.items.len == 0) {
+            const variables = std.AutoHashMap(u32, Term).init(allocator);
+            for (rule.expressions.items) |expr| {
+                const result = try expr.evaluate(arena_allocator, variables, symbols);
+
+                switch (result) {
+                    .bool => |b| if (b) continue else return false,
+                    else => return false,
+                }
+            }
+
+            return true;
+        } else {
+            const matched_variables = try MatchedVariables.init(arena_allocator, rule);
+
+            var it = Combinator.init(0, allocator, matched_variables, rule.body.items, rule.expressions.items, facts, symbols, trusted_origins);
+            defer it.deinit();
+
+            while (try it.next()) |*origin_bindings| {
+                const bindings: MatchedVariables = origin_bindings[1];
+
+                if (try bindings.evaluateExpressions(arena_allocator, rule.expressions.items, symbols)) continue;
+
+                return false;
+            }
+
+            return true;
         }
     }
 

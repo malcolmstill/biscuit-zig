@@ -112,4 +112,8 @@ pub const World = struct {
     pub fn queryMatch(world: *World, rule: *Rule, symbols: SymbolTable, trusted_origins: TrustedOrigins) !bool {
         return rule.findMatch(world.allocator, &world.fact_set, symbols, trusted_origins);
     }
+
+    pub fn queryMatchAll(world: *World, rule: *Rule, symbols: SymbolTable, trusted_origins: TrustedOrigins) !bool {
+        return rule.checkMatchAll(world.allocator, &world.fact_set, symbols, trusted_origins);
+    }
 };

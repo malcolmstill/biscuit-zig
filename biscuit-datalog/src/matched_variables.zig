@@ -2,6 +2,8 @@ const std = @import("std");
 const mem = std.mem;
 const Rule = @import("rule.zig").Rule;
 const Term = @import("term.zig").Term;
+const Expression = @import("expression.zig").Expression;
+const SymbolTable = @import("symbol_table.zig").SymbolTable;
 
 // Is a better name for this VariableBinding?
 
@@ -109,5 +111,25 @@ pub const MatchedVariables = struct {
         }
 
         return completed_variables;
+    }
+
+    pub fn evaluateExpressions(
+        matchced_variables: *const MatchedVariables,
+        allocator: std.mem.Allocator,
+        expressions: []Expression,
+        symbols: SymbolTable,
+    ) !bool {
+        const variables = try matchced_variables.complete(allocator) orelse return error.IncompleteVariables;
+
+        for (expressions) |expression| {
+            const result = try expression.evaluate(allocator, variables, symbols);
+
+            switch (result) {
+                .bool => |b| if (b) continue else return false,
+                else => return false,
+            }
+        }
+
+        return true;
     }
 };

@@ -133,21 +133,6 @@ pub const Combinator = struct {
             const next_predicates = combinator.predicates[1..];
 
             if (next_predicates.len == 0) {
-                const complete_vars = try vars.complete(combinator.allocator) orelse continue :blk;
-
-                for (combinator.expressions) |expr| {
-                    const result = try expr.evaluate(combinator.allocator, complete_vars, combinator.symbols);
-
-                    switch (result) {
-                        .bool => |b| if (b) {
-                            continue;
-                        } else {
-                            continue :blk;
-                        },
-                        else => continue :blk,
-                    }
-                }
-
                 return .{ origin, vars };
             } else {
                 std.debug.assert(combinator.next_combinator == null);
