@@ -176,6 +176,10 @@ pub const Authorizer = struct {
                 // Map from biscuit symbol space to authorizer symbol space
                 const rule = try authority_rule.convert(&biscuit.symbols, &authorizer.symbols);
 
+                if (!rule.validateVariables()) {
+                    try errors.append(.unbound_variable);
+                }
+
                 // A authority block's rule trusts
                 const rule_trusted_origins = try TrustedOrigins.fromScopes(
                     authorizer.allocator,
@@ -207,6 +211,10 @@ pub const Authorizer = struct {
                 for (block.rules.items) |block_rule| {
                     const rule = try block_rule.convert(&biscuit.symbols, &authorizer.symbols);
                     std.debug.print("block rule {any} CONVERTED to rule = {any}\n", .{ block_rule, rule });
+
+                    if (!rule.validateVariables()) {
+                        try errors.append(.unbound_variable);
+                    }
 
                     const block_rule_trusted_origins = try TrustedOrigins.fromScopes(
                         authorizer.allocator,
@@ -374,6 +382,7 @@ const AuthorizerErrorKind = enum(u8) {
     denied_by_policy,
     failed_authorizer_check,
     failed_block_check,
+    unbound_variable,
 };
 
 pub const AuthorizerError = union(AuthorizerErrorKind) {
@@ -381,4 +390,5 @@ pub const AuthorizerError = union(AuthorizerErrorKind) {
     denied_by_policy: struct { deny_policy_id: usize },
     failed_authorizer_check: struct { check_id: usize },
     failed_block_check: struct { block_id: usize, check_id: usize },
+    unbound_variable: void,
 };

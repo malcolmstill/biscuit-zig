@@ -245,6 +245,26 @@ pub const Rule = struct {
         }
     }
 
+    /// Checks there a no unbound variables in the head (i.e. every head variable must appear in the )
+    pub fn validateVariables(rule: Rule) bool {
+        blk: for (rule.head.terms.items) |head_term| {
+            const head_variable = if (head_term == .variable) head_term.variable else continue;
+
+            for (rule.body.items) |body_predicate| {
+                for (body_predicate.terms.items) |body_term| {
+                    const body_variable = if (head_term == .variable) body_term.variable else continue;
+
+                    if (head_variable == body_variable) continue :blk;
+                }
+            }
+
+            // We haven't found this loop's head variable anywhere in the body (i.e. the variable is unbound)
+            return false;
+        }
+
+        return true;
+    }
+
     pub fn format(rule: Rule, comptime _: []const u8, _: std.fmt.FormatOptions, writer: anytype) !void {
         try writer.print("{any} <- ", .{rule.head});
         for (rule.body.items, 0..) |*predicate, i| {

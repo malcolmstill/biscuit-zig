@@ -90,6 +90,7 @@ pub fn validate(alloc: mem.Allocator, token: []const u8, public_key: std.crypto.
                                                     }
                                                 },
                                                 .failed_authorizer_check => return error.NotImplemented,
+                                                .unbound_variable => continue,
                                             }
                                         }
                                     },
@@ -105,6 +106,7 @@ pub fn validate(alloc: mem.Allocator, token: []const u8, public_key: std.crypto.
                                                         check_accounted_for = true;
                                                     }
                                                 },
+                                                .unbound_variable => continue,
                                             }
                                         }
                                     },
@@ -117,7 +119,18 @@ pub fn validate(alloc: mem.Allocator, token: []const u8, public_key: std.crypto.
                         },
                         else => return err,
                     },
-                    .InvalidBlockRule => runValidation(alloc, token, public_key, authorizer_code, &errors) catch |err| switch (err) {
+                    .InvalidBlockRule => |_| runValidation(alloc, token, public_key, authorizer_code, &errors) catch |err| switch (err) {
+                        error.AuthorizationFailed => {
+                            for (errors.items) |found_failed_check| {
+                                switch (found_failed_check) {
+                                    .no_matching_policy => continue,
+                                    .denied_by_policy => continue,
+                                    .failed_block_check => continue,
+                                    .failed_authorizer_check => return error.NotImplemented,
+                                    .unbound_variable => return,
+                                }
+                            }
+                        },
                         else => return err,
                     },
                 },
