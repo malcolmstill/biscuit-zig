@@ -42,6 +42,7 @@ pub fn build(b: *std.Build) void {
     });
     lib_unit_tests.root_module.addImport("biscuit-schema", schema.module("biscuit-schema"));
     lib_unit_tests.root_module.addImport("biscuit-format", format.module("biscuit-format"));
+    lib_unit_tests.root_module.addImport("biscuit-builder", builder.module("biscuit-builder"));
     lib_unit_tests.root_module.addImport("biscuit-datalog", datalog.module("biscuit-datalog"));
 
     const run_lib_unit_tests = b.addRunArtifact(lib_unit_tests);

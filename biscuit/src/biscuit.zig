@@ -2,6 +2,7 @@ const std = @import("std");
 const mem = std.mem;
 const Ed25519 = std.crypto.sign.Ed25519;
 const Authorizer = @import("authorizer.zig").Authorizer;
+const AuthorizerError = @import("authorizer.zig").AuthorizerError;
 const Block = @import("block.zig").Block;
 const SymbolTable = @import("biscuit-datalog").SymbolTable;
 const World = @import("biscuit-datalog").world.World;
@@ -124,10 +125,13 @@ test {
         var b = try Biscuit.fromBytes(allocator, bytes, public_key);
         defer b.deinit();
 
-        var a = b.authorizer(allocator);
+        var a = try b.authorizer(allocator);
         defer a.deinit();
 
-        try a.authorize();
+        var errors = std.ArrayList(AuthorizerError).init(allocator);
+        defer errors.deinit();
+
+        _ = try a.authorize(&errors);
     }
 }
 
@@ -155,9 +159,12 @@ test "Tokens that should fail to validate" {
         var b = try Biscuit.fromBytes(allocator, bytes, public_key);
         defer b.deinit();
 
-        var a = b.authorizer(allocator);
+        var a = try b.authorizer(allocator);
         defer a.deinit();
 
-        try testing.expectError(error.AuthorizationFailed, a.authorize());
+        var errors = std.ArrayList(AuthorizerError).init(allocator);
+        defer errors.deinit();
+
+        try testing.expectError(error.AuthorizationFailed, a.authorize(&errors));
     }
 }
