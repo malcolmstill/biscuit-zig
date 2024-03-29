@@ -33,7 +33,7 @@ pub const Term = union(TermKind) {
             .string => |v| .{ .string = v },
             .bool => |v| .{ .bool = v },
             .date => |v| .{ .date = v },
-            .bytes => return error.FromSchemaNotImplementedForBytes,
+            .bytes => |v| .{ .bytes = v.getSlice() },
             .set => |v| {
                 var set = Set(Term).init(allocator);
                 for (v.set.items) |term| {
@@ -48,9 +48,17 @@ pub const Term = union(TermKind) {
         return switch (term) {
             .variable => |id| .{ .variable = std.math.cast(u32, try new_symbols.insert(try old_symbols.getString(id))) orelse return error.VariableIdTooLarge },
             .string => |id| .{ .string = try new_symbols.insert(try old_symbols.getString(id)) },
-            .integer, .bool, .date => term,
-            .bytes => return error.ConvertNotImplementedForBytes,
-            .set => |_| return error.ConvertNotImplementedForBytes,
+            .integer, .bool, .date, .bytes => term,
+            .set => |s| blk: {
+                var set = Set(Term).init(s.alloc);
+
+                var it = s.iterator();
+                while (it.next()) |term_ptr| {
+                    try set.add(try term_ptr.convert(old_symbols, new_symbols));
+                }
+
+                break :blk .{ .set = set };
+            },
         };
     }
 

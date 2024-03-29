@@ -1,12 +1,13 @@
 const std = @import("std");
 const schema = @import("biscuit-schema");
 const Rule = @import("rule.zig").Rule;
+const SymbolTable = @import("symbol_table.zig").SymbolTable;
 
 pub const Check = struct {
     queries: std.ArrayList(Rule),
     kind: Kind,
 
-    const Kind = enum(u8) { one, all };
+    pub const Kind = enum(u8) { one, all };
 
     pub fn fromSchema(allocator: std.mem.Allocator, schema_check: schema.CheckV2) !Check {
         var rules = std.ArrayList(Rule).init(allocator);
@@ -27,6 +28,7 @@ pub const Check = struct {
         for (check.queries.items) |*query| {
             query.deinit();
         }
+
         check.queries.deinit();
     }
 
@@ -37,5 +39,18 @@ pub const Check = struct {
             if (i < check.queries.items.len - 1) try writer.print(", ", .{});
         }
         return writer.print("", .{});
+    }
+
+    pub fn convert(check: Check, old_symbols: *const SymbolTable, new_symbols: *SymbolTable) !Check {
+        var queries = try check.queries.clone();
+
+        for (queries.items, 0..) |query, i| {
+            queries.items[i] = try query.convert(old_symbols, new_symbols);
+        }
+
+        return .{
+            .queries = queries,
+            .kind = check.kind,
+        };
     }
 };

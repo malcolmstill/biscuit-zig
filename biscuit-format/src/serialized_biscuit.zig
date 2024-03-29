@@ -6,7 +6,7 @@ const SignedBlock = @import("signed_block.zig").SignedBlock;
 const Proof = @import("proof.zig").Proof;
 
 pub const MIN_SCHEMA_VERSION = 3;
-pub const MAX_SCHEMA_VERSION = 3;
+pub const MAX_SCHEMA_VERSION = 4;
 
 pub const SerializedBiscuit = struct {
     decoded_biscuit: schema.Biscuit,
@@ -15,13 +15,16 @@ pub const SerializedBiscuit = struct {
     proof: Proof,
     // root_key_id: ?u64,
 
+    // FIXME: should this take a SymbolTable?
     /// Initialise a SerializedBiscuit from the token's bytes and root public key.
     ///
     /// This decodes the toplevel-level biscuit format from protobuf and verifies
     /// the token.
-    pub fn initFromBytes(allocator: mem.Allocator, bytes: []const u8, public_key: Ed25519.PublicKey) !SerializedBiscuit {
+    pub fn fromBytes(allocator: mem.Allocator, bytes: []const u8, public_key: Ed25519.PublicKey) !SerializedBiscuit {
         const b = try schema.decodeBiscuit(allocator, bytes);
         errdefer b.deinit();
+
+        // FIXME: Add textual public keys to symbols
 
         const authority = try SignedBlock.fromDecodedBlock(b.authority orelse return error.ExpectedAuthorityBlock);
         const proof = try Proof.fromDecodedProof(b.proof orelse return error.ExpectedProof);
@@ -66,44 +69,61 @@ pub const SerializedBiscuit = struct {
     ///    b) If the token is not sealed we check the last block's
     ///       public key is the public key of the private key in the
     ///       the proof.
-    fn verify(serialized_block: *SerializedBiscuit, root_public_key: Ed25519.PublicKey) !void {
+    fn verify(serialized_biscuit: *SerializedBiscuit, root_public_key: Ed25519.PublicKey) !void {
         var pk = root_public_key;
 
         // Verify the authority block's signature
         {
-            var verifier = try serialized_block.authority.signature.verifier(pk);
+            if (serialized_biscuit.authority.external_signature != null) return error.AuthorityBlockMustNotHaveExternalSignature;
 
-            verifier.update(serialized_block.authority.block);
-            verifier.update(&serialized_block.authority.algorithmBuf());
-            verifier.update(&serialized_block.authority.public_key.bytes);
+            var verifier = try serialized_biscuit.authority.signature.verifier(pk);
+
+            verifier.update(serialized_biscuit.authority.block);
+            verifier.update(&serialized_biscuit.authority.algorithmBuf());
+            verifier.update(&serialized_biscuit.authority.public_key.bytes);
 
             try verifier.verify();
 
-            pk = serialized_block.authority.public_key;
+            pk = serialized_biscuit.authority.public_key;
         }
 
         // Verify the other blocks' signatures
-        for (serialized_block.blocks.items) |*block| {
-            var verifier = try block.signature.verifier(pk);
+        for (serialized_biscuit.blocks.items) |*block| {
+            // Verify the block signature
+            {
+                var verifier = try block.signature.verifier(pk);
 
-            verifier.update(block.block);
-            verifier.update(&block.algorithmBuf());
-            verifier.update(&block.public_key.bytes);
+                verifier.update(block.block);
+                if (block.external_signature) |external_signature| {
+                    verifier.update(&external_signature.signature.toBytes());
+                }
+                verifier.update(&block.algorithmBuf());
+                verifier.update(&block.public_key.bytes);
 
-            try verifier.verify();
+                try verifier.verify();
+            }
+
+            // Verify the external signature (where one exists)
+            if (block.external_signature) |external_signature| {
+                var external_verifier = try external_signature.signature.verifier(external_signature.public_key);
+                external_verifier.update(block.block);
+                external_verifier.update(&block.algorithm2Buf());
+                external_verifier.update(&pk.bytes);
+                try external_verifier.verify();
+            }
 
             pk = block.public_key;
         }
 
         // Check the proof
-        switch (serialized_block.proof) {
+        switch (serialized_biscuit.proof) {
             .next_secret => |next_secret| {
                 if (!std.mem.eql(u8, &pk.bytes, &next_secret.publicKeyBytes())) {
                     return error.SecretKeyProofFailedMismatchedPublicKeys;
                 }
             },
             .final_signature => |final_signature| {
-                var last_block = if (serialized_block.blocks.items.len == 0) serialized_block.authority else serialized_block.blocks.items[serialized_block.blocks.items.len - 1];
+                var last_block = if (serialized_biscuit.blocks.items.len == 0) serialized_biscuit.authority else serialized_biscuit.blocks.items[serialized_biscuit.blocks.items.len - 1];
                 var verifier = try final_signature.verifier(pk);
 
                 verifier.update(last_block.block);
@@ -139,7 +159,7 @@ test {
         const bytes = try decode.urlSafeBase64ToBytes(allocator, token);
         defer allocator.free(bytes);
 
-        var b = try SerializedBiscuit.initFromBytes(allocator, bytes, public_key);
+        var b = try SerializedBiscuit.fromBytes(allocator, bytes, public_key);
         defer b.deinit();
     }
 }

@@ -1,6 +1,7 @@
 const std = @import("std");
 const mem = std.mem;
 const schema = @import("biscuit-schema");
+const Regex = @import("regex").Regex;
 const Term = @import("term.zig").Term;
 const SymbolTable = @import("symbol_table.zig").SymbolTable;
 
@@ -60,11 +61,11 @@ pub const Expression = struct {
         expression.ops.deinit();
     }
 
-    pub fn evaluate(expr: Expression, allocator: mem.Allocator, values: std.AutoHashMap(u32, Term), symbols: SymbolTable) !Term {
+    pub fn evaluate(expr: Expression, allocator: mem.Allocator, values: std.AutoHashMap(u32, Term), symbols: *SymbolTable) !Term {
         var stack = std.ArrayList(Term).init(allocator);
         defer stack.deinit();
 
-        for (expr.ops) |op| {
+        for (expr.ops.items) |op| {
             switch (op) {
                 .value => |term| {
                     switch (term) {
@@ -86,7 +87,7 @@ pub const Expression = struct {
                     const right = stack.popOrNull() orelse return error.StackUnderflow;
                     const left = stack.popOrNull() orelse return error.StackUnderflow;
 
-                    const result = try binary_op.evaluate(left, right, symbols);
+                    const result = try binary_op.evaluate(allocator, left, right, symbols);
 
                     try stack.append(result);
                 },
@@ -97,6 +98,62 @@ pub const Expression = struct {
 
         return stack.items[0];
     }
+
+    pub fn convert(expression: Expression, old_symbols: *const SymbolTable, new_symbols: *SymbolTable) !Expression {
+        // std.debug.print("Converting expression\n", .{});
+        const ops = try expression.ops.clone();
+
+        for (ops.items, 0..) |op, i| {
+            ops.items[i] = switch (op) {
+                .value => |trm| .{ .value = try trm.convert(old_symbols, new_symbols) },
+                else => op,
+            };
+        }
+
+        return .{ .ops = ops };
+    }
+
+    pub fn format(expression: Expression, comptime _: []const u8, _: std.fmt.FormatOptions, writer: anytype) !void {
+        for (expression.ops.items) |op| {
+            switch (op) {
+                .value => |v| try writer.print("{any}", .{v}),
+                .unary => |u| {
+                    switch (u) {
+                        .negate => try writer.print("neg", .{}),
+                        .parens => try writer.print("paren", .{}),
+                        .length => try writer.print("length", .{}),
+                    }
+                },
+                .binary => |b| {
+                    switch (b) {
+                        .less_than => try writer.print("<", .{}),
+                        .greater_than => try writer.print(">", .{}),
+                        .less_or_equal => try writer.print("<=", .{}),
+                        .greater_or_equal => try writer.print(">=", .{}),
+                        .equal => try writer.print("==", .{}),
+                        .contains => try writer.print("contains", .{}),
+                        .prefix => try writer.print("starts_with", .{}),
+                        .suffix => try writer.print("ends_with", .{}),
+                        .regex => try writer.print("matches", .{}),
+                        .add => try writer.print("+", .{}),
+                        .sub => try writer.print("-", .{}),
+                        .mul => try writer.print("*", .{}),
+                        .div => try writer.print("/", .{}),
+                        .@"and" => try writer.print("&&", .{}),
+                        .@"or" => try writer.print("||", .{}),
+                        .intersection => try writer.print("intersection", .{}),
+                        .@"union" => try writer.print("union", .{}),
+                        .bitwise_and => try writer.print("&", .{}),
+                        .bitwise_or => try writer.print("|", .{}),
+                        .bitwise_xor => try writer.print("^", .{}),
+                        .not_equal => try writer.print("!=", .{}),
+                    }
+                },
+            }
+
+            try writer.print(" ", .{});
+        }
+    }
 };
 
 const OpKind = enum(u8) {
@@ -105,7 +162,7 @@ const OpKind = enum(u8) {
     binary,
 };
 
-const Op = union(OpKind) {
+pub const Op = union(OpKind) {
     value: Term,
     unary: Unary,
     binary: Binary,
@@ -116,13 +173,18 @@ const Unary = enum {
     parens,
     length,
 
-    pub fn evaluate(expr: Unary, value: Term, symbols: SymbolTable) !Term {
-        _ = symbols; // Different type instead of SymbolTable
-        //
+    pub fn evaluate(expr: Unary, value: Term, symbols: *SymbolTable) !Term {
         return switch (expr) {
             .negate => if (value == .bool) .{ .bool = !value.bool } else return error.UnexpectedTermInUnaryNegate,
             .parens => value,
-            else => error.UnexpectedUnaryTermCombination,
+            .length => .{
+                .integer = switch (value) {
+                    .string => |index| std.math.cast(i64, (try symbols.getString(index)).len) orelse return error.FailedToCaseInt,
+                    .bytes => |b| std.math.cast(i64, b.len) orelse return error.FailedToCaseInt,
+                    .set => |s| std.math.cast(i64, s.count()) orelse return error.FailedToCaseInt,
+                    else => return error.LengthNotSupportedOnValue,
+                },
+            },
         };
     }
 };
@@ -150,7 +212,7 @@ const Binary = enum {
     bitwise_xor,
     not_equal,
 
-    pub fn evaluate(expr: Binary, left: Term, right: Term, symbols: SymbolTable) !Term {
+    pub fn evaluate(expr: Binary, allocator: std.mem.Allocator, left: Term, right: Term, symbols: *SymbolTable) !Term {
         // Integer operands
         if (left == .integer and right == .integer) {
             const i = left.integer;
@@ -163,9 +225,9 @@ const Binary = enum {
                 .greater_or_equal => .{ .bool = i >= j },
                 .equal => .{ .bool = i == j },
                 .not_equal => .{ .bool = i != j },
-                .add => .{ .integer = i + j },
-                .sub => .{ .integer = i - j },
-                .mul => .{ .integer = i * j },
+                .add => .{ .integer = try std.math.add(i64, i, j) },
+                .sub => .{ .integer = try std.math.sub(i64, i, j) },
+                .mul => .{ .integer = try std.math.mul(i64, i, j) },
                 .div => .{ .integer = @divExact(i, j) },
                 .bitwise_and => .{ .integer = i & j },
                 .bitwise_or => .{ .integer = i | j },
@@ -179,9 +241,9 @@ const Binary = enum {
             return switch (expr) {
                 .prefix => .{ .bool = mem.startsWith(u8, sl, sr) },
                 .suffix => .{ .bool = mem.endsWith(u8, sl, sr) },
-                .regex => return error.RegexUnimplemented,
+                .regex => .{ .bool = try match(allocator, sr, sl) },
                 .contains => .{ .bool = mem.containsAtLeast(u8, sl, 1, sr) },
-                .add => return error.StringConcatNotImplemented,
+                .add => .{ .string = try symbols.insert(try concat(allocator, sl, sr)) },
                 .equal => .{ .bool = mem.eql(u8, sl, sr) },
                 .not_equal => .{ .bool = !mem.eql(u8, sl, sr) },
                 else => return error.UnexpectedOperationForStringOperands,
@@ -236,19 +298,29 @@ const Binary = enum {
     }
 };
 
+fn match(allocator: std.mem.Allocator, regex: []const u8, string: []const u8) !bool {
+    var re = try Regex.compile(allocator, regex);
+
+    return re.partialMatch(string);
+}
+
+fn concat(allocator: std.mem.Allocator, left: []const u8, right: []const u8) ![]const u8 {
+    return try std.mem.concat(allocator, u8, &[_][]const u8{ left, right });
+}
+
 test {
     const testing = std.testing;
 
     const t1: Term = .{ .integer = 10 };
     const t2: Term = .{ .integer = 22 };
 
-    try testing.expectEqual(@as(Term, .{ .bool = false }), try Binary.equal.evaluate(t1, t2, SymbolTable.init(testing.allocator)));
-    try testing.expectEqual(@as(Term, .{ .bool = true }), try Binary.equal.evaluate(t1, t1, SymbolTable.init(testing.allocator)));
+    try testing.expectEqual(@as(Term, .{ .bool = false }), try Binary.equal.evaluate(t1, t2, SymbolTable.init("test", testing.allocator)));
+    try testing.expectEqual(@as(Term, .{ .bool = true }), try Binary.equal.evaluate(t1, t1, SymbolTable.init("test", testing.allocator)));
 
-    try testing.expectEqual(@as(Term, .{ .integer = 32 }), try Binary.add.evaluate(t1, t2, SymbolTable.init(testing.allocator)));
-    try testing.expectEqual(@as(Term, .{ .integer = 220 }), try Binary.mul.evaluate(t1, t2, SymbolTable.init(testing.allocator)));
+    try testing.expectEqual(@as(Term, .{ .integer = 32 }), try Binary.add.evaluate(t1, t2, SymbolTable.init("test", testing.allocator)));
+    try testing.expectEqual(@as(Term, .{ .integer = 220 }), try Binary.mul.evaluate(t1, t2, SymbolTable.init("test", testing.allocator)));
 
-    var symbols = SymbolTable.init(testing.allocator);
+    var symbols = SymbolTable.init("test", testing.allocator);
     defer symbols.deinit();
 
     const s = .{ .string = try symbols.insert("prefix_middle_suffix") };
@@ -267,7 +339,7 @@ test {
 // test "negate" {
 //     const testing = std.testing;
 
-//     var symbols = SymbolTable.init(testing.allocator);
+//     var symbols = SymbolTable.init("test", testing.allocator);
 //     defer symbols.deinit();
 
 //     _ = try symbols.insert("test1");

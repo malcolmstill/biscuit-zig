@@ -49,7 +49,18 @@ pub fn Set(comptime K: type) type {
             set.inner.deinit();
         }
 
+        pub fn clone(set: *const Self) !Self {
+            return .{
+                .inner = try set.inner.clone(),
+                .alloc = set.alloc,
+            };
+        }
+
         pub fn iterator(set: Self) InnerSet.KeyIterator {
+            return set.inner.keyIterator();
+        }
+
+        pub fn ptrIterator(set: *Self) InnerSet.KeyIterator {
             return set.inner.keyIterator();
         }
 
@@ -301,4 +312,23 @@ test "Intersection" {
 
     try testing.expect(!s3.contains(.{ .integer = 1 }));
     try testing.expect(!s3.contains(.{ .integer = 4 }));
+}
+
+test "Iterator" {
+    const Term = @import("term.zig").Term;
+
+    const testing = std.testing;
+    const allocator = testing.allocator;
+
+    var s1 = Set(Term).init(allocator);
+    defer s1.deinit();
+
+    try s1.add(.{ .integer = 1 });
+    try s1.add(.{ .integer = 2 });
+
+    var it = s1.iterator();
+
+    try testing.expect(it.next() != null);
+    try testing.expect(it.next() != null);
+    try testing.expect(it.next() == null);
 }

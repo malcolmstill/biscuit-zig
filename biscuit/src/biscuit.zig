@@ -2,33 +2,75 @@ const std = @import("std");
 const mem = std.mem;
 const Ed25519 = std.crypto.sign.Ed25519;
 const Authorizer = @import("authorizer.zig").Authorizer;
+const AuthorizerError = @import("authorizer.zig").AuthorizerError;
 const Block = @import("block.zig").Block;
+const SymbolTable = @import("biscuit-datalog").SymbolTable;
 const World = @import("biscuit-datalog").world.World;
-const SerializedBiscuit = @import("biscuit-format").serialized_biscuit.SerializedBiscuit;
+const SerializedBiscuit = @import("biscuit-format").SerializedBiscuit;
 
 pub const Biscuit = struct {
     serialized: SerializedBiscuit,
     authority: Block,
     blocks: std.ArrayList(Block),
-    symbols: std.ArrayList([]const u8),
+    symbols: SymbolTable,
+    public_key_to_block_id: std.AutoHashMap(usize, std.ArrayList(usize)),
 
-    pub fn initFromBytes(allocator: mem.Allocator, bytes: []const u8, public_key: Ed25519.PublicKey) !Biscuit {
-        std.debug.print("\nInitialising biscuit:\n", .{});
-        var serialized = try SerializedBiscuit.initFromBytes(allocator, bytes, public_key);
+    pub fn fromBytes(allocator: mem.Allocator, token_bytes: []const u8, root_public_key: Ed25519.PublicKey) !Biscuit {
+        var serialized = try SerializedBiscuit.fromBytes(allocator, token_bytes, root_public_key);
         errdefer serialized.deinit();
 
-        const authority = try Block.initFromBytes(allocator, serialized.authority.block);
+        // For each block we will temporarily store the external public key (where it exists).
+        var block_external_keys = try std.ArrayList(?Ed25519.PublicKey).initCapacity(allocator, 1 + serialized.blocks.items.len);
+        defer block_external_keys.deinit();
+        defer std.debug.assert(block_external_keys.items.len == 1 + serialized.blocks.items.len);
+
+        var token_symbols = SymbolTable.init("biscuit", allocator);
+
+        const authority = try Block.fromBytes(allocator, serialized.authority, &token_symbols);
+        try block_external_keys.append(null);
+        std.debug.print("authority block =\n{any}\n", .{authority});
 
         var blocks = std.ArrayList(Block).init(allocator);
-        for (serialized.blocks.items) |b| {
-            try blocks.append(try Block.initFromBytes(allocator, b.block));
+        for (serialized.blocks.items) |signed_block| {
+            const block = try Block.fromBytes(allocator, signed_block, &token_symbols);
+            std.debug.print("non-authority block =\n{any}\n", .{block});
+
+            const external_key = if (signed_block.external_signature) |external_signature| external_signature.public_key else null;
+            try block_external_keys.append(external_key);
+
+            try blocks.append(block);
+        }
+
+        // Build map from public key (rather the symbol index associated with the public key) to block id.
+        // Multiple blocks may be signed by the same external key and so the mapping is from the public
+        // key to a list of block ids.
+        var public_key_to_block_id = std.AutoHashMap(usize, std.ArrayList(usize)).init(allocator);
+        for (block_external_keys.items, 0..) |block_external_key, block_id| {
+            const key = block_external_key orelse continue;
+
+            const key_index = try token_symbols.insertPublicKey(key);
+            if (public_key_to_block_id.getPtr(key_index)) |list_ptr| {
+                try list_ptr.append(block_id);
+            } else {
+                var list = std.ArrayList(usize).init(allocator);
+                try list.append(block_id);
+                try public_key_to_block_id.put(key_index, list);
+            }
+        }
+
+        {
+            var it = public_key_to_block_id.iterator();
+            while (it.next()) |entry| {
+                std.debug.print("public_key_to_block_id: public key id = {}, block_ids = {any}\n", .{ entry.key_ptr.*, entry.value_ptr.items });
+            }
         }
 
         return .{
             .serialized = serialized,
             .authority = authority,
             .blocks = blocks,
-            .symbols = std.ArrayList([]const u8).init(allocator),
+            .symbols = token_symbols,
+            .public_key_to_block_id = public_key_to_block_id,
         };
     }
 
@@ -38,11 +80,19 @@ pub const Biscuit = struct {
         }
         biscuit.blocks.deinit();
         biscuit.authority.deinit();
+
+        // FIXME: think about lifetimes for public_key_to_block_id
+        var it = biscuit.public_key_to_block_id.valueIterator();
+        while (it.next()) |block_ids| {
+            block_ids.deinit();
+        }
+        biscuit.public_key_to_block_id.deinit();
+
         biscuit.serialized.deinit();
     }
 
-    pub fn authorizer(biscuit: *Biscuit, allocator: std.mem.Allocator) Authorizer {
-        return Authorizer.init(allocator, biscuit.*);
+    pub fn authorizer(biscuit: *Biscuit, allocator: std.mem.Allocator) !Authorizer {
+        return try Authorizer.init(allocator, biscuit.*);
     }
 };
 
@@ -72,13 +122,16 @@ test {
         const bytes = try decode.urlSafeBase64ToBytes(allocator, token);
         defer allocator.free(bytes);
 
-        var b = try Biscuit.initFromBytes(allocator, bytes, public_key);
+        var b = try Biscuit.fromBytes(allocator, bytes, public_key);
         defer b.deinit();
 
-        var a = b.authorizer(allocator);
+        var a = try b.authorizer(allocator);
         defer a.deinit();
 
-        try a.authorize();
+        var errors = std.ArrayList(AuthorizerError).init(allocator);
+        defer errors.deinit();
+
+        _ = try a.authorize(&errors);
     }
 }
 
@@ -103,12 +156,15 @@ test "Tokens that should fail to validate" {
         const bytes = try decode.urlSafeBase64ToBytes(allocator, token);
         defer allocator.free(bytes);
 
-        var b = try Biscuit.initFromBytes(allocator, bytes, public_key);
+        var b = try Biscuit.fromBytes(allocator, bytes, public_key);
         defer b.deinit();
 
-        var a = b.authorizer(allocator);
+        var a = try b.authorizer(allocator);
         defer a.deinit();
 
-        try testing.expectError(error.AuthorizationFailed, a.authorize());
+        var errors = std.ArrayList(AuthorizerError).init(allocator);
+        defer errors.deinit();
+
+        try testing.expectError(error.AuthorizationFailed, a.authorize(&errors));
     }
 }

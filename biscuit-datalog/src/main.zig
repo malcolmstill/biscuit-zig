@@ -1,8 +1,19 @@
 pub const fact = @import("fact.zig");
+pub const Fact = @import("fact.zig").Fact;
 pub const predicate = @import("predicate.zig");
+pub const Predicate = @import("predicate.zig").Predicate;
+pub const Expression = @import("expression.zig").Expression;
+pub const Op = @import("expression.zig").Op;
+pub const Scope = @import("scope.zig").Scope;
 pub const rule = @import("rule.zig");
+pub const Rule = @import("rule.zig").Rule;
 pub const check = @import("check.zig");
 pub const symbol_table = @import("symbol_table.zig");
+pub const SymbolTable = @import("symbol_table.zig").SymbolTable;
+pub const Term = @import("term.zig").Term;
+pub const Check = @import("check.zig").Check;
+pub const Origin = @import("origin.zig").Origin;
+pub const TrustedOrigins = @import("trusted_origins.zig").TrustedOrigins;
 pub const world = @import("world.zig");
 
 test {
