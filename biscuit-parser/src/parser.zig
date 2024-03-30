@@ -32,31 +32,29 @@ pub const Parser = struct {
 
     /// Try to parse a fact predicate
     ///
-    /// I.e. if we have a fact: read(1, "hello") we are attempting to
-    /// parse (1, "hello") having already parsed the "read" predicate
-    /// name.
+    /// E.g. read(1, "hello") will parse successfully, but read($foo, "hello")
+    /// will fail because it contains a variable `$foo`.
     ///
-    /// Note that we are specifically parsing a _fact's_ predicate, i.e.
-    /// the terms in the predicate may _not_ contain variables.
+    /// For parsing predicates containing variables see `fn predicate`
     pub fn factPredicate(parser: *Parser) !Predicate {
         var terms = std.ArrayList(Term).init(parser.allocator);
 
         const name = parser.readName();
-
-        parser.skipWhiteSpace();
 
         try parser.consume("(");
 
         while (true) {
             parser.skipWhiteSpace();
 
-            try terms.append(try parser.factTerm());
+            const t = try parser.factTerm();
 
-            if (parser.peek()) |peeked| {
-                if (peeked != ',') break;
-            } else {
-                break;
-            }
+            try terms.append(t);
+
+            parser.skipWhiteSpace();
+
+            if (parser.startsWithConsuming(",")) continue;
+
+            break;
         }
 
         try parser.consume(")");
@@ -891,17 +889,55 @@ const ParserError = error{
     UnexpectedToken,
 };
 
-test "parse fact predicate" {
+test "parse (fact) predicates" {
     const testing = std.testing;
-    const input: []const u8 =
-        \\read(true)
-    ;
 
-    var parser = Parser.init(testing.allocator, input);
+    var arena_state = std.heap.ArenaAllocator.init(testing.allocator);
+    defer arena_state.deinit();
+    const arena = arena_state.allocator();
 
-    const r = try parser.factPredicate();
+    {
+        var parser = Parser.init(arena, "read(true)");
+        const predicate = try parser.factPredicate();
 
-    std.debug.print("{any}\n", .{r});
+        try testing.expectEqualStrings("read", predicate.name);
+        try testing.expectEqual(true, predicate.terms.items[0].bool);
+    }
+
+    {
+        var parser = Parser.init(arena, "read(true, false)");
+        const predicate = try parser.factPredicate();
+
+        try testing.expectEqualStrings("read", predicate.name);
+        try testing.expectEqual(true, predicate.terms.items[0].bool);
+        try testing.expectEqual(false, predicate.terms.items[1].bool);
+    }
+
+    {
+        var parser = Parser.init(arena, "read(true,false)");
+        const predicate = try parser.factPredicate();
+
+        try testing.expectEqualStrings("read", predicate.name);
+        try testing.expectEqual(true, predicate.terms.items[0].bool);
+        try testing.expectEqual(false, predicate.terms.items[1].bool);
+    }
+
+    {
+        // We are allowed spaces around predicate terms
+        var parser = Parser.init(arena, "read( true , false )");
+        const predicate = try parser.factPredicate();
+
+        try testing.expectEqualStrings("read", predicate.name);
+        try testing.expectEqual(true, predicate.terms.items[0].bool);
+        try testing.expectEqual(false, predicate.terms.items[1].bool);
+    }
+
+    {
+        // We don't allow a space between the predicate name and its opening paren
+        var parser = Parser.init(arena, "read  (true, false )");
+
+        try testing.expectError(error.UnexpectedString, parser.factPredicate());
+    }
 }
 
 // test "parse rule body" {
@@ -948,11 +984,17 @@ test "parse fact predicate" {
 
 test "parse check with expression" {
     const testing = std.testing;
+
+    var arena_state = std.heap.ArenaAllocator.init(testing.allocator);
+    defer arena_state.deinit();
+
+    const arena = arena_state.allocator();
+
     const input: []const u8 =
         \\check if right($0, $1), resource($0), operation($1), $0.contains("file")
     ;
 
-    var parser = Parser.init(testing.allocator, input);
+    var parser = Parser.init(arena, input);
 
     const r = try parser.check();
     defer r.deinit();
