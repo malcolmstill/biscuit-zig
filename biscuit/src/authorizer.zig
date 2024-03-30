@@ -77,16 +77,21 @@ pub const Authorizer = struct {
     }
 
     /// Authorize token with authorizer
+    ///
+    /// Will return without error if there is a matching `allow` policy id and the `errors`
+    /// list is empty.
+    ///
+    /// Otherwise will return error.AuthorizationFailed with the reason(s) in `errors`
     pub fn authorize(authorizer: *Authorizer, errors: *std.ArrayList(AuthorizerError)) !usize {
         log.debug("Starting authorize()", .{});
         defer log.debug("Finished authorize()", .{});
 
-        try authorizer.addTokenFactsAndRules(errors); // 1. Add tokens facts and rules to authorizer's world
-        try authorizer.generateFacts(); // 2. Run the world to generate all facts
-        try authorizer.authorizerChecks(errors); // 3. Run checks that have been added to this authorizer
-        try authorizer.authorityChecks(errors); // 4. Run checks in the biscuit's authority block
-        const allowed_policy_id: ?usize = try authorizer.authorizerPolicies(errors); // 5. run policies from the authorizer
-        try authorizer.blockChecks(errors); // 6. Run checks in the biscuit's other blocks
+        try authorizer.addTokenFactsAndRules(errors); // Step 1
+        try authorizer.generateFacts(); // Step 2
+        try authorizer.authorizerChecks(errors); // Step 3
+        try authorizer.authorityChecks(errors); // Step 4
+        const allowed_policy_id: ?usize = try authorizer.authorizerPolicies(errors); // Step 5
+        try authorizer.blockChecks(errors); // Step 6
 
         if (allowed_policy_id) |policy_id| {
             if (errors.items.len == 0) return policy_id;
