@@ -136,109 +136,122 @@ pub const Authorizer = struct {
         log.debug("Starting authorize()", .{});
         defer log.debug("Finished authorize()", .{});
 
-        log.debug("authorizer  public keys:", .{});
-        for (authorizer.symbols.public_keys.items, 0..) |pk, i| {
-            log.debug("  [{}]: {x}", .{ i, pk.bytes });
+        try authorizer.addBiscuitFactsAndRules(errors); // 1. Add tokens facts and rules to authorizer's world
+        try authorizer.generateFacts(); // 2. Run the world to generate all facts
+        try authorizer.authorizerChecks(errors); // 3. Run checks that have been added to this authorizer
+        try authorizer.authorityChecks(errors); // 4. Run checks in the biscuit's authority block
+        const allowed_policy_id: ?usize = try authorizer.authorizerPolicies(errors); // 5. run policies from the authorizer
+        try authorizer.blockChecks(errors); // 6. Run checks in the biscuit's other blocks
+
+        if (allowed_policy_id) |policy_id| {
+            if (errors.items.len == 0) return policy_id;
         }
 
-        {
-            var it = authorizer.public_key_to_block_id.iterator();
-            while (it.next()) |entry| {
-                log.debug("public_key_to_block_id: public key id = {}, block_ids = {any}", .{ entry.key_ptr.*, entry.value_ptr.items });
-            }
-        }
+        return error.AuthorizationFailed;
+    }
 
-        // 1.
+    /// Step 1 in authorize()
+    ///
+    /// This should only be called from authorize()
+    fn addBiscuitFactsAndRules(authorizer: *Authorizer, errors: *std.ArrayList(AuthorizerError)) !void {
         // Load facts and rules from authority block into world. Our block's facts
-        // will have a particular symbol table that we map into the symvol table
+        // will have a particular symbol table that we map into the symbol table
         // of the world.
         //
         // For example, the token may have a string "user123" which has id 12. But
         // when mapped into the world it may have id 5.
-        if (authorizer.biscuit) |biscuit| {
-            log.debug("biscuit token public keys:", .{});
-            for (biscuit.symbols.public_keys.items, 0..) |pk, i| {
-                log.debug("  [{}]: {x}", .{ i, pk.bytes });
-            }
-            for (biscuit.authority.facts.items) |authority_fact| {
-                const fact = try authority_fact.remap(&biscuit.symbols, &authorizer.symbols);
-                const origin = try Origin.initWithId(authorizer.arena, 0);
+        const biscuit = authorizer.biscuit orelse return;
 
-                try authorizer.world.addFact(origin, fact);
+        // Add authority block's facts
+        for (biscuit.authority.facts.items) |authority_fact| {
+            const fact = try authority_fact.remap(&biscuit.symbols, &authorizer.symbols);
+            const origin = try Origin.initWithId(authorizer.arena, 0);
+
+            try authorizer.world.addFact(origin, fact);
+        }
+
+        const authority_trusted_origins = try TrustedOrigins.fromScopes(
+            authorizer.arena,
+            biscuit.authority.scopes.items,
+            try TrustedOrigins.defaultOrigins(authorizer.arena),
+            0,
+            authorizer.public_key_to_block_id,
+        );
+
+        // Add authority block's rules
+        for (biscuit.authority.rules.items) |authority_rule| {
+            // Map from biscuit symbol space to authorizer symbol space
+            const rule = try authority_rule.remap(&biscuit.symbols, &authorizer.symbols);
+
+            if (!rule.validateVariables()) {
+                try errors.append(.unbound_variable);
             }
 
-            const authority_trusted_origins = try TrustedOrigins.fromScopes(
+            // A authority block's rule trusts
+            const rule_trusted_origins = try TrustedOrigins.fromScopes(
                 authorizer.arena,
-                biscuit.authority.scopes.items,
-                try TrustedOrigins.defaultOrigins(authorizer.arena),
+                rule.scopes.items,
+                authority_trusted_origins,
                 0,
                 authorizer.public_key_to_block_id,
             );
 
-            for (biscuit.authority.rules.items) |authority_rule| {
-                // Map from biscuit symbol space to authorizer symbol space
-                const rule = try authority_rule.remap(&biscuit.symbols, &authorizer.symbols);
+            try authorizer.world.addRule(0, rule_trusted_origins, rule);
+        }
+
+        for (biscuit.blocks.items, 1..) |block, block_id| {
+            // Add block facts
+            for (block.facts.items) |block_fact| {
+                const fact = try block_fact.remap(&biscuit.symbols, &authorizer.symbols);
+                const origin = try Origin.initWithId(authorizer.arena, block_id);
+
+                try authorizer.world.addFact(origin, fact);
+            }
+
+            const block_trusted_origins = try TrustedOrigins.fromScopes(
+                authorizer.arena,
+                block.scopes.items,
+                try TrustedOrigins.defaultOrigins(authorizer.arena),
+                block_id,
+                authorizer.public_key_to_block_id,
+            );
+
+            // Add block rules
+            for (block.rules.items) |block_rule| {
+                const rule = try block_rule.remap(&biscuit.symbols, &authorizer.symbols);
+                log.debug("block rule {any} CONVERTED to rule = {any}", .{ block_rule, rule });
 
                 if (!rule.validateVariables()) {
                     try errors.append(.unbound_variable);
                 }
 
-                // A authority block's rule trusts
-                const rule_trusted_origins = try TrustedOrigins.fromScopes(
+                const block_rule_trusted_origins = try TrustedOrigins.fromScopes(
                     authorizer.arena,
                     rule.scopes.items,
-                    authority_trusted_origins,
-                    0,
-                    authorizer.public_key_to_block_id,
-                );
-
-                try authorizer.world.addRule(0, rule_trusted_origins, rule);
-            }
-
-            for (biscuit.blocks.items, 1..) |block, block_id| {
-                for (block.facts.items) |block_fact| {
-                    const fact = try block_fact.remap(&biscuit.symbols, &authorizer.symbols);
-                    const origin = try Origin.initWithId(authorizer.arena, block_id);
-
-                    try authorizer.world.addFact(origin, fact);
-                }
-
-                const block_trusted_origins = try TrustedOrigins.fromScopes(
-                    authorizer.arena,
-                    block.scopes.items,
-                    try TrustedOrigins.defaultOrigins(authorizer.arena),
+                    block_trusted_origins,
                     block_id,
                     authorizer.public_key_to_block_id,
                 );
 
-                for (block.rules.items) |block_rule| {
-                    const rule = try block_rule.remap(&biscuit.symbols, &authorizer.symbols);
-                    log.debug("block rule {any} CONVERTED to rule = {any}", .{ block_rule, rule });
-
-                    if (!rule.validateVariables()) {
-                        try errors.append(.unbound_variable);
-                    }
-
-                    const block_rule_trusted_origins = try TrustedOrigins.fromScopes(
-                        authorizer.arena,
-                        rule.scopes.items,
-                        block_trusted_origins,
-                        block_id,
-                        authorizer.public_key_to_block_id,
-                    );
-
-                    try authorizer.world.addRule(block_id, block_rule_trusted_origins, rule);
-                }
+                try authorizer.world.addRule(block_id, block_rule_trusted_origins, rule);
             }
         }
+    }
 
-        // 2. Run the world to generate all facts
+    /// Step 2 in authorize()
+    ///
+    /// Generate all new facts by running world.
+    fn generateFacts(authorizer: *Authorizer) !void {
         log.debug("Run world", .{});
-        try authorizer.world.run(&authorizer.symbols);
-        log.debug("Finished running world", .{});
+        defer log.debug("Finished running world", .{});
 
-        //  3. Run checks that have been added to this authorizer
+        try authorizer.world.run(&authorizer.symbols);
+    }
+
+    fn authorizerChecks(authorizer: *Authorizer, errors: *std.ArrayList(AuthorizerError)) !void {
         log.debug("AUTHORIZER CHECKS", .{});
+        defer log.debug("END AUTHORIZER CHECKS", .{});
+
         for (authorizer.checks.items) |c| {
             log.debug("authorizer check = {any}", .{c});
             const check = try c.toDatalog(authorizer.arena, &authorizer.symbols);
@@ -261,28 +274,110 @@ pub const Authorizer = struct {
                 log.debug("match {any} = {}", .{ query, is_match });
             }
         }
-        log.debug("END AUTHORIZER CHECKS", .{});
+    }
 
-        // 4. Run checks in the biscuit's authority block
-        if (authorizer.biscuit) |biscuit| {
-            const authority_trusted_origins = try TrustedOrigins.fromScopes(
+    /// Step 4 in authorize()
+    ///
+    /// Run checks from token's authority block
+    fn authorityChecks(authorizer: *Authorizer, errors: *std.ArrayList(AuthorizerError)) !void {
+        const biscuit = authorizer.biscuit orelse return;
+
+        const authority_trusted_origins = try TrustedOrigins.fromScopes(
+            authorizer.arena,
+            biscuit.authority.scopes.items,
+            try TrustedOrigins.defaultOrigins(authorizer.arena),
+            0,
+            authorizer.public_key_to_block_id,
+        );
+
+        for (biscuit.authority.checks.items, 0..) |c, check_id| {
+            const check = try c.remap(&biscuit.symbols, &authorizer.symbols);
+            log.debug("{}: {any}", .{ check_id, check });
+
+            for (check.queries.items) |*query| {
+                const rule_trusted_origins = try TrustedOrigins.fromScopes(
+                    authorizer.arena,
+                    query.scopes.items,
+                    authority_trusted_origins,
+                    0,
+                    authorizer.public_key_to_block_id,
+                );
+
+                const is_match = switch (check.kind) {
+                    .one => try authorizer.world.queryMatch(query, &authorizer.symbols, rule_trusted_origins),
+                    .all => try authorizer.world.queryMatchAll(query, &authorizer.symbols, rule_trusted_origins),
+                };
+
+                if (!is_match) try errors.append(.{ .failed_block_check = .{ .block_id = 0, .check_id = check_id } });
+                log.debug("match {any} = {}", .{ query, is_match });
+            }
+        }
+    }
+
+    /// Step 5 in authorize()
+    ///
+    /// Run authorizer's policies.
+    fn authorizerPolicies(authorizer: *Authorizer, errors: *std.ArrayList(AuthorizerError)) !?usize {
+        for (authorizer.policies.items) |policy| {
+            log.debug("testing policy {any}", .{policy});
+
+            for (policy.queries.items, 0..) |*q, policy_id| {
+                var query = try q.toDatalog(authorizer.arena, &authorizer.symbols);
+
+                const rule_trusted_origins = try TrustedOrigins.fromScopes(
+                    authorizer.arena,
+                    query.scopes.items,
+                    try authorizer.authorizerTrustedOrigins(),
+                    Origin.AUTHORIZER_ID,
+                    authorizer.public_key_to_block_id,
+                );
+
+                const is_match = try authorizer.world.queryMatch(&query, &authorizer.symbols, rule_trusted_origins);
+                log.debug("match {any} = {}", .{ query, is_match });
+
+                if (is_match) {
+                    switch (policy.kind) {
+                        .allow => return policy_id,
+                        .deny => {
+                            try errors.append(.{ .denied_by_policy = .{ .deny_policy_id = policy_id } });
+                            return null;
+                        },
+                    }
+                }
+            }
+        }
+
+        try errors.append(.{ .no_matching_policy = {} });
+
+        return null;
+    }
+
+    /// Step 6 in authorize()
+    ///
+    /// Run checks in all other blocks.
+    fn blockChecks(authorizer: *Authorizer, errors: *std.ArrayList(AuthorizerError)) !void {
+        const biscuit = authorizer.biscuit orelse return;
+
+        for (biscuit.blocks.items, 1..) |block, block_id| {
+            const block_trusted_origins = try TrustedOrigins.fromScopes(
                 authorizer.arena,
-                biscuit.authority.scopes.items,
+                block.scopes.items,
                 try TrustedOrigins.defaultOrigins(authorizer.arena),
-                0,
+                block_id,
                 authorizer.public_key_to_block_id,
             );
 
-            for (biscuit.authority.checks.items, 0..) |c, check_id| {
+            for (block.checks.items, 0..) |c, check_id| {
                 const check = try c.remap(&biscuit.symbols, &authorizer.symbols);
-                log.debug("{}: {any}", .{ check_id, check });
+
+                log.debug("check = {any}", .{check});
 
                 for (check.queries.items) |*query| {
                     const rule_trusted_origins = try TrustedOrigins.fromScopes(
                         authorizer.arena,
                         query.scopes.items,
-                        authority_trusted_origins,
-                        0,
+                        block_trusted_origins,
+                        block_id,
                         authorizer.public_key_to_block_id,
                     );
 
@@ -291,90 +386,12 @@ pub const Authorizer = struct {
                         .all => try authorizer.world.queryMatchAll(query, &authorizer.symbols, rule_trusted_origins),
                     };
 
-                    if (!is_match) try errors.append(.{ .failed_block_check = .{ .block_id = 0, .check_id = check_id } });
+                    if (!is_match) try errors.append(.{ .failed_block_check = .{ .block_id = block_id, .check_id = check_id } });
+
                     log.debug("match {any} = {}", .{ query, is_match });
                 }
             }
         }
-
-        // 5. run policies from the authorizer
-        const allowed_policy_id: ?usize = policy_blk: {
-            for (authorizer.policies.items) |policy| {
-                log.debug("testing policy {any}", .{policy});
-
-                for (policy.queries.items, 0..) |*q, policy_id| {
-                    var query = try q.toDatalog(authorizer.arena, &authorizer.symbols);
-
-                    const rule_trusted_origins = try TrustedOrigins.fromScopes(
-                        authorizer.arena,
-                        query.scopes.items,
-                        try authorizer.authorizerTrustedOrigins(),
-                        Origin.AUTHORIZER_ID,
-                        authorizer.public_key_to_block_id,
-                    );
-
-                    const is_match = try authorizer.world.queryMatch(&query, &authorizer.symbols, rule_trusted_origins);
-                    log.debug("match {any} = {}", .{ query, is_match });
-
-                    if (is_match) {
-                        switch (policy.kind) {
-                            .allow => break :policy_blk policy_id,
-                            .deny => {
-                                try errors.append(.{ .denied_by_policy = .{ .deny_policy_id = policy_id } });
-                                break :policy_blk null;
-                            },
-                        }
-                    }
-                }
-            }
-
-            try errors.append(.{ .no_matching_policy = {} });
-            break :policy_blk null;
-        };
-
-        // 6. Run checks in the biscuit's other blocks
-        if (authorizer.biscuit) |biscuit| {
-            for (biscuit.blocks.items, 1..) |block, block_id| {
-                const block_trusted_origins = try TrustedOrigins.fromScopes(
-                    authorizer.arena,
-                    block.scopes.items,
-                    try TrustedOrigins.defaultOrigins(authorizer.arena),
-                    block_id,
-                    authorizer.public_key_to_block_id,
-                );
-
-                for (block.checks.items, 0..) |c, check_id| {
-                    const check = try c.remap(&biscuit.symbols, &authorizer.symbols);
-
-                    log.debug("check = {any}", .{check});
-
-                    for (check.queries.items) |*query| {
-                        const rule_trusted_origins = try TrustedOrigins.fromScopes(
-                            authorizer.arena,
-                            query.scopes.items,
-                            block_trusted_origins,
-                            block_id,
-                            authorizer.public_key_to_block_id,
-                        );
-
-                        const is_match = switch (check.kind) {
-                            .one => try authorizer.world.queryMatch(query, &authorizer.symbols, rule_trusted_origins),
-                            .all => try authorizer.world.queryMatchAll(query, &authorizer.symbols, rule_trusted_origins),
-                        };
-
-                        if (!is_match) try errors.append(.{ .failed_block_check = .{ .block_id = block_id, .check_id = check_id } });
-
-                        log.debug("match {any} = {}", .{ query, is_match });
-                    }
-                }
-            }
-        }
-
-        if (allowed_policy_id) |policy_id| {
-            if (errors.items.len == 0) return policy_id;
-        }
-
-        return error.AuthorizationFailed;
     }
 };
 
