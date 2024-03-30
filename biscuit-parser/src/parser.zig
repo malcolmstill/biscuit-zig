@@ -860,6 +860,21 @@ test "parse predicates" {
     const arena = arena_state.allocator();
 
     {
+        var parser = Parser.init(arena, "read(-1, 1, \"hello world\", hex:abcd, true, false, $foo, 2024-03-30T20:48:00Z)");
+        const predicate = try parser.predicate(.rule);
+
+        try testing.expectEqualStrings("read", predicate.name);
+        try testing.expectEqual(-1, predicate.terms.items[0].integer);
+        try testing.expectEqual(1, predicate.terms.items[1].integer);
+        try testing.expectEqualStrings("hello world", predicate.terms.items[2].string);
+        try testing.expectEqualStrings("\xab\xcd", predicate.terms.items[3].bytes);
+        try testing.expectEqual(true, predicate.terms.items[4].bool);
+        try testing.expectEqual(false, predicate.terms.items[5].bool);
+        try testing.expectEqualStrings("foo", predicate.terms.items[6].variable);
+        try testing.expectEqual(1711831680, predicate.terms.items[7].date);
+    }
+
+    {
         var parser = Parser.init(arena, "read(true)");
         const predicate = try parser.predicate(.fact);
 
