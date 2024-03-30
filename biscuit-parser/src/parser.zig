@@ -27,18 +27,18 @@ pub const Parser = struct {
     }
 
     pub fn factPredicate(parser: *Parser) !Predicate {
+        var terms = std.ArrayList(Term).init(parser.allocator);
+
         const name = parser.readName();
 
         parser.skipWhiteSpace();
 
         try parser.consume("(");
 
-        var terms = std.ArrayList(Term).init(parser.allocator);
+        while (true) {
+            parser.skipWhiteSpace();
 
-        // Parse terms
-        var it = parser.factTermsIterator();
-        while (try it.next()) |trm| {
-            try terms.append(trm);
+            try terms.append(try parser.factTerm());
 
             if (parser.peek()) |peeked| {
                 if (peeked != ',') break;
@@ -53,17 +53,18 @@ pub const Parser = struct {
     }
 
     pub fn predicate(parser: *Parser) !Predicate {
+        var terms = std.ArrayList(Term).init(parser.allocator);
+
         const name = parser.readName();
 
         parser.skipWhiteSpace();
 
         try parser.consume("(");
 
-        var terms = std.ArrayList(Term).init(parser.allocator);
+        while (true) {
+            parser.skipWhiteSpace();
 
-        var it = parser.termsIterator();
-        while (try it.next()) |trm| {
-            try terms.append(trm);
+            try terms.append(try parser.term());
 
             if (parser.startsWithConsuming(",")) continue;
 
@@ -73,34 +74,6 @@ pub const Parser = struct {
         try parser.consume(")");
 
         return .{ .name = name, .terms = terms };
-    }
-
-    const FactTermIterator = struct {
-        parser: *Parser,
-
-        pub fn next(it: *FactTermIterator) !?Term {
-            it.parser.skipWhiteSpace();
-
-            return try it.parser.factTerm();
-        }
-    };
-
-    pub fn factTermsIterator(parser: *Parser) FactTermIterator {
-        return .{ .parser = parser };
-    }
-
-    const TermIterator = struct {
-        parser: *Parser,
-
-        pub fn next(it: *TermIterator) !?Term {
-            it.parser.skipWhiteSpace();
-
-            return try it.parser.term();
-        }
-    };
-
-    pub fn termsIterator(parser: *Parser) TermIterator {
-        return .{ .parser = parser };
     }
 
     pub fn term(parser: *Parser) !Term {
