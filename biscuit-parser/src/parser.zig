@@ -27,16 +27,10 @@ pub const Parser = struct {
     /// E.g. read(1, "hello") will parse successfully, but read($foo, "hello")
     /// will fail because it contains a variable `$foo`.
     pub fn fact(parser: *Parser) !Fact {
-        return .{ .predicate = try parser.factPredicate(), .variables = null };
+        return .{ .predicate = try parser.predicate(.fact), .variables = null };
     }
 
-    /// Try to parse a fact predicate
-    ///
-    /// E.g. read(1, "hello") will parse successfully, but read($foo, "hello")
-    /// will fail because it contains a variable `$foo`.
-    ///
-    /// For parsing predicates containing variables see `fn predicate`
-    pub fn factPredicate(parser: *Parser) !Predicate {
+    pub fn predicate(parser: *Parser, kind: enum { fact, rule }) !Predicate {
         var terms = std.ArrayList(Term).init(parser.allocator);
 
         const name = parser.readName();
@@ -46,9 +40,10 @@ pub const Parser = struct {
         while (true) {
             parser.skipWhiteSpace();
 
-            const t = try parser.factTerm();
-
-            try terms.append(t);
+            try terms.append(try parser.term(switch (kind) {
+                .rule => .allow_variables,
+                .fact => .disallow_variables,
+            }));
 
             parser.skipWhiteSpace();
 
@@ -62,90 +57,22 @@ pub const Parser = struct {
         return .{ .name = name, .terms = terms };
     }
 
-    pub fn predicate(parser: *Parser) !Predicate {
-        var terms = std.ArrayList(Term).init(parser.allocator);
-
-        const name = parser.readName();
-
-        try parser.consume("(");
-
-        while (true) {
-            parser.skipWhiteSpace();
-
-            try terms.append(try parser.term());
-
-            parser.skipWhiteSpace();
-
-            if (parser.startsWithConsuming(",")) continue;
-
-            break;
-        }
-
-        try parser.consume(")");
-
-        return .{ .name = name, .terms = terms };
-    }
-
-    pub fn term(parser: *Parser) !Term {
+    fn term(parser: *Parser, variables: enum { allow_variables, disallow_variables }) !Term {
         const rst = parser.rest();
 
-        variable_blk: {
-            var term_parser = Parser.init(parser.allocator, rst);
+        if (variables == .disallow_variables) {
+            try parser.reject('$'); // Variables are disallowed in a fact term
+        } else {
+            variable_blk: {
+                var term_parser = Parser.init(parser.allocator, rst);
 
-            const value = term_parser.variable() catch break :variable_blk;
+                const value = term_parser.variable() catch break :variable_blk;
 
-            parser.offset += term_parser.offset;
+                parser.offset += term_parser.offset;
 
-            return .{ .variable = value };
+                return .{ .variable = value };
+            }
         }
-
-        string_blk: {
-            var term_parser = Parser.init(parser.allocator, rst);
-
-            const value = term_parser.string() catch break :string_blk;
-
-            parser.offset += term_parser.offset;
-
-            return .{ .string = value };
-        }
-
-        date_blk: {
-            var term_parser = Parser.init(parser.allocator, rst);
-
-            const value = term_parser.date() catch break :date_blk;
-
-            parser.offset += term_parser.offset;
-
-            return .{ .date = value };
-        }
-
-        number_blk: {
-            var term_parser = Parser.init(parser.allocator, rst);
-
-            const value = term_parser.number(i64) catch break :number_blk;
-
-            parser.offset += term_parser.offset;
-
-            return .{ .integer = value };
-        }
-
-        bool_blk: {
-            var term_parser = Parser.init(parser.allocator, rst);
-
-            const value = term_parser.boolean() catch break :bool_blk;
-
-            parser.offset += term_parser.offset;
-
-            return .{ .bool = value };
-        }
-
-        return error.NoFactTermFound;
-    }
-
-    pub fn factTerm(parser: *Parser) !Term {
-        const rst = parser.rest();
-
-        try parser.reject('$'); // Variables are disallowed in a fact term
 
         string_blk: {
             var term_parser = Parser.init(parser.allocator, rst);
@@ -280,7 +207,7 @@ pub const Parser = struct {
             predicate_blk: {
                 var predicate_parser = Parser.init(parser.allocator, parser.rest());
 
-                const p = predicate_parser.predicate() catch break :predicate_blk;
+                const p = predicate_parser.predicate(.rule) catch break :predicate_blk;
 
                 parser.offset += predicate_parser.offset;
 
@@ -685,7 +612,7 @@ pub const Parser = struct {
         }
 
         // Otherwise we expect term
-        const term1 = try parser.term();
+        const term1 = try parser.term(.allow_variables);
 
         return try Expression.value(term1);
     }
@@ -706,7 +633,7 @@ pub const Parser = struct {
         }
 
         var e: Expression = undefined;
-        if (parser.term()) |t1| {
+        if (parser.term(.allow_variables)) |t1| {
             parser.skipWhiteSpace();
             e = try Expression.value(t1);
         } else |_| {
@@ -898,7 +825,7 @@ test "parse (fact) predicates" {
 
     {
         var parser = Parser.init(arena, "read(true)");
-        const predicate = try parser.factPredicate();
+        const predicate = try parser.predicate(.fact);
 
         try testing.expectEqualStrings("read", predicate.name);
         try testing.expectEqual(true, predicate.terms.items[0].bool);
@@ -906,7 +833,7 @@ test "parse (fact) predicates" {
 
     {
         var parser = Parser.init(arena, "read(true, false)");
-        const predicate = try parser.factPredicate();
+        const predicate = try parser.predicate(.fact);
 
         try testing.expectEqualStrings("read", predicate.name);
         try testing.expectEqual(true, predicate.terms.items[0].bool);
@@ -915,7 +842,7 @@ test "parse (fact) predicates" {
 
     {
         var parser = Parser.init(arena, "read(true,false)");
-        const predicate = try parser.factPredicate();
+        const predicate = try parser.predicate(.fact);
 
         try testing.expectEqualStrings("read", predicate.name);
         try testing.expectEqual(true, predicate.terms.items[0].bool);
@@ -925,7 +852,7 @@ test "parse (fact) predicates" {
     {
         // We are allowed spaces around predicate terms
         var parser = Parser.init(arena, "read( true , false )");
-        const predicate = try parser.factPredicate();
+        const predicate = try parser.predicate(.fact);
 
         try testing.expectEqualStrings("read", predicate.name);
         try testing.expectEqual(true, predicate.terms.items[0].bool);
@@ -936,21 +863,21 @@ test "parse (fact) predicates" {
         // We don't allow a space between the predicate name and its opening paren
         var parser = Parser.init(arena, "read  (true, false )");
 
-        try testing.expectError(error.UnexpectedString, parser.factPredicate());
+        try testing.expectError(error.UnexpectedString, parser.predicate(.fact));
     }
 
     {
         // We don't allow variables in fact predicates
         var parser = Parser.init(arena, "read(true, $foo)");
 
-        try testing.expectError(error.DisallowedChar, parser.factPredicate());
+        try testing.expectError(error.DisallowedChar, parser.predicate(.fact));
     }
 
     {
         // Facts must have at least one term
         var parser = Parser.init(arena, "read()");
 
-        try testing.expectError(error.NoFactTermFound, parser.factPredicate());
+        try testing.expectError(error.NoFactTermFound, parser.predicate(.fact));
     }
 }
 
