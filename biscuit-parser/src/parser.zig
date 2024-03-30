@@ -67,14 +67,14 @@ pub const Parser = struct {
 
         const name = parser.readName();
 
-        parser.skipWhiteSpace();
-
         try parser.consume("(");
 
         while (true) {
             parser.skipWhiteSpace();
 
             try terms.append(try parser.term());
+
+            parser.skipWhiteSpace();
 
             if (parser.startsWithConsuming(",")) continue;
 
@@ -937,6 +937,20 @@ test "parse (fact) predicates" {
         var parser = Parser.init(arena, "read  (true, false )");
 
         try testing.expectError(error.UnexpectedString, parser.factPredicate());
+    }
+
+    {
+        // We don't allow variables in fact predicates
+        var parser = Parser.init(arena, "read(true, $foo)");
+
+        try testing.expectError(error.DisallowedChar, parser.factPredicate());
+    }
+
+    {
+        // Facts must have at least one term
+        var parser = Parser.init(arena, "read()");
+
+        try testing.expectError(error.NoFactTermFound, parser.factPredicate());
     }
 }
 
