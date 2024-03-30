@@ -961,6 +961,28 @@ test "parse numbers" {
     }
 }
 
+test "parse boolean" {
+    const testing = std.testing;
+
+    var arena_state = std.heap.ArenaAllocator.init(testing.allocator);
+    defer arena_state.deinit();
+    const arena = arena_state.allocator();
+
+    {
+        var parser = Parser.init(arena, "true");
+        const boolean = try parser.boolean();
+
+        try testing.expectEqual(true, boolean);
+    }
+
+    {
+        var parser = Parser.init(arena, "false");
+        const boolean = try parser.boolean();
+
+        try testing.expectEqual(false, boolean);
+    }
+}
+
 // test "parse rule body" {
 //     const testing = std.testing;
 //     const input: []const u8 =
