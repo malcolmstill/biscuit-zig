@@ -9,6 +9,7 @@ const Expression = @import("biscuit-builder").Expression;
 const Scope = @import("biscuit-builder").Scope;
 const Date = @import("biscuit-builder").Date;
 const Policy = @import("biscuit-builder").Policy;
+const Set = @import("biscuit-builder").Set;
 const Ed25519 = std.crypto.sign.Ed25519;
 
 const log = std.log.scoped(.parser);
@@ -41,8 +42,8 @@ pub const Parser = struct {
             parser.skipWhiteSpace();
 
             try terms.append(try parser.term(switch (kind) {
-                .rule => .allow_variables,
-                .fact => .disallow_variables,
+                .rule => .allow,
+                .fact => .disallow,
             }));
 
             parser.skipWhiteSpace();
@@ -57,11 +58,11 @@ pub const Parser = struct {
         return .{ .name = predicate_name, .terms = terms };
     }
 
-    fn term(parser: *Parser, variables: enum { allow_variables, disallow_variables }) !Term {
+    fn term(parser: *Parser, variables: AllowVariables) ParserError!Term {
         const rst = parser.rest();
 
-        if (variables == .disallow_variables) {
-            try parser.reject('$'); // Variables are disallowed in a fact term
+        if (variables == .disallow) {
+            try parser.reject("$"); // Variables are disallowed in a fact term
         } else {
             variable_blk: {
                 var term_parser = Parser.init(parser.allocator, rst);
@@ -122,6 +123,16 @@ pub const Parser = struct {
             parser.offset += term_parser.offset;
 
             return .{ .bytes = value };
+        }
+
+        set_blk: {
+            var term_parser = Parser.init(parser.allocator, rst);
+
+            const value = term_parser.set(variables) catch break :set_blk;
+
+            parser.offset += term_parser.offset;
+
+            return .{ .set = value };
         }
 
         return error.NoFactTermFound;
@@ -352,7 +363,6 @@ pub const Parser = struct {
 
     fn boolean(parser: *Parser) !bool {
         if (parser.startsWithConsuming("true")) return true;
-
         if (parser.startsWithConsuming("false")) return false;
 
         return error.ExpectedBooleanTerm;
@@ -368,6 +378,27 @@ pub const Parser = struct {
         const out = try parser.allocator.alloc(u8, hex_string.len / 2);
 
         return try std.fmt.hexToBytes(out, hex_string);
+    }
+
+    fn set(parser: *Parser, variables: AllowVariables) !Set(Term) {
+        var new_set = Set(Term).init(parser.allocator);
+
+        try parser.consume("[");
+
+        while (true) {
+            parser.skipWhiteSpace();
+
+            const trm = try parser.term(variables);
+            try new_set.add(trm);
+
+            parser.skipWhiteSpace();
+
+            if (!parser.startsWithConsuming(",")) break;
+        }
+
+        try parser.consume("]");
+
+        return new_set;
     }
 
     fn expression(parser: *Parser) ParserError!Expression {
@@ -614,7 +645,7 @@ pub const Parser = struct {
         }
 
         // Otherwise we expect term
-        const term1 = try parser.term(.allow_variables);
+        const term1 = try parser.term(.allow);
 
         return try Expression.value(term1);
     }
@@ -635,7 +666,7 @@ pub const Parser = struct {
         }
 
         var e: Expression = undefined;
-        if (parser.term(.allow_variables)) |t1| {
+        if (parser.term(.allow)) |t1| {
             parser.skipWhiteSpace();
             e = try Expression.value(t1);
         } else |_| {
@@ -772,9 +803,8 @@ pub const Parser = struct {
     }
 
     /// Reject char. Does not consume the character
-    fn reject(parser: *Parser, char: u8) !void {
-        const peeked = parser.peek() orelse return error.ExpectedMoreInput;
-        if (peeked == char) return error.DisallowedChar;
+    fn reject(parser: *Parser, str: []const u8) !void {
+        if (parser.startsWith(str)) return error.DisallowedChar;
     }
 
     fn name(parser: *Parser) ![]const u8 {
@@ -825,6 +855,11 @@ pub const Parser = struct {
     }
 };
 
+const AllowVariables = enum {
+    allow,
+    disallow,
+};
+
 fn isHexDigit(char: u8) bool {
     switch (char) {
         'a', 'b', 'c', 'd', 'e', 'f', 'A', 'B', 'C', 'D', 'E', 'F', '0', '1', '2', '3', '4', '5', '6', '7', '8', '9' => return true,
@@ -860,7 +895,7 @@ test "parse predicates" {
     const arena = arena_state.allocator();
 
     {
-        var parser = Parser.init(arena, "read(-1, 1, \"hello world\", hex:abcd, true, false, $foo, 2024-03-30T20:48:00Z)");
+        var parser = Parser.init(arena, "read(-1, 1, \"hello world\", hex:abcd, true, false, $foo, 2024-03-30T20:48:00Z, [1, 2, 3])");
         const predicate = try parser.predicate(.rule);
 
         try testing.expectEqualStrings("read", predicate.name);
@@ -872,6 +907,11 @@ test "parse predicates" {
         try testing.expectEqual(false, predicate.terms.items[5].bool);
         try testing.expectEqualStrings("foo", predicate.terms.items[6].variable);
         try testing.expectEqual(1711831680, predicate.terms.items[7].date);
+
+        const set = predicate.terms.items[8].set;
+        try testing.expect(set.contains(.{ .integer = 1 }));
+        try testing.expect(set.contains(.{ .integer = 2 }));
+        try testing.expect(set.contains(.{ .integer = 3 }));
     }
 
     {

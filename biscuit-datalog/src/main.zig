@@ -15,6 +15,7 @@ pub const Check = @import("check.zig").Check;
 pub const Origin = @import("origin.zig").Origin;
 pub const TrustedOrigins = @import("trusted_origins.zig").TrustedOrigins;
 pub const world = @import("world.zig");
+pub const Set = @import("set.zig").Set;
 
 test {
     _ = @import("check.zig");
