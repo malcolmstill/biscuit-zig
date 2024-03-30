@@ -22,10 +22,22 @@ pub const Parser = struct {
         return .{ .input = input, .allocator = allocator };
     }
 
+    /// Try to parse fact
+    ///
+    /// E.g. read(1, "hello") will parse successfully, but read($foo, "hello")
+    /// will fail because it contains a variable `$foo`.
     pub fn fact(parser: *Parser) !Fact {
         return .{ .predicate = try parser.factPredicate(), .variables = null };
     }
 
+    /// Try to parse a fact predicate
+    ///
+    /// I.e. if we have a fact: read(1, "hello") we are attempting to
+    /// parse (1, "hello") having already parsed the "read" predicate
+    /// name.
+    ///
+    /// Note that we are specifically parsing a _fact's_ predicate, i.e.
+    /// the terms in the predicate may _not_ contain variables.
     pub fn factPredicate(parser: *Parser) !Predicate {
         var terms = std.ArrayList(Term).init(parser.allocator);
 
@@ -879,19 +891,18 @@ const ParserError = error{
     UnexpectedToken,
 };
 
-// test "parse fact predicate" {
-//     const testing = std.testing;
-//     const input: []const u8 =
-//         \\read(true)
-//     ;
+test "parse fact predicate" {
+    const testing = std.testing;
+    const input: []const u8 =
+        \\read(true)
+    ;
 
-//     var parser = Parser.init(input);
+    var parser = Parser.init(testing.allocator, input);
 
-//     const r = try parser.factPredicate(testing.allocator);
-//     defer r.deinit();
+    const r = try parser.factPredicate();
 
-//     std.debug.print("{any}\n", .{r});
-// }
+    std.debug.print("{any}\n", .{r});
+}
 
 // test "parse rule body" {
 //     const testing = std.testing;
