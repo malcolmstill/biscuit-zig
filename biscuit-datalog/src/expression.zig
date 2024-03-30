@@ -311,29 +311,30 @@ fn concat(allocator: std.mem.Allocator, left: []const u8, right: []const u8) ![]
 test {
     const testing = std.testing;
 
+    const allocator = testing.allocator;
+
     const t1: Term = .{ .integer = 10 };
     const t2: Term = .{ .integer = 22 };
 
-    try testing.expectEqual(@as(Term, .{ .bool = false }), try Binary.equal.evaluate(t1, t2, SymbolTable.init("test", testing.allocator)));
-    try testing.expectEqual(@as(Term, .{ .bool = true }), try Binary.equal.evaluate(t1, t1, SymbolTable.init("test", testing.allocator)));
-
-    try testing.expectEqual(@as(Term, .{ .integer = 32 }), try Binary.add.evaluate(t1, t2, SymbolTable.init("test", testing.allocator)));
-    try testing.expectEqual(@as(Term, .{ .integer = 220 }), try Binary.mul.evaluate(t1, t2, SymbolTable.init("test", testing.allocator)));
-
     var symbols = SymbolTable.init("test", testing.allocator);
     defer symbols.deinit();
+
+    try testing.expectEqual(@as(Term, .{ .bool = false }), try Binary.equal.evaluate(allocator, t1, t2, &symbols));
+    try testing.expectEqual(@as(Term, .{ .bool = true }), try Binary.equal.evaluate(allocator, t1, t1, &symbols));
+    try testing.expectEqual(@as(Term, .{ .integer = 32 }), try Binary.add.evaluate(allocator, t1, t2, &symbols));
+    try testing.expectEqual(@as(Term, .{ .integer = 220 }), try Binary.mul.evaluate(allocator, t1, t2, &symbols));
 
     const s = .{ .string = try symbols.insert("prefix_middle_suffix") };
     const prefix = .{ .string = try symbols.insert("prefix") };
     const suffix = .{ .string = try symbols.insert("suffix") };
     const middle = .{ .string = try symbols.insert("middle") };
 
-    try testing.expectEqual(@as(Term, .{ .bool = true }), try Binary.equal.evaluate(s, s, symbols));
-    try testing.expectEqual(@as(Term, .{ .bool = false }), try Binary.equal.evaluate(s, prefix, symbols));
-    try testing.expectEqual(@as(Term, .{ .bool = true }), try Binary.not_equal.evaluate(s, prefix, symbols));
-    try testing.expectEqual(@as(Term, .{ .bool = true }), try Binary.prefix.evaluate(s, prefix, symbols));
-    try testing.expectEqual(@as(Term, .{ .bool = true }), try Binary.suffix.evaluate(s, suffix, symbols));
-    try testing.expectEqual(@as(Term, .{ .bool = true }), try Binary.contains.evaluate(s, middle, symbols));
+    try testing.expectEqual(@as(Term, .{ .bool = true }), try Binary.equal.evaluate(allocator, s, s, &symbols));
+    try testing.expectEqual(@as(Term, .{ .bool = false }), try Binary.equal.evaluate(allocator, s, prefix, &symbols));
+    try testing.expectEqual(@as(Term, .{ .bool = true }), try Binary.not_equal.evaluate(allocator, s, prefix, &symbols));
+    try testing.expectEqual(@as(Term, .{ .bool = true }), try Binary.prefix.evaluate(allocator, s, prefix, &symbols));
+    try testing.expectEqual(@as(Term, .{ .bool = true }), try Binary.suffix.evaluate(allocator, s, suffix, &symbols));
+    try testing.expectEqual(@as(Term, .{ .bool = true }), try Binary.contains.evaluate(allocator, s, middle, &symbols));
 }
 
 // test "negate" {
