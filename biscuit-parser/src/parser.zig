@@ -722,23 +722,10 @@ pub const Parser = struct {
     }
 
     fn scope(parser: *Parser, _: std.mem.Allocator) !Scope {
-        parser.skipWhiteSpace();
+        if (parser.startsWithConsuming("authority")) return .{ .authority = {} };
+        if (parser.startsWithConsuming("previous")) return .{ .previous = {} };
 
-        if (parser.startsWith("authority")) {
-            try parser.consume("authority");
-
-            return .{ .authority = {} };
-        }
-
-        if (parser.startsWith("previous")) {
-            try parser.consume("previous");
-
-            return .{ .previous = {} };
-        }
-
-        if (parser.startsWith("{")) {
-            try parser.consume("{");
-
+        if (parser.startsWithConsuming("{")) {
             const parameter = try parser.name();
 
             try parser.consume("}");
