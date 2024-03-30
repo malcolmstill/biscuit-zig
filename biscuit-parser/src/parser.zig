@@ -199,12 +199,7 @@ pub const Parser = struct {
         while (try it.next()) |trm| {
             try terms.append(trm);
 
-            if (parser.peek()) |peeked| {
-                if (peeked == ',') {
-                    parser.offset += 1;
-                    continue;
-                }
-            }
+            if (parser.startsWithConsuming(",")) continue;
 
             break;
         }
@@ -312,12 +307,7 @@ pub const Parser = struct {
 
                 parser.skipWhiteSpace();
 
-                if (parser.peek()) |peeked| {
-                    if (peeked == ',') {
-                        parser.offset += 1;
-                        continue;
-                    }
-                }
+                if (parser.startsWithConsuming(",")) continue;
             }
 
             // Otherwise try parsing an expression
@@ -332,12 +322,7 @@ pub const Parser = struct {
 
                 parser.skipWhiteSpace();
 
-                if (parser.peek()) |peeked| {
-                    if (peeked == ',') {
-                        parser.offset += 1;
-                        continue;
-                    }
-                }
+                if (parser.startsWithConsuming(",")) continue;
             }
 
             // We haven't found a predicate or expression so we're done,
@@ -727,19 +712,16 @@ pub const Parser = struct {
     fn unary(parser: *Parser) ParserError!Expression {
         parser.skipWhiteSpace();
 
-        if (parser.peek()) |c| {
-            if (c == '!') {
-                try parser.consume("!");
-                parser.skipWhiteSpace();
+        if (parser.startsWithConsuming("!")) {
+            parser.skipWhiteSpace();
 
-                const e = try parser.expr();
+            const e = try parser.expr();
 
-                return try Expression.unary(parser.allocator, .negate, e);
-            }
+            return try Expression.unary(parser.allocator, .negate, e);
+        }
 
-            if (c == '(') {
-                return try parser.unaryParens();
-            }
+        if (parser.startsWith("(")) {
+            return try parser.unaryParens();
         }
 
         var e: Expression = undefined;
