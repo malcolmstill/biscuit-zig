@@ -794,39 +794,19 @@ pub const Parser = struct {
         if (parser.startsWith(str)) return error.DisallowedChar;
     }
 
-    fn nextCodepoint(parser: *Parser) !struct { len: u32, codepoint: u21 } {
-        const remaining = parser.rest();
-
-        if (remaining.len == 0) return error.NextCodePointExpectsAtLeastOneByte;
-
-        const first_byte = remaining[0];
-
-        const byte_len = try std.unicode.utf8ByteSequenceLength(first_byte);
-
-        const codepoint = switch (byte_len) {
-            1 => try std.unicode.utf8Decode(remaining[0..1]),
-            2 => try std.unicode.utf8Decode2(remaining[0..2]),
-            3 => try std.unicode.utf8Decode3(remaining[0..3]),
-            4 => try std.unicode.utf8Decode4(remaining[0..4]),
-            else => return error.IncorrectUtfDecodeLength,
-        };
-
-        return .{ .len = byte_len, .codepoint = codepoint };
-    }
-
     fn name(parser: *Parser) ![]const u8 {
         const start = parser.offset;
 
         if (parser.rest().len == 0) return error.ParsingNameExpectsAtLeastOneCharacter;
 
-        const first_codepoint = try parser.nextCodepoint();
+        const first_codepoint = try nextCodepoint(parser.rest());
 
         if (!ziglyph.isLetter(first_codepoint.codepoint)) return error.ParsingNameFirstCharacterMustBeLetter;
 
         parser.offset += first_codepoint.len;
 
         while (true) {
-            const next_codepoint = try parser.nextCodepoint();
+            const next_codepoint = try nextCodepoint(parser.rest());
 
             if (ziglyph.isAlphaNum(next_codepoint.codepoint)) {
                 parser.offset += next_codepoint.len;
@@ -886,6 +866,28 @@ fn isDigit(char: u8) bool {
         '0', '1', '2', '3', '4', '5', '6', '7', '8', '9' => return true,
         else => return false,
     }
+}
+
+/// Try to get the next UTF-8 codepoint from input. Returns the codepoint
+/// and the number of bytes that codepoint takes up.
+fn nextCodepoint(input: []const u8) !struct { codepoint: u21, len: u32 } {
+    if (input.len == 0) return error.NextCodePointExpectsAtLeastOneByte;
+
+    const first_byte = input[0];
+
+    const byte_len = try std.unicode.utf8ByteSequenceLength(first_byte);
+
+    if (input.len < byte_len) return error.NotEnoughInputForCodepoint;
+
+    const codepoint = switch (byte_len) {
+        1 => try std.unicode.utf8Decode(input[0..1]),
+        2 => try std.unicode.utf8Decode2(input[0..2]),
+        3 => try std.unicode.utf8Decode3(input[0..3]),
+        4 => try std.unicode.utf8Decode4(input[0..4]),
+        else => return error.IncorrectUtfDecodeLength,
+    };
+
+    return .{ .len = byte_len, .codepoint = codepoint };
 }
 
 const ParserError = error{
