@@ -216,108 +216,6 @@ pub const Parser = struct {
         return .{ .name = name, .terms = terms };
     }
 
-    fn variable(parser: *Parser) ![]const u8 {
-        try parser.expect("$");
-
-        const start = parser.offset;
-
-        for (parser.rest()) |c| {
-            if (ziglyph.isAlphaNum(c) or c == '_') {
-                parser.offset += 1;
-                continue;
-            }
-
-            break;
-        }
-
-        return parser.input[start..parser.offset];
-    }
-
-    // FIXME: properly implement string parsing
-    fn string(parser: *Parser) ![]const u8 {
-        try parser.expect("\"");
-
-        const start = parser.offset;
-
-        while (parser.peek()) |peeked| {
-            defer parser.offset += 1;
-            if (peeked == '"') {
-                return parser.input[start..parser.offset];
-            }
-        }
-
-        return error.ExpectedStringTerm;
-    }
-
-    fn date(parser: *Parser) !u64 {
-        const year = try parser.number(i32);
-
-        try parser.expect("-");
-
-        const month = try parser.number(u8);
-        if (month < 1 or month > 12) return error.MonthOutOfRange;
-
-        try parser.expect("-");
-
-        const day = try parser.number(u8);
-        if (!Date.isDayMonthYearValid(i32, year, month, day)) return error.InvalidDayMonthYearCombination;
-
-        try parser.expect("T");
-
-        const hour = try parser.number(u8);
-        if (hour > 23) return error.HoyrOutOfRange;
-
-        try parser.expect(":");
-
-        const minute = try parser.number(u8);
-        if (minute > 59) return error.MinuteOutOfRange;
-
-        try parser.expect(":");
-
-        const second = try parser.number(u8);
-        if (second > 59) return error.SecondOutOfRange;
-
-        try parser.expect("Z");
-
-        const d: Date = .{
-            .year = year,
-            .month = month,
-            .day = day,
-            .hour = hour,
-            .minute = minute,
-            .second = second,
-            .nanosecond = 0,
-            .utc_offset = 0,
-        };
-
-        return d.unixEpoch();
-    }
-
-    fn number(parser: *Parser, comptime T: type) !T {
-        const start = parser.offset;
-
-        for (parser.rest()) |c| {
-            if (ziglyph.isAsciiDigit(c)) {
-                parser.offset += 1;
-                continue;
-            }
-
-            break;
-        }
-
-        const text = parser.input[start..parser.offset];
-
-        return try std.fmt.parseInt(T, text, 10);
-    }
-
-    fn boolean(parser: *Parser) !bool {
-        if (parser.startsWithConsuming("true")) return true;
-
-        if (parser.startsWithConsuming("false")) return false;
-
-        return error.ExpectedBooleanTerm;
-    }
-
     pub fn policy(parser: *Parser) !Policy {
         const kind: Policy.Kind = if (parser.startsWithConsuming("allow if"))
             .allow
@@ -462,6 +360,123 @@ pub const Parser = struct {
         return .{ .predicates = predicates, .expressions = expressions, .scopes = scps };
     }
 
+    fn variable(parser: *Parser) ![]const u8 {
+        try parser.expect("$");
+
+        const start = parser.offset;
+
+        for (parser.rest()) |c| {
+            if (ziglyph.isAlphaNum(c) or c == '_') {
+                parser.offset += 1;
+                continue;
+            }
+
+            break;
+        }
+
+        return parser.input[start..parser.offset];
+    }
+
+    // FIXME: properly implement string parsing
+    fn string(parser: *Parser) ![]const u8 {
+        try parser.expect("\"");
+
+        const start = parser.offset;
+
+        while (parser.peek()) |peeked| {
+            defer parser.offset += 1;
+            if (peeked == '"') {
+                return parser.input[start..parser.offset];
+            }
+        }
+
+        return error.ExpectedStringTerm;
+    }
+
+    fn date(parser: *Parser) !u64 {
+        const year = try parser.number(i32);
+
+        try parser.expect("-");
+
+        const month = try parser.number(u8);
+        if (month < 1 or month > 12) return error.MonthOutOfRange;
+
+        try parser.expect("-");
+
+        const day = try parser.number(u8);
+        if (!Date.isDayMonthYearValid(i32, year, month, day)) return error.InvalidDayMonthYearCombination;
+
+        try parser.expect("T");
+
+        const hour = try parser.number(u8);
+        if (hour > 23) return error.HoyrOutOfRange;
+
+        try parser.expect(":");
+
+        const minute = try parser.number(u8);
+        if (minute > 59) return error.MinuteOutOfRange;
+
+        try parser.expect(":");
+
+        const second = try parser.number(u8);
+        if (second > 59) return error.SecondOutOfRange;
+
+        try parser.expect("Z");
+
+        const d: Date = .{
+            .year = year,
+            .month = month,
+            .day = day,
+            .hour = hour,
+            .minute = minute,
+            .second = second,
+            .nanosecond = 0,
+            .utc_offset = 0,
+        };
+
+        return d.unixEpoch();
+    }
+
+    fn number(parser: *Parser, comptime T: type) !T {
+        const start = parser.offset;
+
+        for (parser.rest()) |c| {
+            if (ziglyph.isAsciiDigit(c)) {
+                parser.offset += 1;
+                continue;
+            }
+
+            break;
+        }
+
+        const text = parser.input[start..parser.offset];
+
+        return try std.fmt.parseInt(T, text, 10);
+    }
+
+    fn boolean(parser: *Parser) !bool {
+        if (parser.startsWithConsuming("true")) return true;
+
+        if (parser.startsWithConsuming("false")) return false;
+
+        return error.ExpectedBooleanTerm;
+    }
+
+    fn hex(parser: *Parser) ![]const u8 {
+        const start = parser.offset;
+
+        for (parser.rest()) |c| {
+            if (ziglyph.isHexDigit(c)) {
+                parser.offset += 1;
+                continue;
+            }
+
+            break;
+        }
+
+        return parser.input[start..parser.offset];
+    }
+
     fn expression(parser: *Parser) ParserError!Expression {
         parser.skipWhiteSpace();
         const e = try parser.expr();
@@ -544,6 +559,13 @@ pub const Parser = struct {
         return e;
     }
 
+    fn binaryOp2(parser: *Parser) ParserError!Expression.BinaryOp {
+        if (parser.startsWithConsuming("+")) return .add;
+        if (parser.startsWithConsuming("-")) return .sub;
+
+        return error.UnexpectedOp;
+    }
+
     fn expr3(parser: *Parser) ParserError!Expression {
         var e = try parser.expr4();
 
@@ -561,6 +583,12 @@ pub const Parser = struct {
         }
 
         return e;
+    }
+
+    fn binaryOp3(parser: *Parser) ParserError!Expression.BinaryOp {
+        if (parser.startsWithConsuming("^")) return .bitwise_xor;
+
+        return error.UnexpectedOp;
     }
 
     fn expr4(parser: *Parser) ParserError!Expression {
@@ -582,6 +610,15 @@ pub const Parser = struct {
         return e;
     }
 
+    fn binaryOp4(parser: *Parser) ParserError!Expression.BinaryOp {
+        if (parser.startsWith("|") and !parser.startsWith("||")) {
+            try parser.expect("|");
+            return .bitwise_or;
+        }
+
+        return error.UnexpectedOp;
+    }
+
     fn expr5(parser: *Parser) ParserError!Expression {
         var e = try parser.expr6();
 
@@ -601,6 +638,15 @@ pub const Parser = struct {
         return e;
     }
 
+    fn binaryOp5(parser: *Parser) ParserError!Expression.BinaryOp {
+        if (parser.startsWith("&") and !parser.startsWith("&&")) {
+            try parser.expect("&");
+            return .bitwise_and;
+        }
+
+        return error.UnexpectedOp;
+    }
+
     fn expr6(parser: *Parser) ParserError!Expression {
         var e = try parser.expr7();
 
@@ -618,6 +664,13 @@ pub const Parser = struct {
         }
 
         return e;
+    }
+
+    fn binaryOp6(parser: *Parser) ParserError!Expression.BinaryOp {
+        if (parser.startsWithConsuming("*")) return .mul;
+        if (parser.startsWithConsuming("/")) return .div;
+
+        return error.UnexpectedOp;
     }
 
     fn expr7(parser: *Parser) ParserError!Expression {
@@ -644,44 +697,6 @@ pub const Parser = struct {
         parser.skipWhiteSpace();
 
         return try Expression.binary(parser.allocator, op, e1, e2);
-    }
-
-    fn binaryOp2(parser: *Parser) ParserError!Expression.BinaryOp {
-        if (parser.startsWithConsuming("+")) return .add;
-        if (parser.startsWithConsuming("-")) return .sub;
-
-        return error.UnexpectedOp;
-    }
-
-    fn binaryOp3(parser: *Parser) ParserError!Expression.BinaryOp {
-        if (parser.startsWithConsuming("^")) return .bitwise_xor;
-
-        return error.UnexpectedOp;
-    }
-
-    fn binaryOp4(parser: *Parser) ParserError!Expression.BinaryOp {
-        if (parser.startsWith("|") and !parser.startsWith("||")) {
-            try parser.expect("|");
-            return .bitwise_or;
-        }
-
-        return error.UnexpectedOp;
-    }
-
-    fn binaryOp5(parser: *Parser) ParserError!Expression.BinaryOp {
-        if (parser.startsWith("&") and !parser.startsWith("&&")) {
-            try parser.expect("&");
-            return .bitwise_and;
-        }
-
-        return error.UnexpectedOp;
-    }
-
-    fn binaryOp6(parser: *Parser) ParserError!Expression.BinaryOp {
-        if (parser.startsWithConsuming("*")) return .mul;
-        if (parser.startsWithConsuming("/")) return .div;
-
-        return error.UnexpectedOp;
     }
 
     fn binaryOp7(parser: *Parser) ParserError!Expression.BinaryOp {
@@ -845,12 +860,16 @@ pub const Parser = struct {
     /// Returns true if the remaining parser input starts with str
     ///
     /// Does not consume any input.
+    ///
+    /// See also `fn startsWithConsuming`
     fn startsWith(parser: *Parser, str: []const u8) bool {
         return std.mem.startsWith(u8, parser.rest(), str);
     }
 
     /// Returns true if the remaining parse input starts with str. If
     /// it does start with that string, the parser consumes the string.
+    ///
+    /// See also `fn startsWith`
     fn startsWithConsuming(parser: *Parser, str: []const u8) bool {
         if (parser.startsWith(str)) {
             parser.offset += str.len; // Consume
@@ -864,21 +883,6 @@ pub const Parser = struct {
     fn reject(parser: *Parser, char: u8) !void {
         const peeked = parser.peek() orelse return error.ExpectedMoreInput;
         if (peeked == char) return error.DisallowedChar;
-    }
-
-    fn hex(parser: *Parser) ![]const u8 {
-        const start = parser.offset;
-
-        for (parser.rest()) |c| {
-            if (ziglyph.isHexDigit(c)) {
-                parser.offset += 1;
-                continue;
-            }
-
-            break;
-        }
-
-        return parser.input[start..parser.offset];
     }
 
     // FIXME: this should error?
