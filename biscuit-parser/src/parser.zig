@@ -199,11 +199,13 @@ pub const Parser = struct {
     }
 
     pub fn rule(parser: *Parser) !Rule {
-        const head = try parser.predicate();
+        const head = try parser.predicate(.rule);
 
         parser.skipWhiteSpace();
 
         try parser.consume("<-");
+
+        parser.skipWhiteSpace();
 
         const body = try parser.ruleBody();
 
@@ -275,7 +277,7 @@ pub const Parser = struct {
     fn variable(parser: *Parser) ![]const u8 {
         try parser.consume("$");
 
-        return try parser.name();
+        return try parser.variableName();
     }
 
     // FIXME: properly implement string parsing
@@ -822,6 +824,34 @@ pub const Parser = struct {
         return parser.input[start..parser.offset];
     }
 
+    fn variableName(parser: *Parser) ![]const u8 {
+        const start = parser.offset;
+
+        if (parser.rest().len == 0) return error.ParsingNameExpectsAtLeastOneCharacter;
+
+        const first_codepoint = try nextCodepoint(parser.rest());
+
+        if (!ziglyph.isAlphaNum(first_codepoint.codepoint)) return error.ParsingNameFirstCharacterMustBeLetter;
+
+        parser.offset += first_codepoint.len;
+
+        while (true) {
+            const next_codepoint = try nextCodepoint(parser.rest());
+
+            if (ziglyph.isAlphaNum(next_codepoint.codepoint)) {
+                parser.offset += next_codepoint.len;
+                continue;
+            } else if (parser.startsWith("_") or parser.startsWith(":")) {
+                parser.offset += 1;
+                continue;
+            }
+
+            break;
+        }
+
+        return parser.input[start..parser.offset];
+    }
+
     fn hex(parser: *Parser) ![]const u8 {
         const start = parser.offset;
 
@@ -1020,7 +1050,6 @@ test "parse predicates" {
         var parser = Parser.init(arena, input);
 
         const predicate = try parser.predicate(.fact);
-        errdefer std.debug.print("Failed on input \"{s}\"", .{input});
 
         try testing.expectEqualStrings("ビスケット", predicate.name);
         try testing.expectEqual(true, predicate.terms.items[0].bool);
@@ -1102,6 +1131,45 @@ test "parse hex" {
         var parser = Parser.init(arena, "hex:BeE");
 
         try testing.expectError(error.ExpectedEvenNumberOfHexDigis, parser.bytes());
+    }
+}
+
+test "parse rule" {
+    const testing = std.testing;
+
+    var arena_state = std.heap.ArenaAllocator.init(testing.allocator);
+    defer arena_state.deinit();
+    const arena = arena_state.allocator();
+
+    {
+        var parser = Parser.init(arena, "read($0, $1) <- operation($0), file($1)");
+        const rule = try parser.rule();
+
+        try testing.expectEqualStrings("read", rule.head.name);
+        try testing.expectEqualStrings("0", rule.head.terms.items[0].variable);
+        try testing.expectEqualStrings("1", rule.head.terms.items[1].variable);
+
+        try testing.expectEqualStrings("operation", rule.body.items[0].name);
+        try testing.expectEqualStrings("0", rule.body.items[0].terms.items[0].variable);
+
+        try testing.expectEqualStrings("file", rule.body.items[1].name);
+        try testing.expectEqualStrings("1", rule.body.items[1].terms.items[0].variable);
+    }
+
+    {
+        // Remove some spaces
+        var parser = Parser.init(arena, "read($0, $1)<-operation($0),file($1)");
+        const rule = try parser.rule();
+
+        try testing.expectEqualStrings("read", rule.head.name);
+        try testing.expectEqualStrings("0", rule.head.terms.items[0].variable);
+        try testing.expectEqualStrings("1", rule.head.terms.items[1].variable);
+
+        try testing.expectEqualStrings("operation", rule.body.items[0].name);
+        try testing.expectEqualStrings("0", rule.body.items[0].terms.items[0].variable);
+
+        try testing.expectEqualStrings("file", rule.body.items[1].name);
+        try testing.expectEqualStrings("1", rule.body.items[1].terms.items[0].variable);
     }
 }
 
