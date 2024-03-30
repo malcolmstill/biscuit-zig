@@ -828,6 +828,7 @@ pub const Parser = struct {
         return .{ .public_key = try parser.publicKey() };
     }
 
+    /// Parser a public key. Currently only supports ed25519.
     fn publicKey(parser: *Parser) !Ed25519.PublicKey {
         try parser.consume("ed25519/");
 
