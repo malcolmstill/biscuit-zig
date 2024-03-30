@@ -76,67 +76,12 @@ pub const Authorizer = struct {
         // }
     }
 
-    pub fn authorizerTrustedOrigins(authorizer: *Authorizer) !TrustedOrigins {
-        return try TrustedOrigins.fromScopes(
-            authorizer.arena,
-            authorizer.scopes.items,
-            try TrustedOrigins.defaultOrigins(authorizer.arena),
-            Origin.AUTHORIZER_ID,
-            authorizer.public_key_to_block_id,
-        );
-    }
-
-    /// Add fact from string to authorizer
-    pub fn addFact(authorizer: *Authorizer, input: []const u8) !void {
-        log.debug("addFact = {s}", .{input});
-        var parser = Parser.init(authorizer.arena, input);
-
-        const fact = try parser.fact();
-
-        const origin = try Origin.initWithId(authorizer.arena, Origin.AUTHORIZER_ID);
-
-        try authorizer.world.addFact(origin, try fact.toDatalog(authorizer.arena, &authorizer.symbols));
-    }
-
-    /// Add check from string to authorizer
-    pub fn addCheck(authorizer: *Authorizer, input: []const u8) !void {
-        log.debug("addCheck = {s}", .{input});
-        var parser = Parser.init(authorizer.arena, input);
-
-        const check = try parser.check();
-
-        try authorizer.checks.append(check);
-    }
-
-    /// Add policy from string to authorizer
-    pub fn addPolicy(authorizer: *Authorizer, input: []const u8) !void {
-        log.debug("addPolicy = {s}", .{input});
-        var parser = Parser.init(authorizer.arena, input);
-
-        const policy = try parser.policy();
-
-        try authorizer.policies.append(policy);
-    }
-
-    /// authorize
-    ///
-    /// authorize the Authorizer
-    ///
-    /// The following high-level steps take place during authorization:
-    /// 1. _biscuit_ (where it exists): load _all_ of the facts and rules
-    ///   in the biscuit. We can add all the facts and rules as this time because
-    ///   the facts and rules are scoped, i.e. the facts / rules are added to particular
-    ///   scopes within the world.
-    /// 2. Run the world to generate new facts.
-    /// 3. _authorizer_: Run the _authorizer's_ checks
-    /// 4. _biscuit_ (where it exists): run the authority block's checks
-    /// 5. _authorizer_: Run the _authorizer's_ policies
-    /// 6. _biscuit_ (where it exists): run the checks from all the non-authority blocks
+    /// Authorize token with authorizer
     pub fn authorize(authorizer: *Authorizer, errors: *std.ArrayList(AuthorizerError)) !usize {
         log.debug("Starting authorize()", .{});
         defer log.debug("Finished authorize()", .{});
 
-        try authorizer.addBiscuitFactsAndRules(errors); // 1. Add tokens facts and rules to authorizer's world
+        try authorizer.addTokenFactsAndRules(errors); // 1. Add tokens facts and rules to authorizer's world
         try authorizer.generateFacts(); // 2. Run the world to generate all facts
         try authorizer.authorizerChecks(errors); // 3. Run checks that have been added to this authorizer
         try authorizer.authorityChecks(errors); // 4. Run checks in the biscuit's authority block
@@ -152,8 +97,10 @@ pub const Authorizer = struct {
 
     /// Step 1 in authorize()
     ///
-    /// This should only be called from authorize()
-    fn addBiscuitFactsAndRules(authorizer: *Authorizer, errors: *std.ArrayList(AuthorizerError)) !void {
+    /// Adds all the facts and rules from the token to the authorizer's world.
+    ///
+    /// Note: this should only be called from authorize()
+    fn addTokenFactsAndRules(authorizer: *Authorizer, errors: *std.ArrayList(AuthorizerError)) !void {
         // Load facts and rules from authority block into world. Our block's facts
         // will have a particular symbol table that we map into the symbol table
         // of the world.
@@ -248,9 +195,14 @@ pub const Authorizer = struct {
         try authorizer.world.run(&authorizer.symbols);
     }
 
+    /// Step 3 in authorize()
+    ///
+    /// Runs the authorizer's checks
+    ///
+    /// Note: should only be called from authorize()
     fn authorizerChecks(authorizer: *Authorizer, errors: *std.ArrayList(AuthorizerError)) !void {
-        log.debug("AUTHORIZER CHECKS", .{});
-        defer log.debug("END AUTHORIZER CHECKS", .{});
+        log.debug("Start authorizerChecks()", .{});
+        defer log.debug("End authorizerChecks()", .{});
 
         for (authorizer.checks.items) |c| {
             log.debug("authorizer check = {any}", .{c});
@@ -279,6 +231,8 @@ pub const Authorizer = struct {
     /// Step 4 in authorize()
     ///
     /// Run checks from token's authority block
+    ///
+    /// Note: should only be called from authorizer()
     fn authorityChecks(authorizer: *Authorizer, errors: *std.ArrayList(AuthorizerError)) !void {
         const biscuit = authorizer.biscuit orelse return;
 
@@ -317,6 +271,8 @@ pub const Authorizer = struct {
     /// Step 5 in authorize()
     ///
     /// Run authorizer's policies.
+    ///
+    /// Note: should only be called from authorizer()
     fn authorizerPolicies(authorizer: *Authorizer, errors: *std.ArrayList(AuthorizerError)) !?usize {
         for (authorizer.policies.items) |policy| {
             log.debug("testing policy {any}", .{policy});
@@ -355,6 +311,8 @@ pub const Authorizer = struct {
     /// Step 6 in authorize()
     ///
     /// Run checks in all other blocks.
+    ///
+    /// Note: should only be called from authorizer()
     fn blockChecks(authorizer: *Authorizer, errors: *std.ArrayList(AuthorizerError)) !void {
         const biscuit = authorizer.biscuit orelse return;
 
@@ -392,6 +350,48 @@ pub const Authorizer = struct {
                 }
             }
         }
+    }
+
+    pub fn authorizerTrustedOrigins(authorizer: *Authorizer) !TrustedOrigins {
+        return try TrustedOrigins.fromScopes(
+            authorizer.arena,
+            authorizer.scopes.items,
+            try TrustedOrigins.defaultOrigins(authorizer.arena),
+            Origin.AUTHORIZER_ID,
+            authorizer.public_key_to_block_id,
+        );
+    }
+
+    /// Add fact from string to authorizer
+    pub fn addFact(authorizer: *Authorizer, input: []const u8) !void {
+        log.debug("addFact = {s}", .{input});
+        var parser = Parser.init(authorizer.arena, input);
+
+        const fact = try parser.fact();
+
+        const origin = try Origin.initWithId(authorizer.arena, Origin.AUTHORIZER_ID);
+
+        try authorizer.world.addFact(origin, try fact.toDatalog(authorizer.arena, &authorizer.symbols));
+    }
+
+    /// Add check from string to authorizer
+    pub fn addCheck(authorizer: *Authorizer, input: []const u8) !void {
+        log.debug("addCheck = {s}", .{input});
+        var parser = Parser.init(authorizer.arena, input);
+
+        const check = try parser.check();
+
+        try authorizer.checks.append(check);
+    }
+
+    /// Add policy from string to authorizer
+    pub fn addPolicy(authorizer: *Authorizer, input: []const u8) !void {
+        log.debug("addPolicy = {s}", .{input});
+        var parser = Parser.init(authorizer.arena, input);
+
+        const policy = try parser.policy();
+
+        try authorizer.policies.append(policy);
     }
 };
 
