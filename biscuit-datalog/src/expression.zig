@@ -5,16 +5,18 @@ const Regex = @import("regex").Regex;
 const Term = @import("term.zig").Term;
 const SymbolTable = @import("symbol_table.zig").SymbolTable;
 
+const log = std.log.scoped(.expression);
+
 pub const Expression = struct {
     ops: std.ArrayList(Op),
 
-    pub fn fromSchema(allocator: std.mem.Allocator, schema_expression: schema.ExpressionV2) !Expression {
-        var ops = std.ArrayList(Op).init(allocator);
+    pub fn fromSchema(arena: std.mem.Allocator, schema_expression: schema.ExpressionV2) !Expression {
+        var ops = try std.ArrayList(Op).initCapacity(arena, schema_expression.ops.items.len);
 
         for (schema_expression.ops.items) |schema_op| {
             const schema_op_content = schema_op.Content orelse return error.ExpectedOp;
             const op: Op = switch (schema_op_content) {
-                .value => |term| .{ .value = try Term.fromSchema(allocator, term) },
+                .value => |term| .{ .value = try Term.fromSchema(arena, term) },
                 .unary => |unary_op| .{
                     .unary = switch (unary_op.kind) {
                         .Negate => .negate,
@@ -57,8 +59,8 @@ pub const Expression = struct {
         return .{ .ops = ops };
     }
 
-    pub fn deinit(expression: *Expression) void {
-        expression.ops.deinit();
+    pub fn deinit(_: *Expression) void {
+        // expression.ops.deinit();
     }
 
     pub fn evaluate(expr: Expression, allocator: mem.Allocator, values: std.AutoHashMap(u32, Term), symbols: *SymbolTable) !Term {
@@ -100,7 +102,6 @@ pub const Expression = struct {
     }
 
     pub fn remap(expression: Expression, old_symbols: *const SymbolTable, new_symbols: *SymbolTable) !Expression {
-        // std.debug.print("Converting expression\n", .{});
         const ops = try expression.ops.clone();
 
         for (ops.items, 0..) |op, i| {

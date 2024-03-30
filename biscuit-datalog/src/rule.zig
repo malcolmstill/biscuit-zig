@@ -15,6 +15,8 @@ const Scope = @import("scope.zig").Scope;
 const Expression = @import("expression.zig").Expression;
 const TrustedOrigins = @import("trusted_origins.zig").TrustedOrigins;
 
+const log = std.log.scoped(.rule);
+
 pub const Rule = struct {
     head: Predicate,
     body: std.ArrayList(Predicate),
@@ -44,20 +46,20 @@ pub const Rule = struct {
         return .{ .head = head, .body = body, .expressions = expressions, .scopes = scopes };
     }
 
-    pub fn deinit(rule: *Rule) void {
-        rule.head.deinit();
+    pub fn deinit(_: *Rule) void {
+        // rule.head.deinit();
 
-        for (rule.body.items) |*predicate| {
-            predicate.deinit();
-        }
+        // for (rule.body.items) |*predicate| {
+        //     predicate.deinit();
+        // }
 
-        for (rule.expressions.items) |*expression| {
-            expression.deinit();
-        }
+        // for (rule.expressions.items) |*expression| {
+        //     expression.deinit();
+        // }
 
-        rule.body.deinit();
-        rule.expressions.deinit();
-        rule.scopes.deinit();
+        // rule.body.deinit();
+        // rule.expressions.deinit();
+        // rule.scopes.deinit();
     }
 
     /// ### Generate new facts from this rule and the existing facts
@@ -115,28 +117,25 @@ pub const Rule = struct {
     /// ```
     ///
     /// ...and we add it to the set of facts (the set will take care of deduplication)
-    pub fn apply(rule: *const Rule, allocator: mem.Allocator, origin_id: u64, facts: *const FactSet, new_facts: *FactSet, symbols: *SymbolTable, trusted_origins: TrustedOrigins) !void {
-        var arena = std.heap.ArenaAllocator.init(allocator);
-        defer arena.deinit();
-
-        std.debug.print("\napplying rule (from origin {}):\n  {any}\n", .{ origin_id, rule });
-        const matched_variables = try MatchedVariables.init(arena.allocator(), rule);
+    pub fn apply(rule: *const Rule, arena: mem.Allocator, origin_id: u64, facts: *const FactSet, new_facts: *FactSet, symbols: *SymbolTable, trusted_origins: TrustedOrigins) !void {
+        log.debug("\napplying rule {any} (from block {})", .{ rule, origin_id });
+        const matched_variables = try MatchedVariables.init(arena, rule);
 
         // TODO: if body is empty stuff
 
-        var it = Combinator.init(0, allocator, matched_variables, rule.body.items, rule.expressions.items, facts, symbols, trusted_origins);
+        var it = Combinator.init(0, arena, matched_variables, rule.body.items, rule.expressions.items, facts, symbols, trusted_origins);
         defer it.deinit();
 
         blk: while (try it.next()) |*origin_bindings| {
             const origin: Origin = origin_bindings[0];
             const bindings: MatchedVariables = origin_bindings[1];
 
-            if (!try bindings.evaluateExpressions(allocator, rule.expressions.items, symbols)) continue;
+            if (!try bindings.evaluateExpressions(arena, rule.expressions.items, symbols)) continue;
 
             // TODO: Describe why clonedWithAllocator? More generally, describe in comment the overall
             // lifetimes / memory allocation approach during evaluation.
-            var predicate = try rule.head.cloneWithAllocator(allocator);
-            defer predicate.deinit();
+            var predicate = try rule.head.clone();
+            // defer predicate.deinit();
 
             // Loop over terms in head predicate. Update all _variable_ terms with their value
             // from the binding.
@@ -153,18 +152,18 @@ pub const Rule = struct {
             var new_origin = try origin.clone();
             try new_origin.insert(origin_id);
 
-            std.debug.print("\nadding new fact:\n  {any} with origin {any}\n", .{ fact, new_origin });
+            log.debug("apply: adding new fact {any} with origin {any}", .{ fact, new_origin });
             // Skip adding fact if we already have generated it. Because the
             // Set will clobber duplicate facts we'll lose a reference when
             // inserting a duplicate and then when we loop over the set to
             // deinit the facts we'll miss some. This ensures that the facts
             // can be freed purely from the Set.
-            if (new_facts.contains(new_origin, fact)) {
-                new_origin.deinit();
-                continue;
-            }
+            // if (new_facts.contains(new_origin, fact)) {
+            //     // new_origin.deinit();
+            //     continue;
+            // }
 
-            try new_facts.add(new_origin, try fact.clone());
+            try new_facts.add(new_origin, fact);
         }
     }
 
@@ -173,17 +172,17 @@ pub const Rule = struct {
     ///
     /// Note: whilst the combinator may return multiple valid matches, `findMatch` only requires a single match
     /// so stopping on the first `it.next()` that returns not-null is enough.
-    pub fn findMatch(rule: *Rule, allocator: mem.Allocator, facts: *const FactSet, symbols: *SymbolTable, trusted_origins: TrustedOrigins) !bool {
-        std.debug.print("\nrule.findMatch on {any} ({any})\n", .{ rule, trusted_origins });
-        var arena = std.heap.ArenaAllocator.init(allocator);
-        defer arena.deinit();
+    pub fn findMatch(rule: *Rule, arena: mem.Allocator, facts: *const FactSet, symbols: *SymbolTable, trusted_origins: TrustedOrigins) !bool {
+        log.debug("findMatch({any}, {any})", .{ rule, trusted_origins });
+        // var arena = std.heap.ArenaAllocator.init(allocator);
+        // defer arena.deinit();
 
-        const arena_allocator = arena.allocator();
+        // const arena_allocator = arena.allocator();
 
         if (rule.body.items.len == 0) {
-            const variables = std.AutoHashMap(u32, Term).init(allocator);
+            const variables = std.AutoHashMap(u32, Term).init(arena);
             for (rule.expressions.items) |expr| {
-                const result = try expr.evaluate(arena_allocator, variables, symbols);
+                const result = try expr.evaluate(arena, variables, symbols);
 
                 switch (result) {
                     .bool => |b| if (b) continue else return false,
@@ -193,32 +192,32 @@ pub const Rule = struct {
 
             return true;
         } else {
-            const matched_variables = try MatchedVariables.init(arena_allocator, rule);
+            const matched_variables = try MatchedVariables.init(arena, rule);
 
-            var it = Combinator.init(0, allocator, matched_variables, rule.body.items, rule.expressions.items, facts, symbols, trusted_origins);
+            var it = Combinator.init(0, arena, matched_variables, rule.body.items, rule.expressions.items, facts, symbols, trusted_origins);
             defer it.deinit();
 
             while (try it.next()) |*origin_bindings| {
                 const bindings: MatchedVariables = origin_bindings[1];
 
-                if (try bindings.evaluateExpressions(arena_allocator, rule.expressions.items, symbols)) return true;
+                if (try bindings.evaluateExpressions(arena, rule.expressions.items, symbols)) return true;
             }
 
             return false;
         }
     }
 
-    pub fn checkMatchAll(rule: *Rule, allocator: mem.Allocator, facts: *const FactSet, symbols: *SymbolTable, trusted_origins: TrustedOrigins) !bool {
-        std.debug.print("\nrule.checkMatchAll on {any} ({any})\n", .{ rule, trusted_origins });
-        var arena = std.heap.ArenaAllocator.init(allocator);
-        defer arena.deinit();
+    pub fn checkMatchAll(rule: *Rule, arena: mem.Allocator, facts: *const FactSet, symbols: *SymbolTable, trusted_origins: TrustedOrigins) !bool {
+        log.debug("checkMatchAll({any}, {any})", .{ rule, trusted_origins });
+        // var arena = std.heap.ArenaAllocator.init(allocator);
+        // defer arena.deinit();
 
-        const arena_allocator = arena.allocator();
+        // const arena_allocator = arena.allocator();
 
         if (rule.body.items.len == 0) {
-            const variables = std.AutoHashMap(u32, Term).init(allocator);
+            const variables = std.AutoHashMap(u32, Term).init(arena);
             for (rule.expressions.items) |expr| {
-                const result = try expr.evaluate(arena_allocator, variables, symbols);
+                const result = try expr.evaluate(arena, variables, symbols);
 
                 switch (result) {
                     .bool => |b| if (b) continue else return false,
@@ -228,15 +227,15 @@ pub const Rule = struct {
 
             return true;
         } else {
-            const matched_variables = try MatchedVariables.init(arena_allocator, rule);
+            const matched_variables = try MatchedVariables.init(arena, rule);
 
-            var it = Combinator.init(0, allocator, matched_variables, rule.body.items, rule.expressions.items, facts, symbols, trusted_origins);
+            var it = Combinator.init(0, arena, matched_variables, rule.body.items, rule.expressions.items, facts, symbols, trusted_origins);
             defer it.deinit();
 
             while (try it.next()) |*origin_bindings| {
                 const bindings: MatchedVariables = origin_bindings[1];
 
-                if (try bindings.evaluateExpressions(arena_allocator, rule.expressions.items, symbols)) continue;
+                if (try bindings.evaluateExpressions(arena, rule.expressions.items, symbols)) continue;
 
                 return false;
             }

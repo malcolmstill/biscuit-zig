@@ -7,8 +7,8 @@ pub const Fact = struct {
     predicate: Predicate,
     variables: ?std.StringHashMap(?Term),
 
-    pub fn deinit(fact: Fact) void {
-        fact.predicate.deinit();
+    pub fn deinit(_: Fact) void {
+        // fact.predicate.deinit();
     }
 
     /// convert to datalog fact

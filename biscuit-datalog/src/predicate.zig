@@ -26,11 +26,11 @@ pub const Predicate = struct {
         return writer.print(")", .{});
     }
 
-    pub fn deinit(predicate: *Predicate) void {
-        for (predicate.terms.items) |*term| {
-            term.deinit();
-        }
-        predicate.terms.deinit();
+    pub fn deinit(_: *Predicate) void {
+        // for (predicate.terms.items) |*term| {
+        //     term.deinit();
+        // }
+        // predicate.terms.deinit();
     }
 
     pub fn eql(predicate: Predicate, other_predicate: Predicate) bool {
@@ -120,6 +120,8 @@ test {
     const testing = std.testing;
     const allocator = testing.allocator;
 
+    const test_log = std.log.scoped(.test_predicate);
+
     var terms_1 = std.ArrayList(Term).init(allocator);
     defer terms_1.deinit();
     try terms_1.insertSlice(0, &.{ .{ .string = 10 }, .{ .integer = 20 } });
@@ -151,5 +153,5 @@ test {
     try testing.expect(!p1.match(p4));
     try testing.expect(p1.match(p5));
 
-    std.debug.print("predicate = {any}\n", .{p1});
+    test_log.debug("predicate = {any}\n", .{p1});
 }

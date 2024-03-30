@@ -14,8 +14,8 @@ pub const TrustedOrigins = struct {
         return .{ .ids = InnerSet.init(allocator) };
     }
 
-    pub fn deinit(trusted_origins: *TrustedOrigins) void {
-        trusted_origins.ids.deinit();
+    pub fn deinit(_: *TrustedOrigins) void {
+        // trusted_origins.ids.deinit();
     }
 
     pub fn clone(trusted_origins: *const TrustedOrigins) !TrustedOrigins {

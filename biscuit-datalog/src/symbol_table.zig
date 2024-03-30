@@ -3,6 +3,8 @@ const mem = std.mem;
 
 const Ed25519 = std.crypto.sign.Ed25519;
 
+const log = std.log.scoped(.symbol_table);
+
 pub const SymbolTable = struct {
     name: []const u8,
     allocator: mem.Allocator,
@@ -41,7 +43,7 @@ pub const SymbolTable = struct {
 
         const index = symbol_table.symbols.items.len - 1 + NON_DEFAULT_SYMBOLS_OFFSET;
 
-        // std.debug.print("{s}: Inserting \"{s}\" at {}\n", .{ symbol_table.name, symbol, index });
+        log.debug("inserting \"{s}\" at {} [{s}]", .{ symbol, index, symbol_table.name });
 
         return index;
     }
@@ -77,17 +79,13 @@ pub const SymbolTable = struct {
 
     pub fn getString(symbol_table: *const SymbolTable, sym_index: u64) ![]const u8 {
         if (indexToDefault(sym_index)) |sym| {
-            // std.debug.print("Found \"{s}\" at {} (default)\n", .{ sym, sym_index });
             return sym;
         }
 
         if (sym_index >= NON_DEFAULT_SYMBOLS_OFFSET and sym_index < NON_DEFAULT_SYMBOLS_OFFSET + symbol_table.symbols.items.len) {
             const sym = symbol_table.symbols.items[sym_index - NON_DEFAULT_SYMBOLS_OFFSET];
-            // std.debug.print("Found \"{s}\" at {}\n", .{ sym, sym_index });
             return sym;
         }
-
-        // std.debug.print("Existing sym index {} not found\n", .{sym_index});
 
         return error.SymbolNotFound;
     }

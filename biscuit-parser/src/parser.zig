@@ -12,6 +12,8 @@ const Date = @import("biscuit-builder").Date;
 const Policy = @import("biscuit-builder").Policy;
 const Ed25519 = std.crypto.sign.Ed25519;
 
+const log = std.log.scoped(.parser);
+
 pub const Parser = struct {
     input: []const u8,
     offset: usize = 0,
@@ -27,8 +29,6 @@ pub const Parser = struct {
 
     pub fn factPredicate(parser: *Parser) !Predicate {
         const name = parser.readName();
-
-        std.debug.print("name = {s}\n", .{name});
 
         parser.skipWhiteSpace();
 
@@ -421,7 +421,6 @@ pub const Parser = struct {
 
         while (true) {
             parser.skipWhiteSpace();
-            std.debug.print("{s}: \"{s}\"\n", .{ @src().fn_name, parser.rest() });
 
             // Try parsing a predicate
             predicate_blk: {
@@ -482,20 +481,14 @@ pub const Parser = struct {
     }
 
     fn expression(parser: *Parser) ParserError!Expression {
-        std.debug.print("Attempting to parser {s}\n", .{parser.rest()});
         parser.skipWhiteSpace();
         const e = try parser.expr();
-
-        std.debug.print("parsed expression = {any}\n", .{e});
 
         return e;
     }
 
     fn expr(parser: *Parser) ParserError!Expression {
-        std.debug.print("[{s}]\n", .{@src().fn_name});
         var e = try parser.expr1();
-
-        std.debug.print("[{s}] e = {any}\n", .{ @src().fn_name, e });
 
         while (true) {
             parser.skipWhiteSpace();
@@ -506,7 +499,6 @@ pub const Parser = struct {
             parser.skipWhiteSpace();
 
             const e2 = try parser.expr1();
-            std.debug.print("[{s}] e2 = {any}\n", .{ @src().fn_name, e2 });
 
             e = try Expression.binary(parser.allocator, op, e, e2);
         }
@@ -515,10 +507,7 @@ pub const Parser = struct {
     }
 
     fn expr1(parser: *Parser) ParserError!Expression {
-        std.debug.print("[{s}]\n", .{@src().fn_name});
         var e = try parser.expr2();
-
-        std.debug.print("[{s}] e = {any}\n", .{ @src().fn_name, e });
 
         while (true) {
             parser.skipWhiteSpace();
@@ -529,7 +518,6 @@ pub const Parser = struct {
             parser.skipWhiteSpace();
 
             const e2 = try parser.expr2();
-            std.debug.print("[{s}] e2 = {any}\n", .{ @src().fn_name, e2 });
 
             e = try Expression.binary(parser.allocator, op, e, e2);
         }
@@ -538,10 +526,7 @@ pub const Parser = struct {
     }
 
     fn expr2(parser: *Parser) ParserError!Expression {
-        std.debug.print("[{s}]\n", .{@src().fn_name});
         var e = try parser.expr3();
-
-        std.debug.print("[{s}] e = {any}\n", .{ @src().fn_name, e });
 
         while (true) {
             parser.skipWhiteSpace();
@@ -552,7 +537,6 @@ pub const Parser = struct {
             parser.skipWhiteSpace();
 
             const e2 = try parser.expr3();
-            std.debug.print("[{s}] e2 = {any}\n", .{ @src().fn_name, e2 });
 
             e = try Expression.binary(parser.allocator, op, e, e2);
         }
@@ -561,10 +545,7 @@ pub const Parser = struct {
     }
 
     fn expr3(parser: *Parser) ParserError!Expression {
-        std.debug.print("[{s}]\n", .{@src().fn_name});
         var e = try parser.expr4();
-
-        std.debug.print("[{s}] e = {any}\n", .{ @src().fn_name, e });
 
         while (true) {
             parser.skipWhiteSpace();
@@ -575,7 +556,6 @@ pub const Parser = struct {
             parser.skipWhiteSpace();
 
             const e2 = try parser.expr4();
-            std.debug.print("[{s}] e2 = {any}\n", .{ @src().fn_name, e2 });
 
             e = try Expression.binary(parser.allocator, op, e, e2);
         }
@@ -584,10 +564,7 @@ pub const Parser = struct {
     }
 
     fn expr4(parser: *Parser) ParserError!Expression {
-        std.debug.print("[{s}]\n", .{@src().fn_name});
         var e = try parser.expr5();
-
-        std.debug.print("[{s}] e = {any}\n", .{ @src().fn_name, e });
 
         while (true) {
             parser.skipWhiteSpace();
@@ -598,7 +575,6 @@ pub const Parser = struct {
             parser.skipWhiteSpace();
 
             const e2 = try parser.expr5();
-            std.debug.print("[{s}] e2 = {any}\n", .{ @src().fn_name, e2 });
 
             e = try Expression.binary(parser.allocator, op, e, e2);
         }
@@ -607,10 +583,7 @@ pub const Parser = struct {
     }
 
     fn expr5(parser: *Parser) ParserError!Expression {
-        std.debug.print("[{s}]\n", .{@src().fn_name});
         var e = try parser.expr6();
-
-        std.debug.print("[{s}] e = {any}\n", .{ @src().fn_name, e });
 
         while (true) {
             parser.skipWhiteSpace();
@@ -622,8 +595,6 @@ pub const Parser = struct {
 
             const e2 = try parser.expr6();
 
-            std.debug.print("[{s}] e2 = {any}\n", .{ @src().fn_name, e2 });
-
             e = try Expression.binary(parser.allocator, op, e, e2);
         }
 
@@ -631,10 +602,7 @@ pub const Parser = struct {
     }
 
     fn expr6(parser: *Parser) ParserError!Expression {
-        std.debug.print("[{s}]\n", .{@src().fn_name});
         var e = try parser.expr7();
-
-        std.debug.print("[{s}] e = {any}\n", .{ @src().fn_name, e });
 
         while (true) {
             parser.skipWhiteSpace();
@@ -645,7 +613,6 @@ pub const Parser = struct {
             parser.skipWhiteSpace();
 
             const e2 = try parser.expr7();
-            std.debug.print("[{s}] e2 = {any}\n", .{ @src().fn_name, e2 });
 
             e = try Expression.binary(parser.allocator, op, e, e2);
         }
@@ -654,10 +621,7 @@ pub const Parser = struct {
     }
 
     fn expr7(parser: *Parser) ParserError!Expression {
-        std.debug.print("[{s}]\n", .{@src().fn_name});
         const e1 = try parser.exprTerm();
-
-        std.debug.print("[{s}] e1 = {any}\n", .{ @src().fn_name, e1 });
 
         parser.skipWhiteSpace();
 
@@ -667,22 +631,14 @@ pub const Parser = struct {
         const op = try parser.binaryOp7();
         parser.skipWhiteSpace();
 
-        std.debug.print("[{s}] op = {any}, rest = \"{s}\"\n", .{ @src().fn_name, op, parser.rest() });
-
-        // if (!parser.startsWith("(")) return error.MissingLeftParen;
         try parser.expect('(');
 
         parser.skipWhiteSpace();
 
-        std.debug.print("here\n", .{});
-
         const e2 = try parser.expr();
-
-        std.debug.print("[{s}] e2 = {any}\n", .{ @src().fn_name, e2 });
 
         parser.skipWhiteSpace();
 
-        // if (!parser.startsWith(")")) return error.MissingRightParen;
         try parser.expect(')');
 
         parser.skipWhiteSpace();
@@ -942,8 +898,6 @@ pub const Parser = struct {
 
         const h = try parser.hex();
 
-        std.debug.print("publickey = {s}\n", .{h});
-
         var out_buf: [Ed25519.PublicKey.encoded_length]u8 = undefined;
 
         _ = try std.fmt.hexToBytes(out_buf[0..], h);
@@ -1108,6 +1062,4 @@ test "parse check with expression" {
 
     const r = try parser.check();
     defer r.deinit();
-
-    std.debug.print("{any}\n", .{r});
 }

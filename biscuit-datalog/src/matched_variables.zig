@@ -49,8 +49,8 @@ pub const MatchedVariables = struct {
         return .{ .variables = variables };
     }
 
-    pub fn deinit(matched_variables: *MatchedVariables) void {
-        matched_variables.variables.deinit();
+    pub fn deinit(_: *MatchedVariables) void {
+        // matched_variables.variables.deinit();
     }
 
     pub fn clone(matched_variables: *const MatchedVariables) !MatchedVariables {

@@ -15,15 +15,15 @@ pub const RuleSet = struct {
         };
     }
 
-    pub fn deinit(rule_set: *RuleSet) void {
-        var it = rule_set.rules.iterator();
+    pub fn deinit(_: *RuleSet) void {
+        // var it = rule_set.rules.iterator();
 
-        while (it.next()) |entry| {
-            entry.key_ptr.deinit();
-            entry.value_ptr.deinit();
-        }
+        // while (it.next()) |entry| {
+        //     entry.key_ptr.deinit();
+        //     entry.value_ptr.deinit();
+        // }
 
-        rule_set.rules.deinit();
+        // rule_set.rules.deinit();
     }
 
     pub fn add(rule_set: *RuleSet, origin: u64, scope: TrustedOrigins, rule: Rule) !void {
@@ -41,6 +41,8 @@ pub const RuleSet = struct {
 test "RuleSet" {
     const testing = std.testing;
 
+    const test_log = std.log.scoped(.test_rule_set);
+
     var rs = RuleSet.init(testing.allocator);
     defer rs.deinit();
 
@@ -48,5 +50,5 @@ test "RuleSet" {
     const rule: Rule = undefined;
 
     try rs.add(0, default_origins, rule);
-    std.debug.print("rs = {any}\n", .{rs});
+    test_log.debug("rs = {any}", .{rs});
 }

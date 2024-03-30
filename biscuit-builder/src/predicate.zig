@@ -6,12 +6,12 @@ pub const Predicate = struct {
     name: []const u8,
     terms: std.ArrayList(Term),
 
-    pub fn deinit(predicate: Predicate) void {
-        for (predicate.terms.items) |term| {
-            term.deinit();
-        }
+    pub fn deinit(_: Predicate) void {
+        // for (predicate.terms.items) |term| {
+        //     term.deinit();
+        // }
 
-        predicate.terms.deinit();
+        // predicate.terms.deinit();
     }
 
     /// convert to datalog predicate

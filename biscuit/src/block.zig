@@ -10,6 +10,8 @@ const Check = @import("biscuit-datalog").check.Check;
 const Scope = @import("biscuit-datalog").Scope;
 const SymbolTable = @import("biscuit-datalog").symbol_table.SymbolTable;
 
+const log = std.log.scoped(.block);
+
 pub const Block = struct {
     version: u32,
     context: []const u8,
@@ -49,7 +51,7 @@ pub const Block = struct {
     /// Given a blocks contents as bytes, derserialize into runtime block
     pub fn fromBytes(allocator: std.mem.Allocator, signed_block: SignedBlock, token_symbols: *SymbolTable) !Block {
         const data = signed_block.block;
-        std.debug.print("Block.fromBytes\n", .{});
+
         const decoded_block = try schema.decodeBlock(allocator, data);
         defer decoded_block.deinit();
 

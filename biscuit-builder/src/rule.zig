@@ -12,20 +12,20 @@ pub const Rule = struct {
     variables: ?std.StringHashMap(?Term),
     scopes: std.ArrayList(Scope),
 
-    pub fn deinit(rule: Rule) void {
-        rule.head.deinit();
+    pub fn deinit(_: Rule) void {
+        // rule.head.deinit();
 
-        for (rule.body.items) |predicate| {
-            predicate.deinit();
-        }
+        // for (rule.body.items) |predicate| {
+        //     predicate.deinit();
+        // }
 
-        for (rule.expressions.items) |*expression| {
-            expression.deinit();
-        }
+        // for (rule.expressions.items) |*expression| {
+        //     expression.deinit();
+        // }
 
-        rule.body.deinit();
-        rule.expressions.deinit();
-        rule.scopes.deinit();
+        // rule.body.deinit();
+        // rule.expressions.deinit();
+        // rule.scopes.deinit();
     }
 
     /// convert to datalog predicate

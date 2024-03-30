@@ -17,8 +17,8 @@ pub const Fact = struct {
         return .{ .predicate = predicate };
     }
 
-    pub fn deinit(fact: *Fact) void {
-        fact.predicate.deinit();
+    pub fn deinit(_: *Fact) void {
+        // fact.predicate.deinit();
     }
 
     /// Convert fact to new symbol space

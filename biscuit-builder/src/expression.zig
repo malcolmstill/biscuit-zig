@@ -113,22 +113,22 @@ pub const Expression = union(ExpressionType) {
         }
     }
 
-    pub fn deinit(expression: *Expression) void {
-        switch (expression.*) {
-            .value => |v| v.deinit(),
-            .unary => |*u| {
-                u.expression.deinit();
+    pub fn deinit(_: *Expression) void {
+        // switch (expression.*) {
+        //     .value => |v| v.deinit(),
+        //     .unary => |*u| {
+        //         u.expression.deinit();
 
-                u.allocator.destroy(u.expression);
-            },
-            .binary => |*b| {
-                b.left.deinit();
-                b.right.deinit();
+        //         u.allocator.destroy(u.expression);
+        //     },
+        //     .binary => |*b| {
+        //         b.left.deinit();
+        //         b.right.deinit();
 
-                b.allocator.destroy(b.left);
-                b.allocator.destroy(b.right);
-            },
-        }
+        //         b.allocator.destroy(b.left);
+        //         b.allocator.destroy(b.right);
+        //     },
+        // }
     }
 
     pub fn value(term: Term) !Expression {

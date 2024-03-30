@@ -8,12 +8,12 @@ pub const Check = struct {
     kind: datalog.Check.Kind,
     queries: std.ArrayList(Rule),
 
-    pub fn deinit(check: Check) void {
-        for (check.queries.items) |query| {
-            query.deinit();
-        }
+    pub fn deinit(_: Check) void {
+        // for (check.queries.items) |query| {
+        //     query.deinit();
+        // }
 
-        check.queries.deinit();
+        // check.queries.deinit();
     }
 
     pub fn toDatalog(check: Check, allocator: std.mem.Allocator, symbols: *datalog.SymbolTable) !datalog.Check {

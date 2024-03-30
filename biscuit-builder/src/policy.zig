@@ -11,12 +11,12 @@ pub const Policy = struct {
         deny,
     };
 
-    pub fn deinit(policy: Policy) void {
-        for (policy.queries.items) |query| {
-            query.deinit();
-        }
+    pub fn deinit(_: Policy) void {
+        // for (policy.queries.items) |query| {
+        //     query.deinit();
+        // }
 
-        policy.queries.deinit();
+        // policy.queries.deinit();
     }
 
     // pub fn toDatalog(policy: Policy, allocator: std.mem.Allocator, symbols: *datalog.SymbolTable) !Policy {
