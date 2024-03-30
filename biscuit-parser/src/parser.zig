@@ -939,6 +939,15 @@ test "parse predicates" {
     }
 
     {
+        // Names can contain : and _
+        var parser = Parser.init(arena, "read:write_admin(true)");
+        const predicate = try parser.predicate(.fact);
+
+        try testing.expectEqualStrings("read:write_admin", predicate.name);
+        try testing.expectEqual(true, predicate.terms.items[0].bool);
+    }
+
+    {
         var parser = Parser.init(arena, "read(true, false)");
         const predicate = try parser.predicate(.fact);
 
@@ -1007,13 +1016,13 @@ test "parse predicates" {
 
     {
         // Names can be UTF-8
-        const input = "こんにちは世界(true)";
+        const input = "ビスケット(true)";
         var parser = Parser.init(arena, input);
 
         const predicate = try parser.predicate(.fact);
         errdefer std.debug.print("Failed on input \"{s}\"", .{input});
 
-        try testing.expectEqualStrings("こんにちは世界", predicate.name);
+        try testing.expectEqualStrings("ビスケット", predicate.name);
         try testing.expectEqual(true, predicate.terms.items[0].bool);
     }
 }
