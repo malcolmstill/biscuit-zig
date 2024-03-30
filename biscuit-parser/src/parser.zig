@@ -926,7 +926,7 @@ test "parse predicates" {
     // }
 }
 
-test "parse terms" {
+test "parse numbers" {
     const testing = std.testing;
 
     var arena_state = std.heap.ArenaAllocator.init(testing.allocator);
@@ -941,10 +941,23 @@ test "parse terms" {
     }
 
     {
+        var parser = Parser.init(arena, "12345");
+        const integer = try parser.number(i64);
+
+        try testing.expectEqual(12345, integer);
+    }
+
+    {
         var parser = Parser.init(arena, "-1");
         const integer = try parser.number(i64);
 
         try testing.expectEqual(-1, integer);
+    }
+
+    {
+        var parser = Parser.init(arena, "-");
+
+        try testing.expectError(error.InvalidCharacter, parser.number(i64));
     }
 }
 
