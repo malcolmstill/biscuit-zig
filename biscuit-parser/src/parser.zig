@@ -146,18 +146,23 @@ pub const Parser = struct {
         else
             return error.UnexpectedPolicyKind;
 
+        try parser.requiredWhiteSpace();
+
         const queries = try parser.checkBody();
 
         return .{ .kind = kind, .queries = queries };
     }
 
     pub fn check(parser: *Parser) !Check {
+        // Note the space after
         const kind: Check.Kind = if (parser.startsWithConsuming("check if"))
             .one
         else if (parser.startsWithConsuming("check all"))
             .all
         else
             return error.UnexpectedCheckKind;
+
+        try parser.requiredWhiteSpace();
 
         const queries = try parser.checkBody();
 
@@ -183,6 +188,8 @@ pub const Parser = struct {
             if (!parser.startsWith("or")) break;
 
             try parser.consume("or");
+
+            parser.skipWhiteSpace();
 
             const body = try parser.ruleBody();
 
@@ -218,47 +225,33 @@ pub const Parser = struct {
         };
     }
 
-    pub fn ruleBody(parser: *Parser) !struct { predicates: std.ArrayList(Predicate), expressions: std.ArrayList(Expression), scopes: std.ArrayList(Scope) } {
+    fn ruleBody(parser: *Parser) !struct { predicates: std.ArrayList(Predicate), expressions: std.ArrayList(Expression), scopes: std.ArrayList(Scope) } {
         var predicates = std.ArrayList(Predicate).init(parser.allocator);
         var expressions = std.ArrayList(Expression).init(parser.allocator);
         var scps = std.ArrayList(Scope).init(parser.allocator);
 
+        const required_rule_body = try parser.ruleBodyElement();
+
+        switch (required_rule_body) {
+            .predicate => |p| try predicates.append(p),
+            .expression => |e| try expressions.append(e),
+        }
+
         while (true) {
             parser.skipWhiteSpace();
 
-            // Try parsing a predicate
-            predicate_blk: {
-                var predicate_parser = Parser.init(parser.allocator, parser.rest());
+            if (!parser.startsWith(",")) break;
 
-                const p = predicate_parser.predicate(.rule) catch break :predicate_blk;
+            try parser.consume(",");
 
-                parser.offset += predicate_parser.offset;
+            parser.skipWhiteSpace();
 
-                try predicates.append(p);
+            const next_rule_body = try parser.ruleBodyElement();
 
-                parser.skipWhiteSpace();
-
-                if (parser.startsWithConsuming(",")) continue;
+            switch (next_rule_body) {
+                .predicate => |p| try predicates.append(p),
+                .expression => |e| try expressions.append(e),
             }
-
-            // Otherwise try parsing an expression
-            expression_blk: {
-                var expression_parser = Parser.init(parser.allocator, parser.rest());
-
-                const e = expression_parser.expression() catch break :expression_blk;
-
-                parser.offset += expression_parser.offset;
-
-                try expressions.append(e);
-
-                parser.skipWhiteSpace();
-
-                if (parser.startsWithConsuming(",")) continue;
-            }
-
-            // We haven't found a predicate or expression so we're done,
-            // other than potentially parsing a scope
-            break;
         }
 
         scopes_blk: {
@@ -272,6 +265,36 @@ pub const Parser = struct {
         }
 
         return .{ .predicates = predicates, .expressions = expressions, .scopes = scps };
+    }
+
+    const BodyElementTag = enum {
+        predicate,
+        expression,
+    };
+
+    fn ruleBodyElement(parser: *Parser) !union(BodyElementTag) { predicate: Predicate, expression: Expression } {
+        predicate_blk: {
+            var predicate_parser = Parser.init(parser.allocator, parser.rest());
+
+            const p = predicate_parser.predicate(.rule) catch break :predicate_blk;
+
+            parser.offset += predicate_parser.offset;
+
+            return .{ .predicate = p };
+        }
+
+        // Otherwise try parsing an expression
+        expression_blk: {
+            var expression_parser = Parser.init(parser.allocator, parser.rest());
+
+            const e = expression_parser.expression() catch break :expression_blk;
+
+            parser.offset += expression_parser.offset;
+
+            return .{ .expression = e };
+        }
+
+        return error.ExpectedPredicateOrExpression;
     }
 
     fn variable(parser: *Parser) ![]const u8 {
@@ -700,6 +723,8 @@ pub const Parser = struct {
     }
 
     fn scopes(parser: *Parser, allocator: std.mem.Allocator) !std.ArrayList(Scope) {
+        try parser.requiredWhiteSpace();
+
         try parser.consume("trusting");
 
         parser.skipWhiteSpace();
@@ -715,9 +740,7 @@ pub const Parser = struct {
 
             parser.skipWhiteSpace();
 
-            if (!parser.startsWith(",")) break;
-
-            try parser.consume(",");
+            if (!parser.startsWithConsuming(",")) break;
         }
 
         return scps;
@@ -867,6 +890,14 @@ pub const Parser = struct {
         return parser.input[start..parser.offset];
     }
 
+    /// Skip whitespace but the whitespace is required (i.e. we need at least one space, tab or newline)
+    fn requiredWhiteSpace(parser: *Parser) !void {
+        if (!(parser.startsWith(" ") or parser.startsWith("\t") or parser.startsWith("\n"))) return error.ExpectedWhiteSpace;
+
+        parser.skipWhiteSpace();
+    }
+
+    /// Skip (optional) whitespace
     fn skipWhiteSpace(parser: *Parser) void {
         for (parser.rest()) |c| {
             if (c == ' ' or c == '\t' or c == '\n') {
@@ -1171,64 +1202,98 @@ test "parse rule" {
         try testing.expectEqualStrings("file", rule.body.items[1].name);
         try testing.expectEqualStrings("1", rule.body.items[1].terms.items[0].variable);
     }
+
+    {
+        // Remove some spaces
+        var parser = Parser.init(arena, "read($0, $1) <- operation($0), 1 < 3, file($1)");
+        const rule = try parser.rule();
+
+        try testing.expectEqualStrings("read", rule.head.name);
+        try testing.expectEqualStrings("0", rule.head.terms.items[0].variable);
+        try testing.expectEqualStrings("1", rule.head.terms.items[1].variable);
+
+        try testing.expectEqualStrings("operation", rule.body.items[0].name);
+        try testing.expectEqualStrings("0", rule.body.items[0].terms.items[0].variable);
+
+        try testing.expectEqualStrings("file", rule.body.items[1].name);
+        try testing.expectEqualStrings("1", rule.body.items[1].terms.items[0].variable);
+
+        try testing.expectEqualStrings("1 < 3", try std.fmt.allocPrint(arena, "{any}", .{rule.expressions.items[0]}));
+    }
+
+    {
+        // We need at least one predicate or expression in the body
+        var parser = Parser.init(arena, "read($0, $1) <- ");
+
+        try testing.expectError(error.ExpectedPredicateOrExpression, parser.rule());
+    }
 }
 
-// test "parse rule body" {
-//     const testing = std.testing;
-//     const input: []const u8 =
-//         \\query(false) <- read(true), write(false)
-//     ;
-
-//     var parser = Parser.init(testing.allocator, input);
-
-//     const r = try parser.rule();
-//     defer r.deinit();
-
-//     std.debug.print("{any}\n", .{r});
-// }
-
-// test "parse rule body with variables" {
-//     const testing = std.testing;
-//     const input: []const u8 =
-//         \\query($0) <- read($0), write(false)
-//     ;
-
-//     var parser = Parser.init(testing.allocator, input);
-
-//     const r = try parser.rule();
-//     defer r.deinit();
-
-//     std.debug.print("{any}\n", .{r});
-// }
-
-// test "parse check" {
-//     const testing = std.testing;
-//     const input: []const u8 =
-//         \\check if right($0, $1), resource($0), operation($1)
-//     ;
-
-//     var parser = Parser.init(testing.allocator, input);
-
-//     const r = try parser.check();
-//     defer r.deinit();
-
-//     std.debug.print("{any}\n", .{r});
-// }
-
-test "parse check with expression" {
+test "parse check" {
     const testing = std.testing;
 
     var arena_state = std.heap.ArenaAllocator.init(testing.allocator);
     defer arena_state.deinit();
-
     const arena = arena_state.allocator();
 
-    const input: []const u8 =
-        \\check if right($0, $1), resource($0), operation($1), $0.contains("file")
-    ;
+    {
+        var parser = Parser.init(arena, "check if right($0, $1), resource($0), operation($1), $0.contains(\"file\")");
+        const check = try parser.check();
 
-    var parser = Parser.init(arena, input);
+        try testing.expectEqual(.one, check.kind);
+        try testing.expectEqual(1, check.queries.items.len);
 
-    const r = try parser.check();
-    defer r.deinit();
+        try testing.expectEqualStrings("query", check.queries.items[0].head.name);
+        try testing.expectEqualStrings("right", check.queries.items[0].body.items[0].name);
+        try testing.expectEqualStrings("resource", check.queries.items[0].body.items[1].name);
+        try testing.expectEqualStrings("operation", check.queries.items[0].body.items[2].name);
+
+        try testing.expectEqualStrings("$0.contains(\"file\")", try std.fmt.allocPrint(arena, "{any}", .{check.queries.items[0].expressions.items[0]}));
+    }
+
+    {
+        // Check with or
+        var parser = Parser.init(arena, "check if right($0, $1), resource($0), operation($1), $0.contains(\"file\") or admin(true)");
+        const check = try parser.check();
+
+        try testing.expectEqual(.one, check.kind);
+        try testing.expectEqual(2, check.queries.items.len);
+
+        try testing.expectEqualStrings("query", check.queries.items[0].head.name);
+        try testing.expectEqualStrings("right", check.queries.items[0].body.items[0].name);
+        try testing.expectEqualStrings("resource", check.queries.items[0].body.items[1].name);
+        try testing.expectEqualStrings("operation", check.queries.items[0].body.items[2].name);
+
+        try testing.expectEqualStrings("query", check.queries.items[1].head.name);
+        try testing.expectEqualStrings("admin", check.queries.items[1].body.items[0].name);
+    }
+
+    {
+        // Check all
+        var parser = Parser.init(arena, "check all right($0, $1), resource($0), operation($1), $0.contains(\"file\") or admin(true)");
+        const check = try parser.check();
+
+        try testing.expectEqual(.all, check.kind);
+        try testing.expectEqual(2, check.queries.items.len);
+
+        try testing.expectEqualStrings("query", check.queries.items[0].head.name);
+        try testing.expectEqualStrings("right", check.queries.items[0].body.items[0].name);
+        try testing.expectEqualStrings("resource", check.queries.items[0].body.items[1].name);
+        try testing.expectEqualStrings("operation", check.queries.items[0].body.items[2].name);
+
+        try testing.expectEqualStrings("query", check.queries.items[1].head.name);
+        try testing.expectEqualStrings("admin", check.queries.items[1].body.items[0].name);
+    }
+
+    {
+        var parser = Parser.init(arena, "check if");
+
+        try testing.expectError(error.ExpectedWhiteSpace, parser.check());
+    }
+
+    {
+        var parser = Parser.init(arena, "check if ");
+
+        try testing.expectError(error.ExpectedPredicateOrExpression, parser.check());
+    }
 }
