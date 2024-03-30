@@ -33,7 +33,7 @@ pub const Parser = struct {
         parser.skipWhiteSpace();
 
         // Consume left paren
-        try parser.expect("(");
+        try parser.consume("(");
 
         // Parse terms
         var terms = std.ArrayList(Term).init(parser.allocator);
@@ -49,7 +49,7 @@ pub const Parser = struct {
             }
         }
 
-        try parser.expect(")");
+        try parser.consume(")");
 
         return .{ .name = name, .terms = terms };
     }
@@ -192,7 +192,7 @@ pub const Parser = struct {
         parser.skipWhiteSpace();
 
         // Consume left paren
-        try parser.expect("(");
+        try parser.consume("(");
 
         // Parse terms
         var terms = std.ArrayList(Term).init(parser.allocator);
@@ -211,7 +211,7 @@ pub const Parser = struct {
             break;
         }
 
-        try parser.expect(")");
+        try parser.consume(")");
 
         return .{ .name = name, .terms = terms };
     }
@@ -260,7 +260,7 @@ pub const Parser = struct {
 
             if (!parser.startsWith("or")) break;
 
-            try parser.expect("or");
+            try parser.consume("or");
 
             const body = try parser.ruleBody();
 
@@ -281,7 +281,7 @@ pub const Parser = struct {
 
         parser.skipWhiteSpace();
 
-        try parser.expect("<-");
+        try parser.consume("<-");
 
         const body = try parser.ruleBody();
 
@@ -361,7 +361,7 @@ pub const Parser = struct {
     }
 
     fn variable(parser: *Parser) ![]const u8 {
-        try parser.expect("$");
+        try parser.consume("$");
 
         const start = parser.offset;
 
@@ -379,7 +379,7 @@ pub const Parser = struct {
 
     // FIXME: properly implement string parsing
     fn string(parser: *Parser) ![]const u8 {
-        try parser.expect("\"");
+        try parser.consume("\"");
 
         const start = parser.offset;
 
@@ -396,32 +396,32 @@ pub const Parser = struct {
     fn date(parser: *Parser) !u64 {
         const year = try parser.number(i32);
 
-        try parser.expect("-");
+        try parser.consume("-");
 
         const month = try parser.number(u8);
         if (month < 1 or month > 12) return error.MonthOutOfRange;
 
-        try parser.expect("-");
+        try parser.consume("-");
 
         const day = try parser.number(u8);
         if (!Date.isDayMonthYearValid(i32, year, month, day)) return error.InvalidDayMonthYearCombination;
 
-        try parser.expect("T");
+        try parser.consume("T");
 
         const hour = try parser.number(u8);
         if (hour > 23) return error.HoyrOutOfRange;
 
-        try parser.expect(":");
+        try parser.consume(":");
 
         const minute = try parser.number(u8);
         if (minute > 59) return error.MinuteOutOfRange;
 
-        try parser.expect(":");
+        try parser.consume(":");
 
         const second = try parser.number(u8);
         if (second > 59) return error.SecondOutOfRange;
 
-        try parser.expect("Z");
+        try parser.consume("Z");
 
         const d: Date = .{
             .year = year,
@@ -612,7 +612,7 @@ pub const Parser = struct {
 
     fn binaryOp4(parser: *Parser) ParserError!Expression.BinaryOp {
         if (parser.startsWith("|") and !parser.startsWith("||")) {
-            try parser.expect("|");
+            try parser.consume("|");
             return .bitwise_or;
         }
 
@@ -640,7 +640,7 @@ pub const Parser = struct {
 
     fn binaryOp5(parser: *Parser) ParserError!Expression.BinaryOp {
         if (parser.startsWith("&") and !parser.startsWith("&&")) {
-            try parser.expect("&");
+            try parser.consume("&");
             return .bitwise_and;
         }
 
@@ -679,12 +679,12 @@ pub const Parser = struct {
         parser.skipWhiteSpace();
 
         if (!parser.startsWith(".")) return e1;
-        try parser.expect(".");
+        try parser.consume(".");
 
         const op = try parser.binaryOp7();
         parser.skipWhiteSpace();
 
-        try parser.expect("(");
+        try parser.consume("(");
 
         parser.skipWhiteSpace();
 
@@ -692,7 +692,7 @@ pub const Parser = struct {
 
         parser.skipWhiteSpace();
 
-        try parser.expect(")");
+        try parser.consume(")");
 
         parser.skipWhiteSpace();
 
@@ -731,7 +731,7 @@ pub const Parser = struct {
 
         if (parser.peek()) |c| {
             if (c == '!') {
-                try parser.expect("!");
+                try parser.consume("!");
                 parser.skipWhiteSpace();
 
                 const e = try parser.expr();
@@ -753,7 +753,7 @@ pub const Parser = struct {
             parser.skipWhiteSpace();
         }
 
-        if (parser.expect(".length()")) |_| {
+        if (parser.consume(".length()")) |_| {
             return try Expression.unary(parser.allocator, .length, e);
         } else |_| {
             return error.UnexpectedToken;
@@ -763,7 +763,7 @@ pub const Parser = struct {
     }
 
     fn unaryParens(parser: *Parser) ParserError!Expression {
-        try parser.expect("(");
+        try parser.consume("(");
 
         parser.skipWhiteSpace();
 
@@ -771,13 +771,13 @@ pub const Parser = struct {
 
         parser.skipWhiteSpace();
 
-        try parser.expect(")");
+        try parser.consume(")");
 
         return try Expression.unary(parser.allocator, .parens, e);
     }
 
     fn scopes(parser: *Parser, allocator: std.mem.Allocator) !std.ArrayList(Scope) {
-        try parser.expect("trusting");
+        try parser.consume("trusting");
 
         parser.skipWhiteSpace();
 
@@ -794,7 +794,7 @@ pub const Parser = struct {
 
             if (!parser.startsWith(",")) break;
 
-            try parser.expect(",");
+            try parser.consume(",");
         }
 
         return scps;
@@ -804,23 +804,23 @@ pub const Parser = struct {
         parser.skipWhiteSpace();
 
         if (parser.startsWith("authority")) {
-            try parser.expect("authority");
+            try parser.consume("authority");
 
             return .{ .authority = {} };
         }
 
         if (parser.startsWith("previous")) {
-            try parser.expect("previous");
+            try parser.consume("previous");
 
             return .{ .previous = {} };
         }
 
         if (parser.startsWith("{")) {
-            try parser.expect("{");
+            try parser.consume("{");
 
             const parameter = parser.readName();
 
-            try parser.expect("}");
+            try parser.consume("}");
 
             return .{ .parameter = parameter };
         }
@@ -829,7 +829,7 @@ pub const Parser = struct {
     }
 
     fn publicKey(parser: *Parser) !Ed25519.PublicKey {
-        try parser.expect("ed25519/");
+        try parser.consume("ed25519/");
 
         const h = try parser.hex();
 
@@ -850,8 +850,9 @@ pub const Parser = struct {
         return parser.input[parser.offset..];
     }
 
-    /// Expect and consume string.
-    fn expect(parser: *Parser, str: []const u8) !void {
+    /// Expect and consume string. Return error.UnexpectedString if
+    /// str is not the start of remaining parser input.
+    fn consume(parser: *Parser, str: []const u8) !void {
         if (!std.mem.startsWith(u8, parser.rest(), str)) return error.UnexpectedString;
 
         parser.offset += str.len;
