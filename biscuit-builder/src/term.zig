@@ -8,6 +8,7 @@ const TermTag = enum(u8) {
     integer,
     bool,
     date,
+    bytes,
 };
 
 pub const Term = union(TermTag) {
@@ -16,6 +17,7 @@ pub const Term = union(TermTag) {
     integer: i64,
     bool: bool,
     date: u64,
+    bytes: []const u8,
 
     pub fn deinit(_: Term) void {}
 
@@ -26,6 +28,7 @@ pub const Term = union(TermTag) {
             .integer => |n| .{ .integer = n },
             .bool => |b| .{ .bool = b },
             .date => |d| .{ .date = d },
+            .bytes => |b| .{ .bytes = b },
         };
     }
 
@@ -36,6 +39,7 @@ pub const Term = union(TermTag) {
             .integer => |n| try writer.print("{}", .{n}),
             .bool => |b| if (b) try writer.print("true", .{}) else try writer.print("false", .{}),
             .date => |n| try writer.print("{}", .{n}),
+            .bytes => unreachable,
         }
     }
 };

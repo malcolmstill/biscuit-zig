@@ -114,6 +114,16 @@ pub const Parser = struct {
             return .{ .bool = value };
         }
 
+        bytes_blk: {
+            var term_parser = Parser.init(parser.allocator, rst);
+
+            const value = term_parser.bytes() catch break :bytes_blk;
+
+            parser.offset += term_parser.offset;
+
+            return .{ .bytes = value };
+        }
+
         return error.NoFactTermFound;
     }
 
@@ -348,19 +358,16 @@ pub const Parser = struct {
         return error.ExpectedBooleanTerm;
     }
 
-    fn hex(parser: *Parser) ![]const u8 {
-        const start = parser.offset;
+    fn bytes(parser: *Parser) ![]const u8 {
+        try parser.consume("hex:");
 
-        for (parser.rest()) |c| {
-            if (isHexDigit(c)) {
-                parser.offset += 1;
-                continue;
-            }
+        const hex_string = try parser.hex();
 
-            break;
-        }
+        if (!(hex_string.len % 2 == 0)) return error.ExpectedEvenNumberOfHexDigis;
 
-        return parser.input[start..parser.offset];
+        const out = try parser.allocator.alloc(u8, hex_string.len / 2);
+
+        return try std.fmt.hexToBytes(out, hex_string);
     }
 
     fn expression(parser: *Parser) ParserError!Expression {
@@ -791,6 +798,21 @@ pub const Parser = struct {
         return parser.input[start..parser.offset];
     }
 
+    fn hex(parser: *Parser) ![]const u8 {
+        const start = parser.offset;
+
+        for (parser.rest()) |c| {
+            if (isHexDigit(c)) {
+                parser.offset += 1;
+                continue;
+            }
+
+            break;
+        }
+
+        return parser.input[start..parser.offset];
+    }
+
     fn skipWhiteSpace(parser: *Parser) void {
         for (parser.rest()) |c| {
             if (c == ' ' or c == '\t' or c == '\n') {
@@ -805,7 +827,7 @@ pub const Parser = struct {
 
 fn isHexDigit(char: u8) bool {
     switch (char) {
-        'a', 'b', 'c', 'd', 'e', 'f', 'A', 'B', 'C', 'D', 'E', 'F' => return true,
+        'a', 'b', 'c', 'd', 'e', 'f', 'A', 'B', 'C', 'D', 'E', 'F', '0', '1', '2', '3', '4', '5', '6', '7', '8', '9' => return true,
         else => return false,
     }
 }
@@ -980,6 +1002,27 @@ test "parse boolean" {
         const boolean = try parser.boolean();
 
         try testing.expectEqual(false, boolean);
+    }
+}
+
+test "parse hex" {
+    const testing = std.testing;
+
+    var arena_state = std.heap.ArenaAllocator.init(testing.allocator);
+    defer arena_state.deinit();
+    const arena = arena_state.allocator();
+
+    {
+        var parser = Parser.init(arena, "hex:BeEf");
+        const bytes = try parser.bytes();
+
+        try testing.expectEqualStrings("\xbe\xef", bytes);
+    }
+
+    {
+        var parser = Parser.init(arena, "hex:BeE");
+
+        try testing.expectError(error.ExpectedEvenNumberOfHexDigis, parser.bytes());
     }
 }
 
