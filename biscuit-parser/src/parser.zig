@@ -311,13 +311,15 @@ pub const Parser = struct {
     }
 
     fn boolean(parser: *Parser) !bool {
-        if (std.mem.startsWith(u8, parser.rest(), "true")) {
-            parser.offset += "term".len;
+        if (parser.startsWith("true")) {
+            try parser.expectString("true");
+
             return true;
         }
 
-        if (std.mem.startsWith(u8, parser.rest(), "false")) {
-            parser.offset += "false".len;
+        if (parser.startsWith("false")) {
+            try parser.expectString("false");
+
             return false;
         }
 
@@ -327,11 +329,13 @@ pub const Parser = struct {
     pub fn policy(parser: *Parser) !Policy {
         var kind: Policy.Kind = undefined;
 
-        if (std.mem.startsWith(u8, parser.rest(), "allow if")) {
-            parser.offset += "allow if".len;
+        if (parser.startsWith("allow if")) {
+            try parser.expectString("allow if");
+
             kind = .allow;
-        } else if (std.mem.startsWith(u8, parser.rest(), "deny if")) {
-            parser.offset += "deny if".len;
+        } else if (parser.startsWith("deny if")) {
+            try parser.expectString("deny if");
+
             kind = .deny;
         } else {
             return error.UnexpectedPolicyKind;
@@ -345,11 +349,13 @@ pub const Parser = struct {
     pub fn check(parser: *Parser) !Check {
         var kind: datalog.Check.Kind = undefined;
 
-        if (std.mem.startsWith(u8, parser.rest(), "check if")) {
-            parser.offset += "check if".len;
+        if (parser.startsWith("check if")) {
+            try parser.expectString("check if");
+
             kind = .one;
-        } else if (std.mem.startsWith(u8, parser.rest(), "check all")) {
-            parser.offset += "check all".len;
+        } else if (parser.startsWith("check all")) {
+            try parser.expectString("check all");
+
             kind = .all;
         } else {
             return error.UnexpectedCheckKind;
@@ -376,9 +382,9 @@ pub const Parser = struct {
         while (true) {
             parser.skipWhiteSpace();
 
-            if (!std.mem.startsWith(u8, parser.rest(), "or")) break;
+            if (!parser.startsWith("or")) break;
 
-            parser.offset += "or".len;
+            try parser.expectString("or");
 
             const body = try parser.ruleBody();
 
@@ -399,9 +405,9 @@ pub const Parser = struct {
 
         parser.skipWhiteSpace();
 
-        if (!std.mem.startsWith(u8, parser.rest(), "<-")) return error.ExpectedArrow;
+        if (!parser.startsWith("<-")) return error.ExpectedArrow;
 
-        parser.offset += "<-".len;
+        try parser.expectString("<-");
 
         const body = try parser.ruleBody();
 
