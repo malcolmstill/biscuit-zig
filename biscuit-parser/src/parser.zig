@@ -33,7 +33,7 @@ pub const Parser = struct {
     pub fn predicate(parser: *Parser, kind: enum { fact, rule }) !Predicate {
         var terms = std.ArrayList(Term).init(parser.allocator);
 
-        const name = parser.readName();
+        const predicate_name = try parser.name();
 
         try parser.consume("(");
 
@@ -54,7 +54,7 @@ pub const Parser = struct {
 
         try parser.consume(")");
 
-        return .{ .name = name, .terms = terms };
+        return .{ .name = predicate_name, .terms = terms };
     }
 
     fn term(parser: *Parser, variables: enum { allow_variables, disallow_variables }) !Term {
@@ -254,18 +254,7 @@ pub const Parser = struct {
     fn variable(parser: *Parser) ![]const u8 {
         try parser.consume("$");
 
-        const start = parser.offset;
-
-        for (parser.rest()) |c| {
-            if (ziglyph.isAlphaNum(c) or c == '_') {
-                parser.offset += 1;
-                continue;
-            }
-
-            break;
-        }
-
-        return parser.input[start..parser.offset];
+        return try parser.name();
     }
 
     // FIXME: properly implement string parsing
@@ -357,7 +346,7 @@ pub const Parser = struct {
         const start = parser.offset;
 
         for (parser.rest()) |c| {
-            if (ziglyph.isHexDigit(c)) {
+            if (isHexDigit(c)) {
                 parser.offset += 1;
                 continue;
             }
@@ -706,7 +695,7 @@ pub const Parser = struct {
         if (parser.startsWith("{")) {
             try parser.consume("{");
 
-            const parameter = parser.readName();
+            const parameter = try parser.name();
 
             try parser.consume("}");
 
@@ -775,9 +764,14 @@ pub const Parser = struct {
         if (peeked == char) return error.DisallowedChar;
     }
 
-    // FIXME: this should error?
-    fn readName(parser: *Parser) []const u8 {
+    fn name(parser: *Parser) ![]const u8 {
         const start = parser.offset;
+
+        if (parser.rest().len == 0) return error.ParsingNameExpectsAtLeastOneCharacter;
+
+        if (!ziglyph.isLetter(parser.rest()[0])) return error.ParsingNameFirstCharacterMustBeLetter;
+
+        parser.offset += 1;
 
         for (parser.rest()) |c| {
             if (ziglyph.isAlphaNum(c) or c == '_' or c == ':') {
@@ -793,7 +787,7 @@ pub const Parser = struct {
 
     fn skipWhiteSpace(parser: *Parser) void {
         for (parser.rest()) |c| {
-            if (ziglyph.isWhiteSpace(c)) {
+            if (c == ' ' or c == '\t' or c == '\n') {
                 parser.offset += 1;
                 continue;
             }
@@ -802,6 +796,13 @@ pub const Parser = struct {
         }
     }
 };
+
+fn isHexDigit(char: u8) bool {
+    switch (char) {
+        'a', 'b', 'c', 'd', 'e', 'f', 'A', 'B', 'C', 'D', 'E', 'F' => return true,
+        else => return false,
+    }
+}
 
 const ParserError = error{
     ExpectedMoreInput,
@@ -816,7 +817,7 @@ const ParserError = error{
     UnexpectedToken,
 };
 
-test "parse (fact) predicates" {
+test "parse predicates" {
     const testing = std.testing;
 
     var arena_state = std.heap.ArenaAllocator.init(testing.allocator);
@@ -874,11 +875,42 @@ test "parse (fact) predicates" {
     }
 
     {
+        // Non-fact predicates can contain variables
+        var parser = Parser.init(arena, "read(true, $foo)");
+
+        const predicate = try parser.predicate(.rule);
+
+        try testing.expectEqualStrings("read", predicate.name);
+        try testing.expectEqual(true, predicate.terms.items[0].bool);
+        try testing.expectEqualStrings("foo", predicate.terms.items[1].variable);
+    }
+
+    {
         // Facts must have at least one term
         var parser = Parser.init(arena, "read()");
 
         try testing.expectError(error.NoFactTermFound, parser.predicate(.fact));
     }
+
+    {
+        // Facts must start with a (UTF-8) letter
+        var parser = Parser.init(arena, "3read(true)");
+
+        try testing.expectError(error.ParsingNameFirstCharacterMustBeLetter, parser.predicate(.fact));
+    }
+
+    // The specification states names can start with any UTF-8 letter. However, the rust implementation
+    // only seems to accept ASCII predicate names
+    // {
+    //     const input = "こんにちは世界(true)";
+    //     var parser = Parser.init(arena, input);
+
+    //     const predicate = try parser.predicate(.fact);
+    //     errdefer std.debug.print("Failed on input \"{s}\"", .{input});
+
+    //     try testing.expectEqualStrings("こんにちは世界", predicate.name);
+    //     try testing.expectEqual(true, predicate.terms.items[0].bool);
+    // }
 }
 
 // test "parse rule body" {
