@@ -52,6 +52,29 @@ pub const Parser = struct {
         return .{ .name = name, .terms = terms };
     }
 
+    pub fn predicate(parser: *Parser) !Predicate {
+        const name = parser.readName();
+
+        parser.skipWhiteSpace();
+
+        try parser.consume("(");
+
+        var terms = std.ArrayList(Term).init(parser.allocator);
+
+        var it = parser.termsIterator();
+        while (try it.next()) |trm| {
+            try terms.append(trm);
+
+            if (parser.startsWithConsuming(",")) continue;
+
+            break;
+        }
+
+        try parser.consume(")");
+
+        return .{ .name = name, .terms = terms };
+    }
+
     const FactTermIterator = struct {
         parser: *Parser,
 
@@ -182,31 +205,6 @@ pub const Parser = struct {
         }
 
         return error.NoFactTermFound;
-    }
-
-    pub fn predicate(parser: *Parser) !Predicate {
-        const name = parser.readName();
-
-        parser.skipWhiteSpace();
-
-        // Consume left paren
-        try parser.consume("(");
-
-        // Parse terms
-        var terms = std.ArrayList(Term).init(parser.allocator);
-
-        var it = parser.termsIterator();
-        while (try it.next()) |trm| {
-            try terms.append(trm);
-
-            if (parser.startsWithConsuming(",")) continue;
-
-            break;
-        }
-
-        try parser.consume(")");
-
-        return .{ .name = name, .terms = terms };
     }
 
     pub fn policy(parser: *Parser) !Policy {
