@@ -1,6 +1,5 @@
 const std = @import("std");
 const ziglyph = @import("ziglyph");
-const datalog = @import("biscuit-datalog");
 const Term = @import("biscuit-builder").Term;
 const Fact = @import("biscuit-builder").Fact;
 const Check = @import("biscuit-builder").Check;
@@ -32,12 +31,11 @@ pub const Parser = struct {
 
         parser.skipWhiteSpace();
 
-        // Consume left paren
         try parser.consume("(");
 
-        // Parse terms
         var terms = std.ArrayList(Term).init(parser.allocator);
 
+        // Parse terms
         var it = parser.factTermsIterator();
         while (try it.next()) |trm| {
             try terms.append(trm);
@@ -230,7 +228,7 @@ pub const Parser = struct {
     }
 
     pub fn check(parser: *Parser) !Check {
-        const kind: datalog.Check.Kind = if (parser.startsWithConsuming("check if"))
+        const kind: Check.Kind = if (parser.startsWithConsuming("check if"))
             .one
         else if (parser.startsWithConsuming("check all"))
             .all

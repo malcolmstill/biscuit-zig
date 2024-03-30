@@ -5,8 +5,13 @@ const Term = @import("term.zig").Term;
 const Rule = @import("rule.zig").Rule;
 
 pub const Check = struct {
-    kind: datalog.Check.Kind,
+    kind: Kind,
     queries: std.ArrayList(Rule),
+
+    pub const Kind = enum {
+        one,
+        all,
+    };
 
     pub fn deinit(_: Check) void {
         // for (check.queries.items) |query| {
@@ -23,7 +28,12 @@ pub const Check = struct {
             try queries.append(try query.toDatalog(allocator, symbols));
         }
 
-        return .{ .kind = check.kind, .queries = queries };
+        const kind: datalog.Check.Kind = switch (check.kind) {
+            .one => .one,
+            .all => .all,
+        };
+
+        return .{ .kind = kind, .queries = queries };
     }
 
     pub fn format(check: Check, comptime _: []const u8, _: std.fmt.FormatOptions, writer: anytype) !void {
