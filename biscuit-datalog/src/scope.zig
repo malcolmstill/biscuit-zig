@@ -20,7 +20,7 @@ pub const Scope = union(ScopeTag) {
         };
     }
 
-    pub fn remapSymbols(scope: Scope, old_symbols: *const SymbolTable, new_symbols: *SymbolTable) !Scope {
+    pub fn remap(scope: Scope, old_symbols: *const SymbolTable, new_symbols: *SymbolTable) !Scope {
         return switch (scope) {
             .authority => .authority,
             .previous => .previous,

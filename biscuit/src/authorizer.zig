@@ -158,7 +158,7 @@ pub const Authorizer = struct {
                 std.debug.print("  [{}]: {x}\n", .{ i, pk.bytes });
             }
             for (biscuit.authority.facts.items) |authority_fact| {
-                const fact = try authority_fact.remapSymbols(&biscuit.symbols, &authorizer.symbols);
+                const fact = try authority_fact.remap(&biscuit.symbols, &authorizer.symbols);
                 const origin = try Origin.initWithId(authorizer.allocator, 0);
 
                 try authorizer.world.addFact(origin, fact);
@@ -174,7 +174,7 @@ pub const Authorizer = struct {
 
             for (biscuit.authority.rules.items) |authority_rule| {
                 // Map from biscuit symbol space to authorizer symbol space
-                const rule = try authority_rule.remapSymbols(&biscuit.symbols, &authorizer.symbols);
+                const rule = try authority_rule.remap(&biscuit.symbols, &authorizer.symbols);
 
                 if (!rule.validateVariables()) {
                     try errors.append(.unbound_variable);
@@ -194,7 +194,7 @@ pub const Authorizer = struct {
 
             for (biscuit.blocks.items, 1..) |block, block_id| {
                 for (block.facts.items) |block_fact| {
-                    const fact = try block_fact.remapSymbols(&biscuit.symbols, &authorizer.symbols);
+                    const fact = try block_fact.remap(&biscuit.symbols, &authorizer.symbols);
                     const origin = try Origin.initWithId(authorizer.allocator, block_id);
 
                     try authorizer.world.addFact(origin, fact);
@@ -209,7 +209,7 @@ pub const Authorizer = struct {
                 );
 
                 for (block.rules.items) |block_rule| {
-                    const rule = try block_rule.remapSymbols(&biscuit.symbols, &authorizer.symbols);
+                    const rule = try block_rule.remap(&biscuit.symbols, &authorizer.symbols);
                     std.debug.print("block rule {any} CONVERTED to rule = {any}\n", .{ block_rule, rule });
 
                     if (!rule.validateVariables()) {
@@ -271,7 +271,7 @@ pub const Authorizer = struct {
             );
 
             for (biscuit.authority.checks.items, 0..) |c, check_id| {
-                const check = try c.remapSymbols(&biscuit.symbols, &authorizer.symbols);
+                const check = try c.remap(&biscuit.symbols, &authorizer.symbols);
                 std.debug.print("{}: {any}\n", .{ check_id, check });
 
                 for (check.queries.items) |*query| {
@@ -343,7 +343,7 @@ pub const Authorizer = struct {
                 std.debug.print("block = {any}\n", .{block});
 
                 for (block.checks.items, 0..) |c, check_id| {
-                    const check = try c.remapSymbols(&biscuit.symbols, &authorizer.symbols);
+                    const check = try c.remap(&biscuit.symbols, &authorizer.symbols);
 
                     std.debug.print("check = {any}\n", .{check});
 

@@ -41,11 +41,11 @@ pub const Check = struct {
         return writer.print("", .{});
     }
 
-    pub fn remapSymbols(check: Check, old_symbols: *const SymbolTable, new_symbols: *SymbolTable) !Check {
+    pub fn remap(check: Check, old_symbols: *const SymbolTable, new_symbols: *SymbolTable) !Check {
         var queries = try check.queries.clone();
 
         for (queries.items, 0..) |query, i| {
-            queries.items[i] = try query.remapSymbols(old_symbols, new_symbols);
+            queries.items[i] = try query.remap(old_symbols, new_symbols);
         }
 
         return .{
