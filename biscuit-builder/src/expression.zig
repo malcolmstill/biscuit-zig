@@ -58,7 +58,7 @@ pub const Expression = union(ExpressionType) {
     };
 
     /// convert to datalog fact
-    pub fn convert(expression: Expression, allocator: std.mem.Allocator, symbols: *datalog.SymbolTable) !datalog.Expression {
+    pub fn toDatalog(expression: Expression, allocator: std.mem.Allocator, symbols: *datalog.SymbolTable) !datalog.Expression {
         var ops = std.ArrayList(datalog.Op).init(allocator);
 
         try expression.toOpcodes(allocator, &ops, symbols);
@@ -68,7 +68,7 @@ pub const Expression = union(ExpressionType) {
 
     pub fn toOpcodes(expression: Expression, allocator: std.mem.Allocator, ops: *std.ArrayList(datalog.Op), symbols: *datalog.SymbolTable) !void {
         switch (expression) {
-            .value => |v| try ops.append(.{ .value = try v.convert(allocator, symbols) }),
+            .value => |v| try ops.append(.{ .value = try v.toDatalog(allocator, symbols) }),
             .unary => |u| {
                 try u.expression.toOpcodes(allocator, ops, symbols);
 

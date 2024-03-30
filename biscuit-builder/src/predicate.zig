@@ -15,13 +15,13 @@ pub const Predicate = struct {
     }
 
     /// convert to datalog predicate
-    pub fn convert(predicate: Predicate, allocator: std.mem.Allocator, symbols: *datalog.SymbolTable) !datalog.Predicate {
+    pub fn toDatalog(predicate: Predicate, allocator: std.mem.Allocator, symbols: *datalog.SymbolTable) !datalog.Predicate {
         const name = try symbols.insert(predicate.name);
 
         var terms = std.ArrayList(datalog.Term).init(allocator);
 
         for (predicate.terms.items) |term| {
-            try terms.append(try term.convert(allocator, symbols));
+            try terms.append(try term.toDatalog(allocator, symbols));
         }
 
         return .{ .name = name, .terms = terms };

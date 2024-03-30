@@ -19,7 +19,7 @@ pub const Policy = struct {
         policy.queries.deinit();
     }
 
-    // pub fn convert(policy: Policy, allocator: std.mem.Allocator, symbols: *datalog.SymbolTable) !Policy {
+    // pub fn toDatalog(policy: Policy, allocator: std.mem.Allocator, symbols: *datalog.SymbolTable) !Policy {
     //     var queries = std.ArrayList(Rule).init(allocator);
 
     //     for (policy.queries.items) |query| {

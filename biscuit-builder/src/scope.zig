@@ -19,7 +19,7 @@ pub const Scope = union(ScopeKind) {
     parameter: []const u8,
 
     /// convert to datalog fact
-    pub fn convert(scope: Scope, _: std.mem.Allocator, symbols: *datalog.SymbolTable) !datalog.Scope {
+    pub fn toDatalog(scope: Scope, _: std.mem.Allocator, symbols: *datalog.SymbolTable) !datalog.Scope {
         return switch (scope) {
             .authority => .{ .authority = {} },
             .previous => .{ .previous = {} },

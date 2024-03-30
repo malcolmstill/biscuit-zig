@@ -19,7 +19,7 @@ pub const Term = union(TermTag) {
 
     pub fn deinit(_: Term) void {}
 
-    pub fn convert(term: Term, _: std.mem.Allocator, symbols: *datalog.SymbolTable) !datalog.Term {
+    pub fn toDatalog(term: Term, _: std.mem.Allocator, symbols: *datalog.SymbolTable) !datalog.Term {
         return switch (term) {
             .variable => |s| .{ .variable = @truncate(try symbols.insert(s)) }, // FIXME: assert symbol fits in u32
             .string => |s| .{ .string = try symbols.insert(s) },

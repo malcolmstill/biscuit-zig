@@ -29,23 +29,23 @@ pub const Rule = struct {
     }
 
     /// convert to datalog predicate
-    pub fn convert(rule: Rule, allocator: std.mem.Allocator, symbols: *datalog.SymbolTable) !datalog.Rule {
-        const head = try rule.head.convert(allocator, symbols);
+    pub fn toDatalog(rule: Rule, allocator: std.mem.Allocator, symbols: *datalog.SymbolTable) !datalog.Rule {
+        const head = try rule.head.toDatalog(allocator, symbols);
 
         var body = std.ArrayList(datalog.Predicate).init(allocator);
         var expressions = std.ArrayList(datalog.Expression).init(allocator);
         var scopes = std.ArrayList(datalog.Scope).init(allocator);
 
         for (rule.body.items) |predicate| {
-            try body.append(try predicate.convert(allocator, symbols));
+            try body.append(try predicate.toDatalog(allocator, symbols));
         }
 
         for (rule.expressions.items) |expression| {
-            try expressions.append(try expression.convert(allocator, symbols));
+            try expressions.append(try expression.toDatalog(allocator, symbols));
         }
 
         for (rule.scopes.items) |scope| {
-            try scopes.append(try scope.convert(allocator, symbols));
+            try scopes.append(try scope.toDatalog(allocator, symbols));
         }
 
         return .{

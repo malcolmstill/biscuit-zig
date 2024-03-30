@@ -95,7 +95,7 @@ pub const Authorizer = struct {
 
         const origin = try Origin.initWithId(authorizer.allocator, Origin.AUTHORIZER_ID);
 
-        try authorizer.world.addFact(origin, try fact.convert(authorizer.allocator, &authorizer.symbols));
+        try authorizer.world.addFact(origin, try fact.toDatalog(authorizer.allocator, &authorizer.symbols));
     }
 
     /// Add check from string to authorizer
@@ -238,7 +238,7 @@ pub const Authorizer = struct {
         std.debug.print("\nAUTHORIZER CHECKS\n", .{});
         for (authorizer.checks.items) |c| {
             std.debug.print("authorizer check = {any}\n", .{c});
-            const check = try c.convert(authorizer.allocator, &authorizer.symbols);
+            const check = try c.toDatalog(authorizer.allocator, &authorizer.symbols);
 
             for (check.queries.items, 0..) |*query, check_id| {
                 const rule_trusted_origins = try TrustedOrigins.fromScopes(
@@ -300,7 +300,7 @@ pub const Authorizer = struct {
                 std.debug.print("authorizer policy = {any}\n", .{policy});
 
                 for (policy.queries.items, 0..) |*q, policy_id| {
-                    var query = try q.convert(authorizer.allocator, &authorizer.symbols);
+                    var query = try q.toDatalog(authorizer.allocator, &authorizer.symbols);
 
                     const rule_trusted_origins = try TrustedOrigins.fromScopes(
                         authorizer.allocator,

@@ -16,11 +16,11 @@ pub const Check = struct {
         check.queries.deinit();
     }
 
-    pub fn convert(check: Check, allocator: std.mem.Allocator, symbols: *datalog.SymbolTable) !datalog.Check {
+    pub fn toDatalog(check: Check, allocator: std.mem.Allocator, symbols: *datalog.SymbolTable) !datalog.Check {
         var queries = std.ArrayList(datalog.Rule).init(allocator);
 
         for (check.queries.items) |query| {
-            try queries.append(try query.convert(allocator, symbols));
+            try queries.append(try query.toDatalog(allocator, symbols));
         }
 
         return .{ .kind = check.kind, .queries = queries };
