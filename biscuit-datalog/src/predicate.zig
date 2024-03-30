@@ -67,12 +67,12 @@ pub const Predicate = struct {
     /// Convert predicate to new symbol space
     ///
     /// Equivalent to clone but with the symbol rewriting
-    pub fn convert(predicate: Predicate, old_symbols: *const SymbolTable, new_symbols: *SymbolTable) !Predicate {
+    pub fn remapSymbols(predicate: Predicate, old_symbols: *const SymbolTable, new_symbols: *SymbolTable) !Predicate {
         const name = try old_symbols.getString(predicate.name);
 
         var terms = try predicate.terms.clone();
         for (terms.items, 0..) |term, i| {
-            terms.items[i] = try term.convert(old_symbols, new_symbols);
+            terms.items[i] = try term.remapSymbols(old_symbols, new_symbols);
         }
 
         return .{

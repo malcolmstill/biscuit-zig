@@ -22,8 +22,8 @@ pub const Fact = struct {
     }
 
     /// Convert fact to new symbol space
-    pub fn convert(fact: Fact, old_symbols: *const SymbolTable, new_symbols: *SymbolTable) !Fact {
-        return .{ .predicate = try fact.predicate.convert(old_symbols, new_symbols) };
+    pub fn remapSymbols(fact: Fact, old_symbols: *const SymbolTable, new_symbols: *SymbolTable) !Fact {
+        return .{ .predicate = try fact.predicate.remapSymbols(old_symbols, new_symbols) };
     }
 
     pub fn clone(fact: Fact) !Fact {

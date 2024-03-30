@@ -99,13 +99,13 @@ pub const Expression = struct {
         return stack.items[0];
     }
 
-    pub fn convert(expression: Expression, old_symbols: *const SymbolTable, new_symbols: *SymbolTable) !Expression {
+    pub fn remapSymbols(expression: Expression, old_symbols: *const SymbolTable, new_symbols: *SymbolTable) !Expression {
         // std.debug.print("Converting expression\n", .{});
         const ops = try expression.ops.clone();
 
         for (ops.items, 0..) |op, i| {
             ops.items[i] = switch (op) {
-                .value => |trm| .{ .value = try trm.convert(old_symbols, new_symbols) },
+                .value => |trm| .{ .value = try trm.remapSymbols(old_symbols, new_symbols) },
                 else => op,
             };
         }

@@ -44,7 +44,7 @@ pub const Term = union(TermKind) {
         };
     }
 
-    pub fn convert(term: Term, old_symbols: *const SymbolTable, new_symbols: *SymbolTable) !Term {
+    pub fn remapSymbols(term: Term, old_symbols: *const SymbolTable, new_symbols: *SymbolTable) !Term {
         return switch (term) {
             .variable => |id| .{ .variable = std.math.cast(u32, try new_symbols.insert(try old_symbols.getString(id))) orelse return error.VariableIdTooLarge },
             .string => |id| .{ .string = try new_symbols.insert(try old_symbols.getString(id)) },
@@ -54,7 +54,7 @@ pub const Term = union(TermKind) {
 
                 var it = s.iterator();
                 while (it.next()) |term_ptr| {
-                    try set.add(try term_ptr.convert(old_symbols, new_symbols));
+                    try set.add(try term_ptr.remapSymbols(old_symbols, new_symbols));
                 }
 
                 break :blk .{ .set = set };

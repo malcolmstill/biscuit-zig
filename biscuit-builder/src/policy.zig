@@ -23,7 +23,7 @@ pub const Policy = struct {
     //     var queries = std.ArrayList(Rule).init(allocator);
 
     //     for (policy.queries.items) |query| {
-    //         try queries.append(try query.convert(allocator, symbols));
+    //         try queries.append(try query.toDatalog(allocator, symbols));
     //     }
 
     //     return .{ .kind = policy.kind, .queries = queries };
