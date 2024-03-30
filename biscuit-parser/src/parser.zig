@@ -320,8 +320,14 @@ pub const Parser = struct {
     fn number(parser: *Parser, comptime T: type) !T {
         const start = parser.offset;
 
+        if (parser.rest().len == 0) return error.ParsingNumberExpectsAtLeastOneCharacter;
+        const first_char = parser.rest()[0];
+
+        if (!(isDigit(first_char) or first_char == '-')) return error.ParsingNameFirstCharacterMustBeLetter;
+        parser.offset += 1;
+
         for (parser.rest()) |c| {
-            if (ziglyph.isAsciiDigit(c)) {
+            if (isDigit(c)) {
                 parser.offset += 1;
                 continue;
             }
@@ -804,6 +810,13 @@ fn isHexDigit(char: u8) bool {
     }
 }
 
+fn isDigit(char: u8) bool {
+    switch (char) {
+        '0', '1', '2', '3', '4', '5', '6', '7', '8', '9' => return true,
+        else => return false,
+    }
+}
+
 const ParserError = error{
     ExpectedMoreInput,
     DisallowedChar,
@@ -911,6 +924,28 @@ test "parse predicates" {
     //     try testing.expectEqualStrings("こんにちは世界", predicate.name);
     //     try testing.expectEqual(true, predicate.terms.items[0].bool);
     // }
+}
+
+test "parse terms" {
+    const testing = std.testing;
+
+    var arena_state = std.heap.ArenaAllocator.init(testing.allocator);
+    defer arena_state.deinit();
+    const arena = arena_state.allocator();
+
+    {
+        var parser = Parser.init(arena, "1");
+        const integer = try parser.number(i64);
+
+        try testing.expectEqual(1, integer);
+    }
+
+    {
+        var parser = Parser.init(arena, "-1");
+        const integer = try parser.number(i64);
+
+        try testing.expectEqual(-1, integer);
+    }
 }
 
 // test "parse rule body" {
