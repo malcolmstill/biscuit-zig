@@ -311,35 +311,20 @@ pub const Parser = struct {
     }
 
     fn boolean(parser: *Parser) !bool {
-        if (parser.startsWith("true")) {
-            try parser.expect("true");
+        if (parser.startsWithConsuming("true")) return true;
 
-            return true;
-        }
-
-        if (parser.startsWith("false")) {
-            try parser.expect("false");
-
-            return false;
-        }
+        if (parser.startsWithConsuming("false")) return false;
 
         return error.ExpectedBooleanTerm;
     }
 
     pub fn policy(parser: *Parser) !Policy {
-        var kind: Policy.Kind = undefined;
-
-        if (parser.startsWith("allow if")) {
-            try parser.expect("allow if");
-
-            kind = .allow;
-        } else if (parser.startsWith("deny if")) {
-            try parser.expect("deny if");
-
-            kind = .deny;
-        } else {
+        const kind: Policy.Kind = if (parser.startsWithConsuming("allow if"))
+            .allow
+        else if (parser.startsWithConsuming("deny if"))
+            .deny
+        else
             return error.UnexpectedPolicyKind;
-        }
 
         const queries = try parser.checkBody();
 
@@ -347,19 +332,12 @@ pub const Parser = struct {
     }
 
     pub fn check(parser: *Parser) !Check {
-        var kind: datalog.Check.Kind = undefined;
-
-        if (parser.startsWith("check if")) {
-            try parser.expect("check if");
-
-            kind = .one;
-        } else if (parser.startsWith("check all")) {
-            try parser.expect("check all");
-
-            kind = .all;
-        } else {
+        const kind: datalog.Check.Kind = if (parser.startsWithConsuming("check if"))
+            .one
+        else if (parser.startsWithConsuming("check all"))
+            .all
+        else
             return error.UnexpectedCheckKind;
-        }
 
         const queries = try parser.checkBody();
 
@@ -404,8 +382,6 @@ pub const Parser = struct {
         const head = try parser.predicate();
 
         parser.skipWhiteSpace();
-
-        if (!parser.startsWith("<-")) return error.ExpectedArrow;
 
         try parser.expect("<-");
 
@@ -512,6 +488,13 @@ pub const Parser = struct {
         return e;
     }
 
+    fn binaryOp0(parser: *Parser) ParserError!Expression.BinaryOp {
+        if (parser.startsWithConsuming("&&")) return .@"and";
+        if (parser.startsWithConsuming("||")) return .@"or";
+
+        return error.UnexpectedOp;
+    }
+
     fn expr1(parser: *Parser) ParserError!Expression {
         var e = try parser.expr2();
 
@@ -529,6 +512,17 @@ pub const Parser = struct {
         }
 
         return e;
+    }
+
+    fn binaryOp1(parser: *Parser) ParserError!Expression.BinaryOp {
+        if (parser.startsWithConsuming("<=")) return .less_or_equal;
+        if (parser.startsWithConsuming(">=")) return .greater_or_equal;
+        if (parser.startsWithConsuming("<")) return .less_than;
+        if (parser.startsWithConsuming(">")) return .greater_than;
+        if (parser.startsWithConsuming("==")) return .equal;
+        if (parser.startsWithConsuming("!=")) return .not_equal;
+
+        return error.UnexpectedOp;
     }
 
     fn expr2(parser: *Parser) ParserError!Expression {
@@ -652,73 +646,15 @@ pub const Parser = struct {
         return try Expression.binary(parser.allocator, op, e1, e2);
     }
 
-    fn binaryOp0(parser: *Parser) ParserError!Expression.BinaryOp {
-        if (parser.startsWith("&&")) {
-            try parser.expect("&&");
-            return .@"and";
-        }
-
-        if (parser.startsWith("||")) {
-            try parser.expect("||");
-            return .@"or";
-        }
-
-        return error.UnexpectedOp;
-    }
-
-    fn binaryOp1(parser: *Parser) ParserError!Expression.BinaryOp {
-        if (parser.startsWith("<=")) {
-            try parser.expect("<=");
-            return .less_or_equal;
-        }
-
-        if (parser.startsWith(">=")) {
-            try parser.expect(">=");
-            return .greater_or_equal;
-        }
-
-        if (parser.startsWith("<")) {
-            try parser.expect("<");
-            return .less_than;
-        }
-
-        if (parser.startsWith(">")) {
-            try parser.expect(">");
-            return .greater_than;
-        }
-
-        if (parser.startsWith("==")) {
-            try parser.expect("==");
-            return .equal;
-        }
-
-        if (parser.startsWith("!=")) {
-            try parser.expect("!=");
-            return .not_equal;
-        }
-
-        return error.UnexpectedOp;
-    }
-
     fn binaryOp2(parser: *Parser) ParserError!Expression.BinaryOp {
-        if (parser.startsWith("+")) {
-            try parser.expect("+");
-            return .add;
-        }
-
-        if (parser.startsWith("-")) {
-            try parser.expect("-");
-            return .sub;
-        }
+        if (parser.startsWithConsuming("+")) return .add;
+        if (parser.startsWithConsuming("-")) return .sub;
 
         return error.UnexpectedOp;
     }
 
     fn binaryOp3(parser: *Parser) ParserError!Expression.BinaryOp {
-        if (parser.startsWith("^")) {
-            try parser.expect("^");
-            return .bitwise_xor;
-        }
+        if (parser.startsWithConsuming("^")) return .bitwise_xor;
 
         return error.UnexpectedOp;
     }
@@ -742,39 +678,17 @@ pub const Parser = struct {
     }
 
     fn binaryOp6(parser: *Parser) ParserError!Expression.BinaryOp {
-        if (parser.startsWith("*")) {
-            try parser.expect("*");
-            return .mul;
-        }
-
-        if (parser.startsWith("/")) {
-            try parser.expect("/");
-            return .div;
-        }
+        if (parser.startsWithConsuming("*")) return .mul;
+        if (parser.startsWithConsuming("/")) return .div;
 
         return error.UnexpectedOp;
     }
 
     fn binaryOp7(parser: *Parser) ParserError!Expression.BinaryOp {
-        if (parser.startsWith("contains")) {
-            try parser.expect("contains");
-            return .contains;
-        }
-
-        if (parser.startsWith("starts_with")) {
-            try parser.expect("starts_with");
-            return .prefix;
-        }
-
-        if (parser.startsWith("ends_with")) {
-            try parser.expect("ends_with");
-            return .suffix;
-        }
-
-        if (parser.startsWith("matches")) {
-            try parser.expect("matches");
-            return .regex;
-        }
+        if (parser.startsWithConsuming("contains")) return .contains;
+        if (parser.startsWithConsuming("starts_with")) return .prefix;
+        if (parser.startsWithConsuming("ends_with")) return .suffix;
+        if (parser.startsWithConsuming("matches")) return .regex;
 
         return error.UnexpectedOp;
     }
@@ -928,8 +842,22 @@ pub const Parser = struct {
         parser.offset += str.len;
     }
 
+    /// Returns true if the remaining parser input starts with str
+    ///
+    /// Does not consume any input.
     fn startsWith(parser: *Parser, str: []const u8) bool {
         return std.mem.startsWith(u8, parser.rest(), str);
+    }
+
+    /// Returns true if the remaining parse input starts with str. If
+    /// it does start with that string, the parser consumes the string.
+    fn startsWithConsuming(parser: *Parser, str: []const u8) bool {
+        if (parser.startsWith(str)) {
+            parser.offset += str.len; // Consume
+            return true;
+        }
+
+        return false;
     }
 
     /// Reject char. Does not consume the character
