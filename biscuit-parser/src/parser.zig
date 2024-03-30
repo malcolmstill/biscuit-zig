@@ -794,17 +794,44 @@ pub const Parser = struct {
         if (parser.startsWith(str)) return error.DisallowedChar;
     }
 
+    fn nextCodepoint(parser: *Parser) !struct { len: u32, codepoint: u21 } {
+        const remaining = parser.rest();
+
+        if (remaining.len == 0) return error.NextCodePointExpectsAtLeastOneByte;
+
+        const first_byte = remaining[0];
+
+        const byte_len = try std.unicode.utf8ByteSequenceLength(first_byte);
+
+        const codepoint = switch (byte_len) {
+            1 => try std.unicode.utf8Decode(remaining[0..1]),
+            2 => try std.unicode.utf8Decode2(remaining[0..2]),
+            3 => try std.unicode.utf8Decode3(remaining[0..3]),
+            4 => try std.unicode.utf8Decode4(remaining[0..4]),
+            else => return error.IncorrectUtfDecodeLength,
+        };
+
+        return .{ .len = byte_len, .codepoint = codepoint };
+    }
+
     fn name(parser: *Parser) ![]const u8 {
         const start = parser.offset;
 
         if (parser.rest().len == 0) return error.ParsingNameExpectsAtLeastOneCharacter;
 
-        if (!ziglyph.isLetter(parser.rest()[0])) return error.ParsingNameFirstCharacterMustBeLetter;
+        const first_codepoint = try parser.nextCodepoint();
 
-        parser.offset += 1;
+        if (!ziglyph.isLetter(first_codepoint.codepoint)) return error.ParsingNameFirstCharacterMustBeLetter;
 
-        for (parser.rest()) |c| {
-            if (ziglyph.isAlphaNum(c) or c == '_' or c == ':') {
+        parser.offset += first_codepoint.len;
+
+        while (true) {
+            const next_codepoint = try parser.nextCodepoint();
+
+            if (ziglyph.isAlphaNum(next_codepoint.codepoint)) {
+                parser.offset += next_codepoint.len;
+                continue;
+            } else if (parser.startsWith("_") or parser.startsWith(":")) {
                 parser.offset += 1;
                 continue;
             }
@@ -976,18 +1003,17 @@ test "parse predicates" {
         try testing.expectError(error.ParsingNameFirstCharacterMustBeLetter, parser.predicate(.fact));
     }
 
-    // The specification states names can start with any UTF-8 letter. However, the rust implementation
-    // only seems to accept ASCII predicate names
-    // {
-    //     const input = "こんにちは世界(true)";
-    //     var parser = Parser.init(arena, input);
+    {
+        // Names can be UTF-8
+        const input = "こんにちは世界(true)";
+        var parser = Parser.init(arena, input);
 
-    //     const predicate = try parser.predicate(.fact);
-    //     errdefer std.debug.print("Failed on input \"{s}\"", .{input});
+        const predicate = try parser.predicate(.fact);
+        errdefer std.debug.print("Failed on input \"{s}\"", .{input});
 
-    //     try testing.expectEqualStrings("こんにちは世界", predicate.name);
-    //     try testing.expectEqual(true, predicate.terms.items[0].bool);
-    // }
+        try testing.expectEqualStrings("こんにちは世界", predicate.name);
+        try testing.expectEqual(true, predicate.terms.items[0].bool);
+    }
 }
 
 test "parse numbers" {
