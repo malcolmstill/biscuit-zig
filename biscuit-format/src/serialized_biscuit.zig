@@ -19,9 +19,8 @@ pub const SerializedBiscuit = struct {
 
     /// Initialise a SerializedBiscuit from the token's bytes and root public key.
     ///
-    /// This decodes the toplevel-level biscuit format from protobuf and verifies
-    /// the token.
-    pub fn fromBytes(allocator: mem.Allocator, bytes: []const u8, public_key: Ed25519.PublicKey) !SerializedBiscuit {
+    /// This decodes the toplevel-level biscuit format from protobuf and verifies the token.
+    pub fn deserialize(allocator: mem.Allocator, bytes: []const u8, public_key: Ed25519.PublicKey) !SerializedBiscuit {
         const b = try schema.decodeBiscuit(allocator, bytes);
         defer b.deinit();
 
@@ -227,7 +226,7 @@ test {
         const bytes = try decode.urlSafeBase64ToBytes(testing.allocator, token);
         defer testing.allocator.free(bytes);
 
-        var b = try SerializedBiscuit.fromBytes(testing.allocator, bytes, public_key);
+        var b = try SerializedBiscuit.deserialize(testing.allocator, bytes, public_key);
         defer b.deinit();
 
         // We should be able to seal the tokens
@@ -244,7 +243,7 @@ test {
         const bytes = try decode.urlSafeBase64ToBytes(testing.allocator, token);
         defer testing.allocator.free(bytes);
 
-        var b = try SerializedBiscuit.fromBytes(testing.allocator, bytes, public_key);
+        var b = try SerializedBiscuit.deserialize(testing.allocator, bytes, public_key);
         defer b.deinit();
 
         // The tokens are already sealed so should fail

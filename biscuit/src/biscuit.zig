@@ -18,7 +18,7 @@ pub const Biscuit = struct {
     public_key_to_block_id: std.AutoHashMap(usize, std.ArrayList(usize)),
 
     pub fn fromBytes(allocator: mem.Allocator, token_bytes: []const u8, root_public_key: Ed25519.PublicKey) !Biscuit {
-        var serialized = try SerializedBiscuit.fromBytes(allocator, token_bytes, root_public_key);
+        var serialized = try SerializedBiscuit.deserialize(allocator, token_bytes, root_public_key);
         errdefer serialized.deinit();
 
         // For each block we will temporarily store the external public key (where it exists).
