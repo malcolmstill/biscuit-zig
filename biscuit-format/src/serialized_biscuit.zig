@@ -231,7 +231,13 @@ test {
         defer b.deinit();
 
         // We should be able to seal the tokens
-        _ = try b.seal();
+        var sealed = try b.seal();
+
+        // Trying to seal again should fail
+        _ = sealed.seal() catch |err| switch (err) {
+            error.AlreadySealed => continue,
+            else => return err,
+        };
     }
 
     for (sealed_tokens) |token| {
