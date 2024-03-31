@@ -9,7 +9,13 @@ pub const SignedBlock = struct {
     public_key: Ed25519.PublicKey,
     external_signature: ?ExternalSignature,
 
-    pub fn fromDecodedBlock(schema_signed_block: schema.SignedBlock) !SignedBlock {
+    /// Convert schema block representation to SignedBlock
+    ///
+    /// This mostly involves converting the string representation of keys, signatures into useful
+    /// runtime types (i.e. Ed25519 structures)
+    ///
+    /// Allocates block byte array into arena so that schema.SignedBlock can be freed.
+    pub fn fromDecodedBlock(arena: std.mem.Allocator, schema_signed_block: schema.SignedBlock) !SignedBlock {
         const block_signature = schema_signed_block.signature.getSlice();
 
         const next_key = schema_signed_block.nextKey orelse return error.ExpectedNextKey;
@@ -51,7 +57,7 @@ pub const SignedBlock = struct {
         } else null;
 
         return .{
-            .block = schema_signed_block.block.getSlice(),
+            .block = try arena.dupe(u8, schema_signed_block.block.getSlice()),
             .algorithm = algorithm,
             .signature = signature,
             .public_key = public_key,
@@ -61,14 +67,14 @@ pub const SignedBlock = struct {
 
     pub fn algorithmBuf(signed_block: *SignedBlock) [4]u8 {
         var buf: [4]u8 = undefined;
-        std.mem.writeInt(u32, buf[0..], @as(u32, @bitCast(@intFromEnum(signed_block.algorithm))), @import("builtin").cpu.arch.endian());
+        std.mem.writeInt(u32, buf[0..], @as(u32, @bitCast(@intFromEnum(signed_block.algorithm))), .little);
         return buf;
     }
 
     // FIXME: we should take the algorithm from the appropriate key
     pub fn algorithm2Buf(_: *SignedBlock) [4]u8 {
         var buf: [4]u8 = undefined;
-        std.mem.writeInt(u32, buf[0..], @as(u32, 0), @import("builtin").cpu.arch.endian());
+        std.mem.writeInt(u32, buf[0..], @as(u32, 0), .little);
         return buf;
     }
 };

@@ -11,36 +11,38 @@ pub const MIN_SCHEMA_VERSION = 3;
 pub const MAX_SCHEMA_VERSION = 4;
 
 pub const SerializedBiscuit = struct {
-    decoded_biscuit: schema.Biscuit,
+    arena_state: ?std.heap.ArenaAllocator,
     authority: SignedBlock,
     blocks: std.ArrayList(SignedBlock),
     proof: Proof,
     // root_key_id: ?u64,
 
-    // FIXME: should this take a SymbolTable?
     /// Initialise a SerializedBiscuit from the token's bytes and root public key.
     ///
     /// This decodes the toplevel-level biscuit format from protobuf and verifies
     /// the token.
     pub fn fromBytes(allocator: mem.Allocator, bytes: []const u8, public_key: Ed25519.PublicKey) !SerializedBiscuit {
         const b = try schema.decodeBiscuit(allocator, bytes);
-        errdefer b.deinit();
+        defer b.deinit();
 
-        // FIXME: Add textual public keys to symbols
+        var arena_state = std.heap.ArenaAllocator.init(allocator);
+        errdefer arena_state.deinit();
 
-        const authority = try SignedBlock.fromDecodedBlock(b.authority orelse return error.ExpectedAuthorityBlock);
+        const arena = arena_state.allocator();
+
+        const authority = try SignedBlock.fromDecodedBlock(arena, b.authority orelse return error.ExpectedAuthorityBlock);
         const proof = try Proof.fromDecodedProof(b.proof orelse return error.ExpectedProof);
 
-        var blocks = std.ArrayList(SignedBlock).init(allocator);
-        errdefer blocks.deinit();
+        var blocks = try std.ArrayList(SignedBlock).initCapacity(arena, b.blocks.items.len);
 
         for (b.blocks.items) |block| {
-            const signed_block = try SignedBlock.fromDecodedBlock(block);
+            const signed_block = try SignedBlock.fromDecodedBlock(arena, block);
+
             try blocks.append(signed_block);
         }
 
         var biscuit = SerializedBiscuit{
-            .decoded_biscuit = b,
+            .arena_state = arena_state,
             .authority = authority,
             .blocks = blocks,
             .proof = proof,
@@ -51,9 +53,14 @@ pub const SerializedBiscuit = struct {
         return biscuit;
     }
 
+    /// Deinitialize serialized biscuit created from fromBytes.
+    ///
+    /// Panics if we call deinit on _derived_ SerializedBiscuit, i.e.
+    /// a SerializedBiscuit we've called `fn seal` on
     pub fn deinit(serialized_block: *SerializedBiscuit) void {
-        serialized_block.blocks.deinit();
-        serialized_block.decoded_biscuit.deinit();
+        var arena_state = serialized_block.arena_state orelse unreachable;
+
+        arena_state.deinit();
     }
 
     /// Verify the token
@@ -153,19 +160,62 @@ pub const SerializedBiscuit = struct {
             },
         }
     }
+
+    /// Seal SerializedBiscuit
+    ///
+    /// Requires that the biscuit we're sealing has not been sealed (returns error.AlreadySealed otherwise).
+    ///
+    /// Use secret key from the proof to produce signature.
+    ///
+    /// Does not allocate (reuses memory of parent biscuit). Do not call `deinit` (which will panic).
+    pub fn seal(serialized_biscuit: *SerializedBiscuit) !SerializedBiscuit {
+        const secret_key = if (serialized_biscuit.proof == .next_secret) serialized_biscuit.proof.next_secret else return error.AlreadySealed;
+
+        const final_block = if (serialized_biscuit.blocks.items.len == 0)
+            serialized_biscuit.authority
+        else
+            serialized_biscuit.blocks.getLast();
+
+        const key_pair = try Ed25519.KeyPair.fromSecretKey(secret_key);
+
+        var signer = try Ed25519.KeyPair.signer(key_pair, null);
+
+        signer.update(final_block.block);
+        signer.update(&algorithm());
+        signer.update(&final_block.public_key.bytes);
+        signer.update(&final_block.signature.toBytes());
+
+        const signature = signer.finalize();
+
+        return .{
+            .arena_state = serialized_biscuit.arena_state,
+            .authority = serialized_biscuit.authority,
+            .blocks = serialized_biscuit.blocks,
+            .proof = .{ .final_signature = signature },
+        };
+    }
 };
+
+// FIXME this is duplicated
+pub fn algorithm() [4]u8 {
+    var buf: [4]u8 = undefined;
+    std.mem.writeInt(u32, buf[0..], @as(u32, @bitCast(@intFromEnum(schema.PublicKey.Algorithm.Ed25519))), .little);
+    return buf;
+}
 
 test {
     const decode = @import("decode.zig");
     const testing = std.testing;
-    var allocator = testing.allocator;
 
     // Key
     // private: 83e03c958f83085923f3cd091bab3c3b33a0c7f93f44889739fdb6c6fdb26f5b
     // public:  49fe7ec1972952c8c92119def96235ad622d0d024f3042a49c7317f7d5baf3da
-    const tokens: [3][]const u8 = .{
+    const unsealed_tokens: [2][]const u8 = .{
         "En0KEwoEMTIzNBgDIgkKBwgKEgMYgAgSJAgAEiCicdgxKsSQpGYPKcR7hmnI7WcRLaFNUNzqkCc92yZluhpAyMoux34FBhYaTsw32rddToN7qbl-XOAPQcaUALPg_SfmuxfXbU9aEIJGVCANQLUfoQwU1GAa8ZkXESkW1uCdCyIiCiCyJCJ0e-e00kyM_3O6IbbftDeYAnkoI8-G1x06NK283w==",
         "En0KEwoEMTIzNBgDIgkKBwgKEgMYgAgSJAgAEiCicdgxKsSQpGYPKcR7hmnI7WcRLaFNUNzqkCc92yZluhpAyMoux34FBhYaTsw32rddToN7qbl-XOAPQcaUALPg_SfmuxfXbU9aEIJGVCANQLUfoQwU1GAa8ZkXESkW1uCdCxp9ChMKBGFiY2QYAyIJCgcIAhIDGIEIEiQIABIgkJwspMgTz4pW4hQ_Tkua7EdZ5AajdxV35q42IyXzAt0aQBH3kiLfP06W0dPlQeuxgLU26ssrjoK-v1vvw0dzQ2BtaQjPs8eKhsowhFCjQ6nnhSP0p7v4TaJHWeO2fPsbUQwiIgogeuDcbq6waTZ1HpYt_zYNtAy02gbnjV-5-juc9sdXNJg=",
+    };
+
+    const sealed_tokens: [1][]const u8 = .{
         "En0KEwoEMTIzNBgDIgkKBwgKEgMYgAgSJAgAEiCicdgxKsSQpGYPKcR7hmnI7WcRLaFNUNzqkCc92yZluhpAyMoux34FBhYaTsw32rddToN7qbl-XOAPQcaUALPg_SfmuxfXbU9aEIJGVCANQLUfoQwU1GAa8ZkXESkW1uCdCxp9ChMKBGFiY2QYAyIJCgcIAhIDGIEIEiQIABIgkJwspMgTz4pW4hQ_Tkua7EdZ5AajdxV35q42IyXzAt0aQBH3kiLfP06W0dPlQeuxgLU26ssrjoK-v1vvw0dzQ2BtaQjPs8eKhsowhFCjQ6nnhSP0p7v4TaJHWeO2fPsbUQwiQhJAfNph7vZIL6WSLwOCmMHkwb4OmCc5s7EByizwq6HZOF04SRwCF8THWcNImPj-5xWOuI3zVdxg11Qr6d0c5yxuCw==",
     };
 
@@ -173,11 +223,28 @@ test {
     _ = try std.fmt.hexToBytes(&public_key_mem, "49fe7ec1972952c8c92119def96235ad622d0d024f3042a49c7317f7d5baf3da");
     const public_key = try Ed25519.PublicKey.fromBytes(public_key_mem);
 
-    for (tokens) |token| {
-        const bytes = try decode.urlSafeBase64ToBytes(allocator, token);
-        defer allocator.free(bytes);
+    for (unsealed_tokens) |token| {
+        const bytes = try decode.urlSafeBase64ToBytes(testing.allocator, token);
+        defer testing.allocator.free(bytes);
 
-        var b = try SerializedBiscuit.fromBytes(allocator, bytes, public_key);
+        var b = try SerializedBiscuit.fromBytes(testing.allocator, bytes, public_key);
         defer b.deinit();
+
+        // We should be able to seal the tokens
+        _ = try b.seal();
+    }
+
+    for (sealed_tokens) |token| {
+        const bytes = try decode.urlSafeBase64ToBytes(testing.allocator, token);
+        defer testing.allocator.free(bytes);
+
+        var b = try SerializedBiscuit.fromBytes(testing.allocator, bytes, public_key);
+        defer b.deinit();
+
+        // The tokens are already sealed so should fail
+        _ = b.seal() catch |err| switch (err) {
+            error.AlreadySealed => continue,
+            else => return err,
+        };
     }
 }
