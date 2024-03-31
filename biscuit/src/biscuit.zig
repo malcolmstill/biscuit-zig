@@ -7,6 +7,7 @@ const Block = @import("block.zig").Block;
 const SymbolTable = @import("biscuit-datalog").SymbolTable;
 const World = @import("biscuit-datalog").world.World;
 const SerializedBiscuit = @import("biscuit-format").SerializedBiscuit;
+const builder = @import("biscuit-builder");
 
 const log = std.log.scoped(.biscuit);
 
