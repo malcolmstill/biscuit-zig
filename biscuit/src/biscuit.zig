@@ -17,6 +17,12 @@ pub const Biscuit = struct {
     symbols: SymbolTable,
     public_key_to_block_id: std.AutoHashMap(usize, std.ArrayList(usize)),
 
+    pub fn new(allocator: mem.Allocator, root_secret_key: Ed25519.SecretKey) !Biscuit {
+        _ = root_secret_key;
+        _ = allocator;
+        unreachable;
+    }
+
     pub fn fromBytes(allocator: mem.Allocator, token_bytes: []const u8, root_public_key: Ed25519.PublicKey) !Biscuit {
         var serialized = try SerializedBiscuit.deserialize(allocator, token_bytes, root_public_key);
         errdefer serialized.deinit();
@@ -95,6 +101,33 @@ pub const Biscuit = struct {
 
     pub fn authorizer(biscuit: *Biscuit, allocator: std.mem.Allocator) !Authorizer {
         return try Authorizer.init(allocator, biscuit.*);
+    }
+
+    /// Append block to biscuit
+    ///
+    /// This will be the auhtority block in the case the biscuit is empty otherwise
+    /// will append a non-authority block.
+    pub fn append(biscuit: *Biscuit, block: builder.Block) !void {
+        _ = block;
+        _ = biscuit;
+        unreachable;
+    }
+
+    /// Seal biscuit
+    pub fn seal(biscuit: *Biscuit) !Biscuit {
+        return .{
+            .serialized = try biscuit.serialized.seal(),
+            .authority = biscuit.authority,
+            .blocks = biscuit.blocks,
+            .symbols = biscuit.symbols,
+            .public_key_to_block_id = biscuit.public_key_to_block_id,
+        };
+    }
+
+    /// Serialize biscuit to byte array
+    pub fn serialize(biscuit: *Biscuit) ![]const u8 {
+        _ = biscuit;
+        unreachable;
     }
 };
 
