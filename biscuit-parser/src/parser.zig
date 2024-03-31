@@ -58,6 +58,9 @@ pub const Parser = struct {
         return .{ .name = predicate_name, .terms = terms };
     }
 
+    /// Try to parse a term
+    ///
+    /// Does not consume `parser` input on failure.
     fn term(parser: *Parser, variables: AllowVariables) ParserError!Term {
         const rst = parser.rest();
 
@@ -272,6 +275,9 @@ pub const Parser = struct {
         expression,
     };
 
+    /// Try to parse a rule body element (a predicate or an expression)
+    ///
+    /// Does not consume `parser` input on failure.
     fn ruleBodyElement(parser: *Parser) !union(BodyElementTag) { predicate: Predicate, expression: Expression } {
         predicate_blk: {
             var predicate_parser = Parser.init(parser.allocator, parser.rest());
@@ -429,12 +435,12 @@ pub const Parser = struct {
 
     fn expression(parser: *Parser) ParserError!Expression {
         parser.skipWhiteSpace();
-        const e = try parser.expr();
+        const e = try parser.expr0();
 
         return e;
     }
 
-    fn expr(parser: *Parser) ParserError!Expression {
+    fn expr0(parser: *Parser) ParserError!Expression {
         var e = try parser.expr1();
 
         while (true) {
@@ -638,7 +644,7 @@ pub const Parser = struct {
 
         parser.skipWhiteSpace();
 
-        const e2 = try parser.expr();
+        const e2 = try parser.expr0();
 
         parser.skipWhiteSpace();
 
@@ -682,7 +688,7 @@ pub const Parser = struct {
         if (parser.startsWithConsuming("!")) {
             parser.skipWhiteSpace();
 
-            const e = try parser.expr();
+            const e = try parser.expr0();
 
             return try Expression.unary(parser.allocator, .negate, e);
         }
@@ -714,7 +720,7 @@ pub const Parser = struct {
 
         parser.skipWhiteSpace();
 
-        const e = try parser.expr();
+        const e = try parser.expr0();
 
         parser.skipWhiteSpace();
 
