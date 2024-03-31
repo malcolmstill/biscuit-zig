@@ -632,6 +632,23 @@ pub const Parser = struct {
         return e1;
     }
 
+    fn exprTerm(parser: *Parser) ParserError!Expression {
+        blk: {
+            var tmp = parser.temporary();
+
+            const p = tmp.unaryParens() catch break :blk;
+
+            parser.offset += tmp.offset;
+
+            return p;
+        }
+
+        // Otherwise we expect term
+        const term1 = try parser.term(.allow);
+
+        return try Expression.value(term1);
+    }
+
     fn binaryMethod(parser: *Parser, e1: Expression) ParserError!Expression {
         const op = try parser.binaryOp8();
 
@@ -656,6 +673,30 @@ pub const Parser = struct {
         try parser.consume("length()");
 
         return try Expression.unary(parser.allocator, .length, e1);
+    }
+
+    fn unaryNegate(parser: *Parser) ParserError!Expression {
+        try parser.consume("!");
+
+        parser.skipWhiteSpace();
+
+        const e = try parser.expression();
+
+        return try Expression.unary(parser.allocator, .negate, e);
+    }
+
+    fn unaryParens(parser: *Parser) ParserError!Expression {
+        try parser.consume("(");
+
+        parser.skipWhiteSpace();
+
+        const e = try parser.expression();
+
+        parser.skipWhiteSpace();
+
+        try parser.consume(")");
+
+        return try Expression.unary(parser.allocator, .parens, e);
     }
 
     fn binaryOp0(parser: *Parser) ParserError!Expression.BinaryOp {
@@ -728,81 +769,6 @@ pub const Parser = struct {
         if (parser.startsWithConsuming("union")) return .@"union";
 
         return error.UnexpectedOp;
-    }
-
-    fn exprTerm(parser: *Parser) ParserError!Expression {
-        // Try to parse unary
-        unary_parens_blk: {
-            var tmp = parser.temporary();
-
-            const p = tmp.unaryParens() catch break :unary_parens_blk;
-
-            parser.offset += tmp.offset;
-
-            return p;
-        }
-
-        // Otherwise we expect term
-        const term1 = try parser.term(.allow);
-
-        return try Expression.value(term1);
-    }
-
-    // fn unary(parser: *Parser) ParserError!Expression {
-    //     parser.skipWhiteSpace();
-
-    //     if (parser.startsWithConsuming("!")) {
-    //         parser.skipWhiteSpace();
-
-    //         const e = try parser.expression();
-
-    //         return try Expression.unary(parser.allocator, .negate, e);
-    //     }
-
-    //     if (parser.startsWith("(")) {
-    //         return try parser.unaryParens();
-    //     }
-
-    //     var e: Expression = undefined;
-    //     if (parser.term(.allow)) |t1| {
-    //         parser.skipWhiteSpace();
-    //         e = try Expression.value(t1);
-    //     } else |_| {
-    //         e = try parser.unaryParens();
-    //         parser.skipWhiteSpace();
-    //     }
-
-    //     if (parser.consume(".length()")) |_| {
-    //         return try Expression.unary(parser.allocator, .length, e);
-    //     } else |_| {
-    //         return error.UnexpectedToken;
-    //     }
-
-    //     return error.UnexpectedToken;
-    // }
-
-    fn unaryNegate(parser: *Parser) ParserError!Expression {
-        try parser.consume("!");
-
-        parser.skipWhiteSpace();
-
-        const e = try parser.expression();
-
-        return try Expression.unary(parser.allocator, .negate, e);
-    }
-
-    fn unaryParens(parser: *Parser) ParserError!Expression {
-        try parser.consume("(");
-
-        parser.skipWhiteSpace();
-
-        const e = try parser.expression();
-
-        parser.skipWhiteSpace();
-
-        try parser.consume(")");
-
-        return try Expression.unary(parser.allocator, .parens, e);
     }
 
     fn scopes(parser: *Parser, allocator: std.mem.Allocator) !std.ArrayList(Scope) {
