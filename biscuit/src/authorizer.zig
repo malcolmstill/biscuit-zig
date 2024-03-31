@@ -14,17 +14,18 @@ const PolicyResult = @import("biscuit-builder").PolicyResult;
 const log = std.log.scoped(.authorizer);
 
 pub const Authorizer = struct {
+    allocator: mem.Allocator,
     arena: mem.Allocator,
     checks: std.ArrayList(builder.Check),
     policies: std.ArrayList(builder.Policy),
-    biscuit: ?Biscuit,
+    biscuit: ?*Biscuit,
     world: World,
     symbols: SymbolTable,
     public_key_to_block_id: std.AutoHashMap(usize, std.ArrayList(usize)),
     scopes: std.ArrayList(Scope),
 
-    pub fn init(arena: std.mem.Allocator, biscuit: Biscuit) !Authorizer {
-        var symbols = SymbolTable.init("authorizer", arena);
+    pub fn init(allocator: mem.Allocator, arena: std.mem.Allocator, biscuit: *Biscuit) !Authorizer {
+        var symbols = SymbolTable.init("authorizer", allocator);
         var public_key_to_block_id = std.AutoHashMap(usize, std.ArrayList(usize)).init(arena);
 
         // Map public key symbols into authorizer symbols and public_key_to_block_id map
@@ -37,10 +38,15 @@ pub const Authorizer = struct {
 
             const authorizer_public_key_index = try symbols.insertPublicKey(public_key);
 
-            try public_key_to_block_id.put(authorizer_public_key_index, try block_ids.clone());
+            var list = try std.ArrayList(usize).initCapacity(allocator, block_ids.items.len);
+
+            for (block_ids.items) |id| try list.append(id);
+
+            try public_key_to_block_id.put(authorizer_public_key_index, list);
         }
 
         return .{
+            .allocator = allocator,
             .arena = arena,
             .checks = std.ArrayList(builder.Check).init(arena),
             .policies = std.ArrayList(builder.Policy).init(arena),
@@ -52,28 +58,16 @@ pub const Authorizer = struct {
         };
     }
 
-    pub fn deinit(_: *Authorizer) void {
-        // authorizer.world.deinit();
-        // authorizer.symbols.deinit();
-        // authorizer.scopes.deinit();
+    pub fn deinit(authorizer: *Authorizer) void {
+        authorizer.symbols.deinit();
 
-        // for (authorizer.checks.items) |check| {
-        //     check.deinit();
-        // }
-        // authorizer.checks.deinit();
-
-        // for (authorizer.policies.items) |policy| {
-        //     policy.deinit();
-        // }
-        // authorizer.policies.deinit();
-
-        // {
-        //     var it = authorizer.public_key_to_block_id.valueIterator();
-        //     while (it.next()) |block_ids| {
-        //         block_ids.deinit();
-        //     }
-        //     authorizer.public_key_to_block_id.deinit();
-        // }
+        {
+            var it = authorizer.public_key_to_block_id.valueIterator();
+            while (it.next()) |block_ids| {
+                block_ids.deinit();
+            }
+            authorizer.public_key_to_block_id.deinit();
+        }
     }
 
     /// Authorize token with authorizer
