@@ -1290,3 +1290,41 @@ test "parse check" {
         try testing.expectError(error.ExpectedPredicateOrExpression, parser.check());
     }
 }
+
+test "parse policy" {
+    const testing = std.testing;
+
+    var arena_state = std.heap.ArenaAllocator.init(testing.allocator);
+    defer arena_state.deinit();
+    const arena = arena_state.allocator();
+
+    {
+        var parser = Parser.init(arena, "allow if right($0, $1), resource($0), operation($1), $0.contains(\"file\")");
+        const policy = try parser.policy();
+
+        try testing.expectEqual(.allow, policy.kind);
+        try testing.expectEqual(1, policy.queries.items.len);
+
+        try testing.expectEqualStrings("query", policy.queries.items[0].head.name);
+        try testing.expectEqualStrings("right", policy.queries.items[0].body.items[0].name);
+        try testing.expectEqualStrings("resource", policy.queries.items[0].body.items[1].name);
+        try testing.expectEqualStrings("operation", policy.queries.items[0].body.items[2].name);
+
+        try testing.expectEqualStrings("$0.contains(\"file\")", try std.fmt.allocPrint(arena, "{any}", .{policy.queries.items[0].expressions.items[0]}));
+    }
+
+    {
+        var parser = Parser.init(arena, "deny if right($0, $1), resource($0), operation($1), $0.contains(\"file\")");
+        const policy = try parser.policy();
+
+        try testing.expectEqual(.deny, policy.kind);
+        try testing.expectEqual(1, policy.queries.items.len);
+
+        try testing.expectEqualStrings("query", policy.queries.items[0].head.name);
+        try testing.expectEqualStrings("right", policy.queries.items[0].body.items[0].name);
+        try testing.expectEqualStrings("resource", policy.queries.items[0].body.items[1].name);
+        try testing.expectEqualStrings("operation", policy.queries.items[0].body.items[2].name);
+
+        try testing.expectEqualStrings("$0.contains(\"file\")", try std.fmt.allocPrint(arena, "{any}", .{policy.queries.items[0].expressions.items[0]}));
+    }
+}
