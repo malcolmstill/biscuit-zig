@@ -73,72 +73,72 @@ pub const Parser = struct {
             try parser.reject("$"); // Variables are disallowed in a fact term
         } else {
             variable_blk: {
-                var term_parser = parser.temporary();
+                var tmp = parser.temporary();
 
-                const value = term_parser.variable() catch break :variable_blk;
+                const value = tmp.variable() catch break :variable_blk;
 
-                parser.offset += term_parser.offset;
+                parser.offset += tmp.offset;
 
                 return .{ .variable = value };
             }
         }
 
         string_blk: {
-            var term_parser = parser.temporary();
+            var tmp = parser.temporary();
 
-            const value = term_parser.string() catch break :string_blk;
+            const value = tmp.string() catch break :string_blk;
 
-            parser.offset += term_parser.offset;
+            parser.offset += tmp.offset;
 
             return .{ .string = value };
         }
 
         date_blk: {
-            var term_parser = parser.temporary();
+            var tmp = parser.temporary();
 
-            const value = term_parser.date() catch break :date_blk;
+            const value = tmp.date() catch break :date_blk;
 
-            parser.offset += term_parser.offset;
+            parser.offset += tmp.offset;
 
             return .{ .date = value };
         }
 
         number_blk: {
-            var term_parser = parser.temporary();
+            var tmp = parser.temporary();
 
-            const value = term_parser.number(i64) catch break :number_blk;
+            const value = tmp.number(i64) catch break :number_blk;
 
-            parser.offset += term_parser.offset;
+            parser.offset += tmp.offset;
 
             return .{ .integer = value };
         }
 
         bool_blk: {
-            var term_parser = parser.temporary();
+            var tmp = parser.temporary();
 
-            const value = term_parser.boolean() catch break :bool_blk;
+            const value = tmp.boolean() catch break :bool_blk;
 
-            parser.offset += term_parser.offset;
+            parser.offset += tmp.offset;
 
             return .{ .bool = value };
         }
 
         bytes_blk: {
-            var term_parser = parser.temporary();
+            var tmp = parser.temporary();
 
-            const value = term_parser.bytes() catch break :bytes_blk;
+            const value = tmp.bytes() catch break :bytes_blk;
 
-            parser.offset += term_parser.offset;
+            parser.offset += tmp.offset;
 
             return .{ .bytes = value };
         }
 
         set_blk: {
-            var term_parser = parser.temporary();
+            var tmp = parser.temporary();
 
-            const value = term_parser.set(variables) catch break :set_blk;
+            const value = tmp.set(variables) catch break :set_blk;
 
-            parser.offset += term_parser.offset;
+            parser.offset += tmp.offset;
 
             return .{ .set = value };
         }
@@ -247,11 +247,11 @@ pub const Parser = struct {
         }
 
         scopes_blk: {
-            var scope_parser = parser.temporary();
+            var tmp = parser.temporary();
 
-            const s = scope_parser.scopes(parser.allocator) catch break :scopes_blk;
+            const s = tmp.scopes(parser.allocator) catch break :scopes_blk;
 
-            parser.offset += scope_parser.offset;
+            parser.offset += tmp.offset;
 
             scps = s;
         }
@@ -269,22 +269,22 @@ pub const Parser = struct {
     /// Does not consume `parser` input on failure.
     fn ruleBodyElement(parser: *Parser) !union(BodyElementTag) { predicate: Predicate, expression: Expression } {
         predicate_blk: {
-            var predicate_parser = parser.temporary();
+            var tmp = parser.temporary();
 
-            const p = predicate_parser.predicate(.rule) catch break :predicate_blk;
+            const p = tmp.predicate(.rule) catch break :predicate_blk;
 
-            parser.offset += predicate_parser.offset;
+            parser.offset += tmp.offset;
 
             return .{ .predicate = p };
         }
 
         // Otherwise try parsing an expression
         expression_blk: {
-            var expression_parser = parser.temporary();
+            var tmp = parser.temporary();
 
-            const e = expression_parser.expression() catch break :expression_blk;
+            const e = tmp.expression() catch break :expression_blk;
 
-            parser.offset += expression_parser.offset;
+            parser.offset += tmp.offset;
 
             return .{ .expression = e };
         }
@@ -556,13 +556,84 @@ pub const Parser = struct {
     }
 
     fn expr7(parser: *Parser) ParserError!Expression {
-        const e1 = try parser.exprTerm();
+        var e = try parser.expr8();
+
+        while (true) {
+            parser.skipWhiteSpace();
+
+            const op = parser.binaryOp7() catch break;
+
+            parser.skipWhiteSpace();
+
+            const e2 = try parser.expr8();
+
+            e = try Expression.binary(parser.allocator, op, e, e2);
+        }
+
+        return e;
+    }
+
+    fn expr8(parser: *Parser) ParserError!Expression {
+        unary_negate_blk: {
+            var tmp = parser.temporary();
+
+            const e = tmp.unaryNegate() catch break :unary_negate_blk;
+
+            parser.offset += tmp.offset;
+
+            return e;
+        }
+
+        expr9_blk: {
+            var tmp = parser.temporary();
+
+            const e = tmp.expr9() catch break :expr9_blk;
+
+            parser.offset += tmp.offset;
+
+            return e;
+        }
+
+        return error.ExpectedUnaryNegateOrMethod;
+    }
+
+    /// Parse a unary or binary method
+    fn expr9(parser: *Parser) ParserError!Expression {
+        var e1 = try parser.exprTerm();
 
         parser.skipWhiteSpace();
 
         if (!parser.startsWithConsuming(".")) return e1;
 
-        const op = try parser.binaryOp7();
+        while (true) {
+            blk: {
+                var tmp = parser.temporary();
+
+                e1 = tmp.binaryMethod(e1) catch break :blk;
+
+                parser.offset += tmp.offset;
+
+                if (parser.startsWithConsuming(".")) continue;
+            }
+
+            blk: {
+                var tmp = parser.temporary();
+
+                e1 = tmp.unaryMethod(e1) catch break :blk;
+
+                parser.offset += tmp.offset;
+
+                if (parser.startsWithConsuming(".")) continue;
+            }
+
+            break;
+        }
+
+        return e1;
+    }
+
+    fn binaryMethod(parser: *Parser, e1: Expression) ParserError!Expression {
+        const op = try parser.binaryOp8();
 
         parser.skipWhiteSpace();
 
@@ -581,27 +652,31 @@ pub const Parser = struct {
         return try Expression.binary(parser.allocator, op, e1, e2);
     }
 
+    fn unaryMethod(parser: *Parser, e1: Expression) ParserError!Expression {
+        try parser.consume("length()");
+
+        return try Expression.unary(parser.allocator, .length, e1);
+    }
+
     fn binaryOp0(parser: *Parser) ParserError!Expression.BinaryOp {
-        if (parser.startsWithConsuming("&&")) return .@"and";
         if (parser.startsWithConsuming("||")) return .@"or";
 
         return error.UnexpectedOp;
     }
 
     fn binaryOp1(parser: *Parser) ParserError!Expression.BinaryOp {
+        if (parser.startsWithConsuming("&&")) return .@"and";
+
+        return error.UnexpectedOp;
+    }
+
+    fn binaryOp2(parser: *Parser) ParserError!Expression.BinaryOp {
         if (parser.startsWithConsuming("<=")) return .less_or_equal;
         if (parser.startsWithConsuming(">=")) return .greater_or_equal;
         if (parser.startsWithConsuming("<")) return .less_than;
         if (parser.startsWithConsuming(">")) return .greater_than;
         if (parser.startsWithConsuming("==")) return .equal;
         if (parser.startsWithConsuming("!=")) return .not_equal;
-
-        return error.UnexpectedOp;
-    }
-
-    fn binaryOp2(parser: *Parser) ParserError!Expression.BinaryOp {
-        if (parser.startsWithConsuming("+")) return .add;
-        if (parser.startsWithConsuming("-")) return .sub;
 
         return error.UnexpectedOp;
     }
@@ -631,13 +706,20 @@ pub const Parser = struct {
     }
 
     fn binaryOp6(parser: *Parser) ParserError!Expression.BinaryOp {
+        if (parser.startsWithConsuming("+")) return .add;
+        if (parser.startsWithConsuming("-")) return .sub;
+
+        return error.UnexpectedOp;
+    }
+
+    fn binaryOp7(parser: *Parser) ParserError!Expression.BinaryOp {
         if (parser.startsWithConsuming("*")) return .mul;
         if (parser.startsWithConsuming("/")) return .div;
 
         return error.UnexpectedOp;
     }
 
-    fn binaryOp7(parser: *Parser) ParserError!Expression.BinaryOp {
+    fn binaryOp8(parser: *Parser) ParserError!Expression.BinaryOp {
         if (parser.startsWithConsuming("contains")) return .contains;
         if (parser.startsWithConsuming("starts_with")) return .prefix;
         if (parser.startsWithConsuming("ends_with")) return .suffix;
@@ -650,12 +732,12 @@ pub const Parser = struct {
 
     fn exprTerm(parser: *Parser) ParserError!Expression {
         // Try to parse unary
-        unary_blk: {
-            var unary_parser = parser.temporary();
+        unary_parens_blk: {
+            var tmp = parser.temporary();
 
-            const p = unary_parser.unary() catch break :unary_blk;
+            const p = tmp.unaryParens() catch break :unary_parens_blk;
 
-            parser.offset += unary_parser.offset;
+            parser.offset += tmp.offset;
 
             return p;
         }
@@ -666,37 +748,47 @@ pub const Parser = struct {
         return try Expression.value(term1);
     }
 
-    fn unary(parser: *Parser) ParserError!Expression {
+    // fn unary(parser: *Parser) ParserError!Expression {
+    //     parser.skipWhiteSpace();
+
+    //     if (parser.startsWithConsuming("!")) {
+    //         parser.skipWhiteSpace();
+
+    //         const e = try parser.expression();
+
+    //         return try Expression.unary(parser.allocator, .negate, e);
+    //     }
+
+    //     if (parser.startsWith("(")) {
+    //         return try parser.unaryParens();
+    //     }
+
+    //     var e: Expression = undefined;
+    //     if (parser.term(.allow)) |t1| {
+    //         parser.skipWhiteSpace();
+    //         e = try Expression.value(t1);
+    //     } else |_| {
+    //         e = try parser.unaryParens();
+    //         parser.skipWhiteSpace();
+    //     }
+
+    //     if (parser.consume(".length()")) |_| {
+    //         return try Expression.unary(parser.allocator, .length, e);
+    //     } else |_| {
+    //         return error.UnexpectedToken;
+    //     }
+
+    //     return error.UnexpectedToken;
+    // }
+
+    fn unaryNegate(parser: *Parser) ParserError!Expression {
+        try parser.consume("!");
+
         parser.skipWhiteSpace();
 
-        if (parser.startsWithConsuming("!")) {
-            parser.skipWhiteSpace();
+        const e = try parser.expression();
 
-            const e = try parser.expression();
-
-            return try Expression.unary(parser.allocator, .negate, e);
-        }
-
-        if (parser.startsWith("(")) {
-            return try parser.unaryParens();
-        }
-
-        var e: Expression = undefined;
-        if (parser.term(.allow)) |t1| {
-            parser.skipWhiteSpace();
-            e = try Expression.value(t1);
-        } else |_| {
-            e = try parser.unaryParens();
-            parser.skipWhiteSpace();
-        }
-
-        if (parser.consume(".length()")) |_| {
-            return try Expression.unary(parser.allocator, .length, e);
-        } else |_| {
-            return error.UnexpectedToken;
-        }
-
-        return error.UnexpectedToken;
+        return try Expression.unary(parser.allocator, .negate, e);
     }
 
     fn unaryParens(parser: *Parser) ParserError!Expression {
@@ -947,6 +1039,8 @@ const ParserError = error{
     DisallowedChar,
     UnexpectedString,
     ExpectedChar,
+    ExpectedUnaryNegateOrMethod,
+    ExpectedUnaryOrBinaryMethod,
     NoFactTermFound,
     UnexpectedOp,
     MissingLeftParen,
@@ -1337,24 +1431,24 @@ test "parse expression" {
     defer arena_state.deinit();
     const arena = arena_state.allocator();
 
-    {
-        var parser = Parser.init(arena, "$0.contains(\"file\")");
+    const inputs = [_][]const u8{
+        "1",
+        "[2]",
+        "$0.contains(\"file\")",
+        "!(1 + 2)",
+        "1 ^ (4 + 6)",
+        "[1].intersection([2])",
+        "[1].intersection([2]).length().union([3])",
+        "1 + 2 * 3 / (4 + 5)",
+        "[1].length()",
+        "\"hello\".length()",
+    };
+
+    for (inputs) |input| {
+        var parser = Parser.init(arena, input);
         const expression = try parser.expression();
+        std.debug.print("input = \"{s}\", output = \"{}\"\n", .{ input, expression });
 
-        try testing.expectEqualStrings("$0.contains(\"file\")", try std.fmt.allocPrint(arena, "{any}", .{expression}));
-    }
-
-    {
-        var parser = Parser.init(arena, "!(1 + 2)");
-        const expression = try parser.expression();
-
-        try testing.expectEqualStrings("!(1 + 2)", try std.fmt.allocPrint(arena, "{any}", .{expression}));
-    }
-
-    {
-        var parser = Parser.init(arena, "[1].intersection([2]).length().union([3])");
-        const expression = try parser.expression();
-
-        try testing.expectEqualStrings("[1].intersection([2]).length().union([3])", try std.fmt.allocPrint(arena, "{any}", .{expression}));
+        try testing.expectEqualStrings(input, try std.fmt.allocPrint(arena, "{any}", .{expression}));
     }
 }
