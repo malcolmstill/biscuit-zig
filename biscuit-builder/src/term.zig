@@ -36,7 +36,7 @@ pub const Term = union(TermTag) {
 
                 var it = s.iterator();
                 while (it.next()) |t| {
-                    try datalog_set.add(t);
+                    try datalog_set.add(try t.toDatalog(arena, symbols));
                 }
 
                 return .{ .set = datalog_set };
