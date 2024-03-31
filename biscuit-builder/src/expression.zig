@@ -159,7 +159,7 @@ pub const Expression = union(ExpressionType) {
             .value => |v| try writer.print("{any}", .{v}),
             .unary => |u| {
                 switch (u.op) {
-                    .negate => try writer.print("-{any}", .{u.expression}),
+                    .negate => try writer.print("!{any}", .{u.expression}),
                     .parens => try writer.print("({any})", .{u.expression}),
                     .length => try writer.print("{any}.length()", .{u.expression}),
                 }

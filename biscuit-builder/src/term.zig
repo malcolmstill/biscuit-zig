@@ -52,7 +52,23 @@ pub const Term = union(TermTag) {
             .bool => |b| if (b) try writer.print("true", .{}) else try writer.print("false", .{}),
             .date => |n| try writer.print("{}", .{n}),
             .bytes => unreachable,
-            .set => unreachable,
+            .set => |s| {
+                try writer.print("[", .{});
+
+                const count = s.count();
+
+                var it = s.iterator();
+
+                var i: usize = 0;
+                while (it.next()) |t| {
+                    defer i += 1;
+                    try writer.print("{any}", .{t});
+
+                    if (i < count - 1) try writer.print(", ", .{});
+                }
+
+                try writer.print("]", .{});
+            },
         }
     }
 

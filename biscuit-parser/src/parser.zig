@@ -422,19 +422,18 @@ pub const Parser = struct {
         return new_set;
     }
 
+    /// Parse an expression
+    ///
+    /// This is the top-level expression parsing function. Where
+    /// other parts of the code call `parser.expression` you know
+    /// they are parsing a "full" expression.
+    ///
+    /// The code uses the "precedence climbing" approach.
     fn expression(parser: *Parser) ParserError!Expression {
-        parser.skipWhiteSpace();
-        const e = try parser.expr0();
-
-        return e;
-    }
-
-    fn expr0(parser: *Parser) ParserError!Expression {
         var e = try parser.expr1();
 
         while (true) {
             parser.skipWhiteSpace();
-            if (parser.rest().len == 0) break;
 
             const op = parser.binaryOp0() catch break;
 
@@ -460,7 +459,6 @@ pub const Parser = struct {
 
         while (true) {
             parser.skipWhiteSpace();
-            if (parser.rest().len == 0) break;
 
             const op = parser.binaryOp1() catch break;
 
@@ -490,7 +488,6 @@ pub const Parser = struct {
 
         while (true) {
             parser.skipWhiteSpace();
-            if (parser.rest().len == 0) break;
 
             const op = parser.binaryOp2() catch break;
 
@@ -516,7 +513,6 @@ pub const Parser = struct {
 
         while (true) {
             parser.skipWhiteSpace();
-            if (parser.rest().len == 0) break;
 
             const op = parser.binaryOp3() catch break;
 
@@ -541,7 +537,6 @@ pub const Parser = struct {
 
         while (true) {
             parser.skipWhiteSpace();
-            if (parser.rest().len == 0) break;
 
             const op = parser.binaryOp4() catch break;
 
@@ -569,7 +564,6 @@ pub const Parser = struct {
 
         while (true) {
             parser.skipWhiteSpace();
-            if (parser.rest().len == 0) break;
 
             const op = parser.binaryOp5() catch break;
 
@@ -597,7 +591,6 @@ pub const Parser = struct {
 
         while (true) {
             parser.skipWhiteSpace();
-            if (parser.rest().len == 0) break;
 
             const op = parser.binaryOp6() catch break;
 
@@ -633,7 +626,7 @@ pub const Parser = struct {
 
         parser.skipWhiteSpace();
 
-        const e2 = try parser.expr0();
+        const e2 = try parser.expression();
 
         parser.skipWhiteSpace();
 
@@ -677,7 +670,7 @@ pub const Parser = struct {
         if (parser.startsWithConsuming("!")) {
             parser.skipWhiteSpace();
 
-            const e = try parser.expr0();
+            const e = try parser.expression();
 
             return try Expression.unary(parser.allocator, .negate, e);
         }
@@ -709,7 +702,7 @@ pub const Parser = struct {
 
         parser.skipWhiteSpace();
 
-        const e = try parser.expr0();
+        const e = try parser.expression();
 
         parser.skipWhiteSpace();
 
@@ -1333,4 +1326,33 @@ test "parse policy" {
 
         try testing.expectEqualStrings("$0.contains(\"file\")", try std.fmt.allocPrint(arena, "{any}", .{policy.queries.items[0].expressions.items[0]}));
     }
+}
+
+test "parse expression" {
+    const testing = std.testing;
+
+    var arena_state = std.heap.ArenaAllocator.init(testing.allocator);
+    defer arena_state.deinit();
+    const arena = arena_state.allocator();
+
+    {
+        var parser = Parser.init(arena, "$0.contains(\"file\")");
+        const expression = try parser.expression();
+
+        try testing.expectEqualStrings("$0.contains(\"file\")", try std.fmt.allocPrint(arena, "{any}", .{expression}));
+    }
+
+    {
+        var parser = Parser.init(arena, "!(1 + 2)");
+        const expression = try parser.expression();
+
+        try testing.expectEqualStrings("!(1 + 2)", try std.fmt.allocPrint(arena, "{any}", .{expression}));
+    }
+
+    // {
+    //     var parser = Parser.init(arena, "[1].intersection([2]).length().union([3])");
+    //     const expression = try parser.expression();
+
+    //     try testing.expectEqualStrings("[1].intersection([2]).length().union([3])", try std.fmt.allocPrint(arena, "{any}", .{expression}));
+    // }
 }
