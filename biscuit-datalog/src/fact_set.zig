@@ -38,11 +38,11 @@ pub const FactSet = struct {
     // value as a key, and we try to insert into hashmap that already contains that value,
     // we will leak the key if we don't detect the existing version and deallocate one of the
     // keys.
-    pub fn deinit(fact_set: *FactSet) void {
+    pub fn testDeinit(fact_set: *FactSet) void {
         var it = fact_set.sets.iterator();
 
         while (it.next()) |origin_facts| {
-            origin_facts.key_ptr.deinit(); // Okay, in practice this is also giving us incorrect alignment issues
+            origin_facts.key_ptr.testDeinit(); // Okay, in practice this is also giving us incorrect alignment issues
             origin_facts.value_ptr.deinit();
         }
 
@@ -150,7 +150,7 @@ test "FactSet trustedIterator" {
     const Term = @import("term.zig").Term;
 
     var fs = FactSet.init(testing.allocator);
-    defer fs.deinit();
+    defer fs.testDeinit();
 
     var origin = Origin.init(testing.allocator);
     try origin.insert(0);
@@ -184,7 +184,7 @@ test "FactSet trustedIterator" {
     // With a trusted iterator only trusting [0] we only expect a single fact
     {
         var trusted_origins = try TrustedOrigins.defaultOrigins(testing.allocator);
-        defer trusted_origins.deinit();
+        defer trusted_origins.testDeinit();
 
         var count: usize = 0;
 

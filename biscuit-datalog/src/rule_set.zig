@@ -15,11 +15,11 @@ pub const RuleSet = struct {
         };
     }
 
-    pub fn deinit(rule_set: *RuleSet) void {
+    pub fn testDeinit(rule_set: *RuleSet) void {
         var it = rule_set.rules.iterator();
 
         while (it.next()) |entry| {
-            entry.key_ptr.deinit();
+            entry.key_ptr.testDeinit();
             entry.value_ptr.deinit();
         }
 
@@ -44,7 +44,7 @@ test "RuleSet" {
     const test_log = std.log.scoped(.test_rule_set);
 
     var rs = RuleSet.init(testing.allocator);
-    defer rs.deinit();
+    defer rs.testDeinit();
 
     const default_origins = try TrustedOrigins.defaultOrigins(testing.allocator);
     const rule: Rule = undefined;

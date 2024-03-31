@@ -36,9 +36,9 @@ pub const Block = struct {
     }
 
     pub fn deinit(block: *Block) void {
-        for (block.checks.items) |*check| check.deinit();
-        for (block.rules.items) |*rule| rule.deinit();
-        for (block.facts.items) |*fact| fact.deinit();
+        // for (block.checks.items) |*check| check.deinit();
+        // for (block.rules.items) |*rule| rule.deinit();
+        // for (block.facts.items) |*fact| fact.deinit();
 
         block.checks.deinit();
         block.rules.deinit();

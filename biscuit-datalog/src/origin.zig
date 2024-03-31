@@ -23,9 +23,7 @@ pub const Origin = struct {
         return .{ .block_ids = block_ids };
     }
 
-    pub fn deinit(origin: *Origin) void {
-        if (@import("builtin").mode != .Debug) unreachable; // .deinit only used in tests
-
+    pub fn testDeinit(origin: *Origin) void {
         origin.block_ids.deinit();
     }
 
@@ -96,7 +94,7 @@ test "Origins" {
     const testing = std.testing;
 
     var origins = Origin.init(testing.allocator);
-    defer origins.deinit();
+    defer origins.testDeinit();
 
     try origins.insert(12);
     try origins.insert(13);

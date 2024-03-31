@@ -47,7 +47,7 @@ pub const World = struct {
             const starting_fact_count = world.fact_set.count();
 
             var new_fact_sets = FactSet.init(world.arena);
-            defer new_fact_sets.deinit();
+            // defer new_fact_sets.deinit();
 
             // Iterate over rules to generate new facts
             {

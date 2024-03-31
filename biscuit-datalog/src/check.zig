@@ -24,9 +24,9 @@ pub const Check = struct {
         return .{ .queries = rules, .kind = kind };
     }
 
-    pub fn deinit(check: *Check) void {
+    pub fn testDeinit(check: *Check) void {
         for (check.queries.items) |*query| {
-            query.deinit();
+            query.testDeinit();
         }
 
         check.queries.deinit();
