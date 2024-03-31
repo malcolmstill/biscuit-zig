@@ -447,13 +447,6 @@ pub const Parser = struct {
         return e;
     }
 
-    fn binaryOp0(parser: *Parser) ParserError!Expression.BinaryOp {
-        if (parser.startsWithConsuming("&&")) return .@"and";
-        if (parser.startsWithConsuming("||")) return .@"or";
-
-        return error.UnexpectedOp;
-    }
-
     fn expr1(parser: *Parser) ParserError!Expression {
         var e = try parser.expr2();
 
@@ -470,17 +463,6 @@ pub const Parser = struct {
         }
 
         return e;
-    }
-
-    fn binaryOp1(parser: *Parser) ParserError!Expression.BinaryOp {
-        if (parser.startsWithConsuming("<=")) return .less_or_equal;
-        if (parser.startsWithConsuming(">=")) return .greater_or_equal;
-        if (parser.startsWithConsuming("<")) return .less_than;
-        if (parser.startsWithConsuming(">")) return .greater_than;
-        if (parser.startsWithConsuming("==")) return .equal;
-        if (parser.startsWithConsuming("!=")) return .not_equal;
-
-        return error.UnexpectedOp;
     }
 
     fn expr2(parser: *Parser) ParserError!Expression {
@@ -501,13 +483,6 @@ pub const Parser = struct {
         return e;
     }
 
-    fn binaryOp2(parser: *Parser) ParserError!Expression.BinaryOp {
-        if (parser.startsWithConsuming("+")) return .add;
-        if (parser.startsWithConsuming("-")) return .sub;
-
-        return error.UnexpectedOp;
-    }
-
     fn expr3(parser: *Parser) ParserError!Expression {
         var e = try parser.expr4();
 
@@ -524,12 +499,6 @@ pub const Parser = struct {
         }
 
         return e;
-    }
-
-    fn binaryOp3(parser: *Parser) ParserError!Expression.BinaryOp {
-        if (parser.startsWithConsuming("^")) return .bitwise_xor;
-
-        return error.UnexpectedOp;
     }
 
     fn expr4(parser: *Parser) ParserError!Expression {
@@ -550,15 +519,6 @@ pub const Parser = struct {
         return e;
     }
 
-    fn binaryOp4(parser: *Parser) ParserError!Expression.BinaryOp {
-        if (parser.startsWith("|") and !parser.startsWith("||")) {
-            try parser.consume("|");
-            return .bitwise_or;
-        }
-
-        return error.UnexpectedOp;
-    }
-
     fn expr5(parser: *Parser) ParserError!Expression {
         var e = try parser.expr6();
 
@@ -577,15 +537,6 @@ pub const Parser = struct {
         return e;
     }
 
-    fn binaryOp5(parser: *Parser) ParserError!Expression.BinaryOp {
-        if (parser.startsWith("&") and !parser.startsWith("&&")) {
-            try parser.consume("&");
-            return .bitwise_and;
-        }
-
-        return error.UnexpectedOp;
-    }
-
     fn expr6(parser: *Parser) ParserError!Expression {
         var e = try parser.expr7();
 
@@ -602,13 +553,6 @@ pub const Parser = struct {
         }
 
         return e;
-    }
-
-    fn binaryOp6(parser: *Parser) ParserError!Expression.BinaryOp {
-        if (parser.startsWithConsuming("*")) return .mul;
-        if (parser.startsWithConsuming("/")) return .div;
-
-        return error.UnexpectedOp;
     }
 
     fn expr7(parser: *Parser) ParserError!Expression {
@@ -637,11 +581,69 @@ pub const Parser = struct {
         return try Expression.binary(parser.allocator, op, e1, e2);
     }
 
+    fn binaryOp0(parser: *Parser) ParserError!Expression.BinaryOp {
+        if (parser.startsWithConsuming("&&")) return .@"and";
+        if (parser.startsWithConsuming("||")) return .@"or";
+
+        return error.UnexpectedOp;
+    }
+
+    fn binaryOp1(parser: *Parser) ParserError!Expression.BinaryOp {
+        if (parser.startsWithConsuming("<=")) return .less_or_equal;
+        if (parser.startsWithConsuming(">=")) return .greater_or_equal;
+        if (parser.startsWithConsuming("<")) return .less_than;
+        if (parser.startsWithConsuming(">")) return .greater_than;
+        if (parser.startsWithConsuming("==")) return .equal;
+        if (parser.startsWithConsuming("!=")) return .not_equal;
+
+        return error.UnexpectedOp;
+    }
+
+    fn binaryOp2(parser: *Parser) ParserError!Expression.BinaryOp {
+        if (parser.startsWithConsuming("+")) return .add;
+        if (parser.startsWithConsuming("-")) return .sub;
+
+        return error.UnexpectedOp;
+    }
+
+    fn binaryOp3(parser: *Parser) ParserError!Expression.BinaryOp {
+        if (parser.startsWithConsuming("^")) return .bitwise_xor;
+
+        return error.UnexpectedOp;
+    }
+
+    fn binaryOp4(parser: *Parser) ParserError!Expression.BinaryOp {
+        if (parser.startsWith("|") and !parser.startsWith("||")) {
+            try parser.consume("|");
+            return .bitwise_or;
+        }
+
+        return error.UnexpectedOp;
+    }
+
+    fn binaryOp5(parser: *Parser) ParserError!Expression.BinaryOp {
+        if (parser.startsWith("&") and !parser.startsWith("&&")) {
+            try parser.consume("&");
+            return .bitwise_and;
+        }
+
+        return error.UnexpectedOp;
+    }
+
+    fn binaryOp6(parser: *Parser) ParserError!Expression.BinaryOp {
+        if (parser.startsWithConsuming("*")) return .mul;
+        if (parser.startsWithConsuming("/")) return .div;
+
+        return error.UnexpectedOp;
+    }
+
     fn binaryOp7(parser: *Parser) ParserError!Expression.BinaryOp {
         if (parser.startsWithConsuming("contains")) return .contains;
         if (parser.startsWithConsuming("starts_with")) return .prefix;
         if (parser.startsWithConsuming("ends_with")) return .suffix;
         if (parser.startsWithConsuming("matches")) return .regex;
+        if (parser.startsWithConsuming("intersection")) return .intersection;
+        if (parser.startsWithConsuming("union")) return .@"union";
 
         return error.UnexpectedOp;
     }
@@ -1349,10 +1351,10 @@ test "parse expression" {
         try testing.expectEqualStrings("!(1 + 2)", try std.fmt.allocPrint(arena, "{any}", .{expression}));
     }
 
-    // {
-    //     var parser = Parser.init(arena, "[1].intersection([2]).length().union([3])");
-    //     const expression = try parser.expression();
+    {
+        var parser = Parser.init(arena, "[1].intersection([2]).length().union([3])");
+        const expression = try parser.expression();
 
-    //     try testing.expectEqualStrings("[1].intersection([2]).length().union([3])", try std.fmt.allocPrint(arena, "{any}", .{expression}));
-    // }
+        try testing.expectEqualStrings("[1].intersection([2]).length().union([3])", try std.fmt.allocPrint(arena, "{any}", .{expression}));
+    }
 }
