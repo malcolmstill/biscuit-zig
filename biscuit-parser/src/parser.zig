@@ -1023,7 +1023,7 @@ test "parse predicates" {
     const arena = arena_state.allocator();
 
     {
-        var parser = Parser.init(arena, "read(-1, 1, \"hello world\", hex:abcd, true, false, $foo, 2024-03-30T20:48:00Z, [1, 2, 3], [])");
+        var parser = Parser.init(arena, "read(-1, 1, \"hello world\", hex:abcd, true, false, $foo, 2024-03-30T20:48:00Z, [1, 2, 3], [], hex:)");
         const predicate = try parser.predicate(.rule);
 
         try testing.expectEqualStrings("read", predicate.name);
@@ -1043,6 +1043,8 @@ test "parse predicates" {
 
         const empty_set = predicate.terms.items[9].set;
         try testing.expectEqual(0, empty_set.count());
+
+        try testing.expectEqualStrings("", predicate.terms.items[10].bytes);
     }
 
     {

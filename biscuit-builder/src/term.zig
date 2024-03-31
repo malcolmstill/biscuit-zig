@@ -51,7 +51,7 @@ pub const Term = union(TermTag) {
             .integer => |n| try writer.print("{}", .{n}),
             .bool => |b| if (b) try writer.print("true", .{}) else try writer.print("false", .{}),
             .date => |n| try writer.print("{}", .{n}),
-            .bytes => unreachable,
+            .bytes => |b| try writer.print("{x}", .{b}),
             .set => |s| {
                 try writer.print("[", .{});
 
