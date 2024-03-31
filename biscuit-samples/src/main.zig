@@ -177,3 +177,21 @@ pub fn runValidation(allocator: mem.Allocator, token: []const u8, public_key: st
         return err;
     };
 }
+
+test "Basic token can be sealed" {
+    const testing = std.testing;
+
+    const hex_root_public_key = "1055c750b1a1505937af1537c626ba3263995c33a64758aaafb1275b0312e284";
+
+    var public_key_mem: [32]u8 = undefined;
+    _ = try std.fmt.hexToBytes(&public_key_mem, hex_root_public_key);
+    const public_key = try std.crypto.sign.Ed25519.PublicKey.fromBytes(public_key_mem);
+
+    const token = try std.fs.cwd().readFileAlloc(testing.allocator, "src/samples/test001_basic.bc", 0xFFFFFFF);
+    defer testing.allocator.free(token);
+
+    var b = try Biscuit.fromBytes(testing.allocator, token, public_key);
+    defer b.deinit();
+
+    _ = try b.seal();
+}

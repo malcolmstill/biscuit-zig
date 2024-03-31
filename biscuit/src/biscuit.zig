@@ -141,6 +141,8 @@ pub const Biscuit = struct {
     /// Seal biscuit
     pub fn seal(biscuit: *Biscuit) !Biscuit {
         return .{
+            .allocator = biscuit.allocator,
+            .arena_state = biscuit.arena_state,
             .serialized = try biscuit.serialized.seal(),
             .authority = biscuit.authority,
             .blocks = biscuit.blocks,
