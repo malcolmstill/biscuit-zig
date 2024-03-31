@@ -154,7 +154,8 @@ pub const Parser = struct {
         else
             return error.UnexpectedPolicyKind;
 
-        try parser.requiredWhiteSpace();
+        // FIXME: figure out if the space is required or not
+        // try parser.requiredWhiteSpace();
 
         const queries = try parser.checkBody();
 
@@ -169,7 +170,8 @@ pub const Parser = struct {
         else
             return error.UnexpectedCheckKind;
 
-        try parser.requiredWhiteSpace();
+        // FIXME: figure out if the space is required or not
+        // try parser.requiredWhiteSpace();
 
         const queries = try parser.checkBody();
 
@@ -772,8 +774,6 @@ pub const Parser = struct {
     }
 
     fn scopes(parser: *Parser, allocator: std.mem.Allocator) !std.ArrayList(Scope) {
-        try parser.requiredWhiteSpace();
-
         try parser.consume("trusting");
 
         parser.skipWhiteSpace();
@@ -940,11 +940,11 @@ pub const Parser = struct {
     }
 
     /// Skip whitespace but the whitespace is required (i.e. we need at least one space, tab or newline)
-    fn requiredWhiteSpace(parser: *Parser) !void {
-        if (!(parser.startsWith(" ") or parser.startsWith("\t") or parser.startsWith("\n"))) return error.ExpectedWhiteSpace;
+    // fn requiredWhiteSpace(parser: *Parser) !void {
+    //     if (!(parser.startsWith(" ") or parser.startsWith("\t") or parser.startsWith("\n"))) return error.ExpectedWhiteSpace;
 
-        parser.skipWhiteSpace();
-    }
+    //     parser.skipWhiteSpace();
+    // }
 
     /// Skip (optional) whitespace
     fn skipWhiteSpace(parser: *Parser) void {
@@ -1344,13 +1344,29 @@ test "parse check" {
     {
         var parser = Parser.init(arena, "check if");
 
-        try testing.expectError(error.ExpectedWhiteSpace, parser.check());
+        try testing.expectError(error.ExpectedPredicateOrExpression, parser.check());
     }
 
     {
         var parser = Parser.init(arena, "check if ");
 
         try testing.expectError(error.ExpectedPredicateOrExpression, parser.check());
+    }
+
+    {
+        const input = "check if query(1, 2) trusting ed25519/acdd6d5b53bfee478bf689f8e012fe7988bf755e3d7c5152947abc149bc20189, ed25519/a060270db7e9c9f06e8f9cc33a64e99f6596af12cb01c4b638df8afc7b642463";
+        var parser = Parser.init(arena, input);
+        const check = try parser.check();
+
+        try testing.expectEqual(.one, check.kind);
+        try testing.expectEqual(1, check.queries.items.len);
+
+        try testing.expectEqualStrings("query", check.queries.items[0].head.name);
+        try testing.expectEqualStrings("query", check.queries.items[0].body.items[0].name);
+
+        try testing.expectEqual(2, check.queries.items[0].scopes.items.len);
+        try testing.expectEqualStrings("acdd6d5b53bfee478bf689f8e012fe7988bf755e3d7c5152947abc149bc20189", &std.fmt.bytesToHex(check.queries.items[0].scopes.items[0].public_key.toBytes(), .lower));
+        try testing.expectEqualStrings("a060270db7e9c9f06e8f9cc33a64e99f6596af12cb01c4b638df8afc7b642463", &std.fmt.bytesToHex(check.queries.items[0].scopes.items[1].public_key.toBytes(), .lower));
     }
 }
 
