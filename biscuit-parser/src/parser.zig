@@ -413,7 +413,8 @@ pub const Parser = struct {
         while (true) {
             parser.skipWhiteSpace();
 
-            const trm = try parser.term(variables);
+            // Try to parse a term. Since sets can be empty we break on catch;
+            const trm = parser.term(variables) catch break;
             try new_set.add(trm);
 
             parser.skipWhiteSpace();
@@ -972,7 +973,7 @@ test "parse predicates" {
     const arena = arena_state.allocator();
 
     {
-        var parser = Parser.init(arena, "read(-1, 1, \"hello world\", hex:abcd, true, false, $foo, 2024-03-30T20:48:00Z, [1, 2, 3])");
+        var parser = Parser.init(arena, "read(-1, 1, \"hello world\", hex:abcd, true, false, $foo, 2024-03-30T20:48:00Z, [1, 2, 3], [])");
         const predicate = try parser.predicate(.rule);
 
         try testing.expectEqualStrings("read", predicate.name);
@@ -989,6 +990,9 @@ test "parse predicates" {
         try testing.expect(set.contains(.{ .integer = 1 }));
         try testing.expect(set.contains(.{ .integer = 2 }));
         try testing.expect(set.contains(.{ .integer = 3 }));
+
+        const empty_set = predicate.terms.items[9].set;
+        try testing.expectEqual(0, empty_set.count());
     }
 
     {
