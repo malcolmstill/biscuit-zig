@@ -48,9 +48,7 @@ pub const Parser = struct {
 
             parser.skipWhiteSpace();
 
-            if (parser.startsWithConsuming(",")) continue;
-
-            break;
+            if (!parser.startsWithConsuming(",")) break;
         }
 
         try parser.consume(")");
