@@ -5,13 +5,16 @@ const schema = @import("biscuit-schema");
 const SignedBlock = @import("signed_block.zig").SignedBlock;
 const Proof = @import("proof.zig").Proof;
 
+const ArenaAllocator = std.heap.ArenaAllocator;
+
 const log = std.log.scoped(.serialized_biscuit);
 
 pub const MIN_SCHEMA_VERSION = 3;
 pub const MAX_SCHEMA_VERSION = 4;
 
 pub const SerializedBiscuit = struct {
-    arena_state: ?std.heap.ArenaAllocator,
+    allocator: mem.Allocator,
+    arena_state: ?*ArenaAllocator,
     authority: SignedBlock,
     blocks: std.ArrayList(SignedBlock),
     proof: Proof,
@@ -24,8 +27,12 @@ pub const SerializedBiscuit = struct {
         const b = try schema.decodeBiscuit(allocator, bytes);
         defer b.deinit();
 
-        var arena_state = std.heap.ArenaAllocator.init(allocator);
-        errdefer arena_state.deinit();
+        var arena_state = try allocator.create(ArenaAllocator);
+        arena_state.* = ArenaAllocator.init(allocator);
+        errdefer {
+            arena_state.deinit();
+            allocator.destroy(arena_state);
+        }
 
         const arena = arena_state.allocator();
 
@@ -41,6 +48,7 @@ pub const SerializedBiscuit = struct {
         }
 
         var biscuit = SerializedBiscuit{
+            .allocator = allocator,
             .arena_state = arena_state,
             .authority = authority,
             .blocks = blocks,
@@ -60,6 +68,7 @@ pub const SerializedBiscuit = struct {
         var arena_state = serialized_block.arena_state orelse unreachable;
 
         arena_state.deinit();
+        serialized_block.allocator.destroy(arena_state);
     }
 
     /// Verify the token
@@ -187,7 +196,8 @@ pub const SerializedBiscuit = struct {
         const signature = signer.finalize();
 
         return .{
-            .arena_state = serialized_biscuit.arena_state,
+            .allocator = serialized_biscuit.allocator,
+            .arena_state = null,
             .authority = serialized_biscuit.authority,
             .blocks = serialized_biscuit.blocks,
             .proof = .{ .final_signature = signature },
