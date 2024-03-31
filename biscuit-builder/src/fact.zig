@@ -7,13 +7,13 @@ pub const Fact = struct {
     predicate: Predicate,
     variables: ?std.StringHashMap(?Term),
 
-    pub fn deinit(fact: Fact) void {
-        fact.predicate.deinit();
+    pub fn deinit(_: Fact) void {
+        // fact.predicate.deinit();
     }
 
     /// convert to datalog fact
-    pub fn convert(fact: Fact, allocator: std.mem.Allocator, symbols: *datalog.SymbolTable) !datalog.Fact {
-        return .{ .predicate = try fact.predicate.convert(allocator, symbols) };
+    pub fn toDatalog(fact: Fact, allocator: std.mem.Allocator, symbols: *datalog.SymbolTable) !datalog.Fact {
+        return .{ .predicate = try fact.predicate.toDatalog(allocator, symbols) };
     }
 
     pub fn format(fact: Fact, comptime _: []const u8, _: std.fmt.FormatOptions, writer: anytype) !void {

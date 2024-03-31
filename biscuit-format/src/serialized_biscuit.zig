@@ -5,6 +5,8 @@ const schema = @import("biscuit-schema");
 const SignedBlock = @import("signed_block.zig").SignedBlock;
 const Proof = @import("proof.zig").Proof;
 
+const log = std.log.scoped(.serialized_biscuit);
+
 pub const MIN_SCHEMA_VERSION = 3;
 pub const MAX_SCHEMA_VERSION = 4;
 
@@ -70,10 +72,15 @@ pub const SerializedBiscuit = struct {
     ///       public key is the public key of the private key in the
     ///       the proof.
     fn verify(serialized_biscuit: *SerializedBiscuit, root_public_key: Ed25519.PublicKey) !void {
+        log.debug("verify()", .{});
+        defer log.debug("end verify()", .{});
+
         var pk = root_public_key;
 
         // Verify the authority block's signature
         {
+            log.debug("verifying authority block", .{});
+            errdefer log.debug("failed to verify authority block", .{});
             if (serialized_biscuit.authority.external_signature != null) return error.AuthorityBlockMustNotHaveExternalSignature;
 
             var verifier = try serialized_biscuit.authority.signature.verifier(pk);
@@ -88,9 +95,12 @@ pub const SerializedBiscuit = struct {
         }
 
         // Verify the other blocks' signatures
-        for (serialized_biscuit.blocks.items) |*block| {
+        for (serialized_biscuit.blocks.items, 1..) |*block, block_id| {
             // Verify the block signature
             {
+                log.debug("verifying block {}", .{block_id});
+                errdefer log.debug("failed to verify block {}", .{block_id});
+
                 var verifier = try block.signature.verifier(pk);
 
                 verifier.update(block.block);
@@ -105,6 +115,9 @@ pub const SerializedBiscuit = struct {
 
             // Verify the external signature (where one exists)
             if (block.external_signature) |external_signature| {
+                log.debug("verifying external signature on block {}", .{block_id});
+                errdefer log.debug("failed to verify external signature on block {}", .{block_id});
+
                 var external_verifier = try external_signature.signature.verifier(external_signature.public_key);
                 external_verifier.update(block.block);
                 external_verifier.update(&block.algorithm2Buf());
@@ -116,13 +129,18 @@ pub const SerializedBiscuit = struct {
         }
 
         // Check the proof
+
+        log.debug("verifying proof", .{});
         switch (serialized_biscuit.proof) {
             .next_secret => |next_secret| {
                 if (!std.mem.eql(u8, &pk.bytes, &next_secret.publicKeyBytes())) {
+                    log.debug("failed to verify proof (sealed)", .{});
                     return error.SecretKeyProofFailedMismatchedPublicKeys;
                 }
             },
             .final_signature => |final_signature| {
+                errdefer log.debug("failed to verify proof (attenuated)", .{});
+
                 var last_block = if (serialized_biscuit.blocks.items.len == 0) serialized_biscuit.authority else serialized_biscuit.blocks.items[serialized_biscuit.blocks.items.len - 1];
                 var verifier = try final_signature.verifier(pk);
 

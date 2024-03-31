@@ -14,7 +14,7 @@ pub const TrustedOrigins = struct {
         return .{ .ids = InnerSet.init(allocator) };
     }
 
-    pub fn deinit(trusted_origins: *TrustedOrigins) void {
+    pub fn testDeinit(trusted_origins: *TrustedOrigins) void {
         trusted_origins.ids.deinit();
     }
 
@@ -124,10 +124,10 @@ test "Trusted origin" {
     const testing = std.testing;
 
     var to = try TrustedOrigins.defaultOrigins(testing.allocator);
-    defer to.deinit();
+    defer to.testDeinit();
 
     var o = Origin.init(testing.allocator);
-    defer o.deinit();
+    defer o.testDeinit();
 
     try o.insert(22);
 

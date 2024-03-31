@@ -5,16 +5,18 @@ const Regex = @import("regex").Regex;
 const Term = @import("term.zig").Term;
 const SymbolTable = @import("symbol_table.zig").SymbolTable;
 
+const log = std.log.scoped(.expression);
+
 pub const Expression = struct {
     ops: std.ArrayList(Op),
 
-    pub fn fromSchema(allocator: std.mem.Allocator, schema_expression: schema.ExpressionV2) !Expression {
-        var ops = std.ArrayList(Op).init(allocator);
+    pub fn fromSchema(arena: std.mem.Allocator, schema_expression: schema.ExpressionV2) !Expression {
+        var ops = try std.ArrayList(Op).initCapacity(arena, schema_expression.ops.items.len);
 
         for (schema_expression.ops.items) |schema_op| {
             const schema_op_content = schema_op.Content orelse return error.ExpectedOp;
             const op: Op = switch (schema_op_content) {
-                .value => |term| .{ .value = try Term.fromSchema(allocator, term) },
+                .value => |term| .{ .value = try Term.fromSchema(arena, term) },
                 .unary => |unary_op| .{
                     .unary = switch (unary_op.kind) {
                         .Negate => .negate,
@@ -57,8 +59,8 @@ pub const Expression = struct {
         return .{ .ops = ops };
     }
 
-    pub fn deinit(expression: *Expression) void {
-        expression.ops.deinit();
+    pub fn deinit(_: *Expression) void {
+        // expression.ops.deinit();
     }
 
     pub fn evaluate(expr: Expression, allocator: mem.Allocator, values: std.AutoHashMap(u32, Term), symbols: *SymbolTable) !Term {
@@ -99,13 +101,12 @@ pub const Expression = struct {
         return stack.items[0];
     }
 
-    pub fn convert(expression: Expression, old_symbols: *const SymbolTable, new_symbols: *SymbolTable) !Expression {
-        // std.debug.print("Converting expression\n", .{});
+    pub fn remap(expression: Expression, old_symbols: *const SymbolTable, new_symbols: *SymbolTable) !Expression {
         const ops = try expression.ops.clone();
 
         for (ops.items, 0..) |op, i| {
             ops.items[i] = switch (op) {
-                .value => |trm| .{ .value = try trm.convert(old_symbols, new_symbols) },
+                .value => |trm| .{ .value = try trm.remap(old_symbols, new_symbols) },
                 else => op,
             };
         }
@@ -311,29 +312,30 @@ fn concat(allocator: std.mem.Allocator, left: []const u8, right: []const u8) ![]
 test {
     const testing = std.testing;
 
+    const allocator = testing.allocator;
+
     const t1: Term = .{ .integer = 10 };
     const t2: Term = .{ .integer = 22 };
 
-    try testing.expectEqual(@as(Term, .{ .bool = false }), try Binary.equal.evaluate(t1, t2, SymbolTable.init("test", testing.allocator)));
-    try testing.expectEqual(@as(Term, .{ .bool = true }), try Binary.equal.evaluate(t1, t1, SymbolTable.init("test", testing.allocator)));
-
-    try testing.expectEqual(@as(Term, .{ .integer = 32 }), try Binary.add.evaluate(t1, t2, SymbolTable.init("test", testing.allocator)));
-    try testing.expectEqual(@as(Term, .{ .integer = 220 }), try Binary.mul.evaluate(t1, t2, SymbolTable.init("test", testing.allocator)));
-
     var symbols = SymbolTable.init("test", testing.allocator);
     defer symbols.deinit();
+
+    try testing.expectEqual(@as(Term, .{ .bool = false }), try Binary.equal.evaluate(allocator, t1, t2, &symbols));
+    try testing.expectEqual(@as(Term, .{ .bool = true }), try Binary.equal.evaluate(allocator, t1, t1, &symbols));
+    try testing.expectEqual(@as(Term, .{ .integer = 32 }), try Binary.add.evaluate(allocator, t1, t2, &symbols));
+    try testing.expectEqual(@as(Term, .{ .integer = 220 }), try Binary.mul.evaluate(allocator, t1, t2, &symbols));
 
     const s = .{ .string = try symbols.insert("prefix_middle_suffix") };
     const prefix = .{ .string = try symbols.insert("prefix") };
     const suffix = .{ .string = try symbols.insert("suffix") };
     const middle = .{ .string = try symbols.insert("middle") };
 
-    try testing.expectEqual(@as(Term, .{ .bool = true }), try Binary.equal.evaluate(s, s, symbols));
-    try testing.expectEqual(@as(Term, .{ .bool = false }), try Binary.equal.evaluate(s, prefix, symbols));
-    try testing.expectEqual(@as(Term, .{ .bool = true }), try Binary.not_equal.evaluate(s, prefix, symbols));
-    try testing.expectEqual(@as(Term, .{ .bool = true }), try Binary.prefix.evaluate(s, prefix, symbols));
-    try testing.expectEqual(@as(Term, .{ .bool = true }), try Binary.suffix.evaluate(s, suffix, symbols));
-    try testing.expectEqual(@as(Term, .{ .bool = true }), try Binary.contains.evaluate(s, middle, symbols));
+    try testing.expectEqual(@as(Term, .{ .bool = true }), try Binary.equal.evaluate(allocator, s, s, &symbols));
+    try testing.expectEqual(@as(Term, .{ .bool = false }), try Binary.equal.evaluate(allocator, s, prefix, &symbols));
+    try testing.expectEqual(@as(Term, .{ .bool = true }), try Binary.not_equal.evaluate(allocator, s, prefix, &symbols));
+    try testing.expectEqual(@as(Term, .{ .bool = true }), try Binary.prefix.evaluate(allocator, s, prefix, &symbols));
+    try testing.expectEqual(@as(Term, .{ .bool = true }), try Binary.suffix.evaluate(allocator, s, suffix, &symbols));
+    try testing.expectEqual(@as(Term, .{ .bool = true }), try Binary.contains.evaluate(allocator, s, middle, &symbols));
 }
 
 // test "negate" {

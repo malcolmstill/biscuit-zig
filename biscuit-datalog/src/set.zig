@@ -171,6 +171,8 @@ test {
     const testing = std.testing;
     const allocator = testing.allocator;
 
+    const test_log = std.log.scoped(.test_set);
+
     var s = Set(Fact).init(allocator);
     defer s.deinit();
 
@@ -187,7 +189,7 @@ test {
     try s.add(Fact{ .predicate = Predicate{ .name = 10, .terms = undefined } });
     try testing.expectEqual(@as(u32, 2), s.count());
 
-    std.debug.print("set = {any}\n", .{s});
+    test_log.debug("set = {any}\n", .{s});
 }
 
 test "hashing" {

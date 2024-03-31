@@ -1,6 +1,5 @@
 const std = @import("std");
 const ziglyph = @import("ziglyph");
-const datalog = @import("biscuit-datalog");
 const Term = @import("biscuit-builder").Term;
 const Fact = @import("biscuit-builder").Fact;
 const Check = @import("biscuit-builder").Check;
@@ -10,7 +9,10 @@ const Expression = @import("biscuit-builder").Expression;
 const Scope = @import("biscuit-builder").Scope;
 const Date = @import("biscuit-builder").Date;
 const Policy = @import("biscuit-builder").Policy;
+const Set = @import("biscuit-builder").Set;
 const Ed25519 = std.crypto.sign.Ed25519;
+
+const log = std.log.scoped(.parser);
 
 pub const Parser = struct {
     input: []const u8,
@@ -21,221 +23,286 @@ pub const Parser = struct {
         return .{ .input = input, .allocator = allocator };
     }
 
+    /// Return a new temporary parser with the current state of parent parser
+    /// for attempting to parse one of choice of things.
+    ///
+    /// E.g. when we parse a term we try parse each subtype of term with a temporary
+    /// parser.
+    pub fn temporary(parser: *Parser) Parser {
+        return Parser.init(parser.allocator, parser.rest());
+    }
+
+    /// Try to parse fact
+    ///
+    /// E.g. read(1, "hello") will parse successfully, but read($foo, "hello")
+    /// will fail because it contains a variable `$foo`.
     pub fn fact(parser: *Parser) !Fact {
-        return .{ .predicate = try parser.factPredicate(), .variables = null };
+        return .{ .predicate = try parser.predicate(.fact), .variables = null };
     }
 
-    pub fn factPredicate(parser: *Parser) !Predicate {
-        const name = parser.readName();
-
-        std.debug.print("name = {s}\n", .{name});
-
-        parser.skipWhiteSpace();
-
-        // Consume left paren
-        try parser.expect('(');
-
-        // Parse terms
+    pub fn predicate(parser: *Parser, kind: enum { fact, rule }) !Predicate {
         var terms = std.ArrayList(Term).init(parser.allocator);
 
-        var it = parser.factTermsIterator();
-        while (try it.next()) |trm| {
-            try terms.append(trm);
+        const predicate_name = try parser.name();
 
-            if (parser.peek()) |peeked| {
-                if (peeked != ',') break;
-            } else {
-                break;
+        try parser.consume("(");
+
+        while (true) {
+            parser.skipWhiteSpace();
+
+            try terms.append(try parser.term(switch (kind) {
+                .rule => .allow,
+                .fact => .disallow,
+            }));
+
+            parser.skipWhiteSpace();
+
+            if (!parser.startsWithConsuming(",")) break;
+        }
+
+        try parser.consume(")");
+
+        return .{ .name = predicate_name, .terms = terms };
+    }
+
+    /// Try to parse a term
+    ///
+    /// Does not consume `parser` input on failure.
+    fn term(parser: *Parser, variables: AllowVariables) ParserError!Term {
+        if (variables == .disallow) {
+            try parser.reject("$"); // Variables are disallowed in a fact term
+        } else {
+            blk: {
+                var tmp = parser.temporary();
+
+                const value = tmp.variable() catch break :blk;
+
+                parser.offset += tmp.offset;
+
+                return .{ .variable = value };
             }
         }
 
-        try parser.expect(')');
+        blk: {
+            var tmp = parser.temporary();
 
-        return .{ .name = name, .terms = terms };
-    }
+            const value = tmp.string() catch break :blk;
 
-    const FactTermIterator = struct {
-        parser: *Parser,
-
-        pub fn next(it: *FactTermIterator) !?Term {
-            it.parser.skipWhiteSpace();
-
-            return try it.parser.factTerm();
-        }
-    };
-
-    pub fn factTermsIterator(parser: *Parser) FactTermIterator {
-        return .{ .parser = parser };
-    }
-
-    const TermIterator = struct {
-        parser: *Parser,
-
-        pub fn next(it: *TermIterator) !?Term {
-            it.parser.skipWhiteSpace();
-
-            return try it.parser.term();
-        }
-    };
-
-    pub fn termsIterator(parser: *Parser) TermIterator {
-        return .{ .parser = parser };
-    }
-
-    pub fn term(parser: *Parser) !Term {
-        const rst = parser.rest();
-
-        variable_blk: {
-            var term_parser = Parser.init(parser.allocator, rst);
-
-            const value = term_parser.variable() catch break :variable_blk;
-
-            parser.offset += term_parser.offset;
-
-            return .{ .variable = value };
-        }
-
-        string_blk: {
-            var term_parser = Parser.init(parser.allocator, rst);
-
-            const value = term_parser.string() catch break :string_blk;
-
-            parser.offset += term_parser.offset;
+            parser.offset += tmp.offset;
 
             return .{ .string = value };
         }
 
-        date_blk: {
-            var term_parser = Parser.init(parser.allocator, rst);
+        blk: {
+            var tmp = parser.temporary();
 
-            const value = term_parser.date() catch break :date_blk;
+            const value = tmp.date() catch break :blk;
 
-            parser.offset += term_parser.offset;
+            parser.offset += tmp.offset;
 
             return .{ .date = value };
         }
 
-        number_blk: {
-            var term_parser = Parser.init(parser.allocator, rst);
+        blk: {
+            var tmp = parser.temporary();
 
-            const value = term_parser.number(i64) catch break :number_blk;
+            const value = tmp.number(i64) catch break :blk;
 
-            parser.offset += term_parser.offset;
+            parser.offset += tmp.offset;
 
             return .{ .integer = value };
         }
 
-        bool_blk: {
-            var term_parser = Parser.init(parser.allocator, rst);
+        blk: {
+            var tmp = parser.temporary();
 
-            const value = term_parser.boolean() catch break :bool_blk;
+            const value = tmp.boolean() catch break :blk;
 
-            parser.offset += term_parser.offset;
+            parser.offset += tmp.offset;
 
             return .{ .bool = value };
+        }
+
+        blk: {
+            var tmp = parser.temporary();
+
+            const value = tmp.bytes() catch break :blk;
+
+            parser.offset += tmp.offset;
+
+            return .{ .bytes = value };
+        }
+
+        blk: {
+            var tmp = parser.temporary();
+
+            const value = tmp.set(variables) catch break :blk;
+
+            parser.offset += tmp.offset;
+
+            return .{ .set = value };
         }
 
         return error.NoFactTermFound;
     }
 
-    pub fn factTerm(parser: *Parser) !Term {
-        const rst = parser.rest();
+    pub fn policy(parser: *Parser) !Policy {
+        const kind: Policy.Kind = if (parser.startsWithConsuming("allow if"))
+            .allow
+        else if (parser.startsWithConsuming("deny if"))
+            .deny
+        else
+            return error.UnexpectedPolicyKind;
 
-        try parser.reject('$'); // Variables are disallowed in a fact term
+        // FIXME: figure out if the space is required or not
+        // try parser.requiredWhiteSpace();
 
-        string_blk: {
-            var term_parser = Parser.init(parser.allocator, rst);
+        const queries = try parser.checkBody();
 
-            const value = term_parser.string() catch break :string_blk;
-
-            parser.offset += term_parser.offset;
-
-            return .{ .string = value };
-        }
-
-        date_blk: {
-            var term_parser = Parser.init(parser.allocator, rst);
-
-            const value = term_parser.date() catch break :date_blk;
-
-            parser.offset += term_parser.offset;
-
-            return .{ .date = value };
-        }
-
-        number_blk: {
-            var term_parser = Parser.init(parser.allocator, rst);
-
-            const value = term_parser.number(i64) catch break :number_blk;
-
-            parser.offset += term_parser.offset;
-
-            return .{ .integer = value };
-        }
-
-        bool_blk: {
-            var term_parser = Parser.init(parser.allocator, rst);
-
-            const value = term_parser.boolean() catch break :bool_blk;
-
-            parser.offset += term_parser.offset;
-
-            return .{ .bool = value };
-        }
-
-        return error.NoFactTermFound;
+        return .{ .kind = kind, .queries = queries };
     }
 
-    pub fn predicate(parser: *Parser) !Predicate {
-        const name = parser.readName();
+    pub fn check(parser: *Parser) !Check {
+        const kind: Check.Kind = if (parser.startsWithConsuming("check if"))
+            .one
+        else if (parser.startsWithConsuming("check all"))
+            .all
+        else
+            return error.UnexpectedCheckKind;
+
+        // FIXME: figure out if the space is required or not
+        // try parser.requiredWhiteSpace();
+
+        const queries = try parser.checkBody();
+
+        return .{ .kind = kind, .queries = queries };
+    }
+
+    /// Parse check body
+    ///
+    /// E.g. given check if right($0, $1), resource($0), operation($1), $0.contains(\"file\") or admin(true)
+    /// this will (attempt to) parse `right($0, $1), resource($0), operation($1), $0.contains(\"file\") or admin(true)`
+    ///
+    /// Requires at least one rule body.
+    fn checkBody(parser: *Parser) !std.ArrayList(Rule) {
+        var queries = std.ArrayList(Rule).init(parser.allocator);
+
+        while (true) {
+            parser.skipWhiteSpace();
+
+            const body = try parser.ruleBody();
+
+            try queries.append(.{
+                .head = .{ .name = "query", .terms = std.ArrayList(Term).init(parser.allocator) },
+                .body = body.predicates,
+                .expressions = body.expressions,
+                .scopes = body.scopes,
+                .variables = null,
+            });
+
+            parser.skipWhiteSpace();
+
+            if (!parser.startsWithConsuming("or")) break;
+        }
+
+        return queries;
+    }
+
+    pub fn rule(parser: *Parser) !Rule {
+        const head = try parser.predicate(.rule);
 
         parser.skipWhiteSpace();
 
-        // Consume left paren
-        try parser.expect('(');
+        try parser.consume("<-");
 
-        // Parse terms
-        var terms = std.ArrayList(Term).init(parser.allocator);
+        parser.skipWhiteSpace();
 
-        var it = parser.termsIterator();
-        while (try it.next()) |trm| {
-            try terms.append(trm);
+        const body = try parser.ruleBody();
 
-            if (parser.peek()) |peeked| {
-                if (peeked == ',') {
-                    parser.offset += 1;
-                    continue;
-                }
+        return .{
+            .head = head,
+            .body = body.predicates,
+            .expressions = body.expressions,
+            .scopes = body.scopes,
+            .variables = null,
+        };
+    }
+
+    fn ruleBody(parser: *Parser) !struct { predicates: std.ArrayList(Predicate), expressions: std.ArrayList(Expression), scopes: std.ArrayList(Scope) } {
+        var predicates = std.ArrayList(Predicate).init(parser.allocator);
+        var expressions = std.ArrayList(Expression).init(parser.allocator);
+        var scps = std.ArrayList(Scope).init(parser.allocator);
+
+        while (true) {
+            parser.skipWhiteSpace();
+
+            const rule_body = try parser.ruleBodyElement();
+
+            switch (rule_body) {
+                .predicate => |p| try predicates.append(p),
+                .expression => |e| try expressions.append(e),
             }
 
-            break;
+            parser.skipWhiteSpace();
+
+            if (!parser.startsWithConsuming(",")) break;
         }
 
-        try parser.expect(')');
+        blk: {
+            var tmp = parser.temporary();
 
-        return .{ .name = name, .terms = terms };
+            const s = tmp.scopes(parser.allocator) catch break :blk;
+
+            parser.offset += tmp.offset;
+
+            scps = s;
+        }
+
+        return .{ .predicates = predicates, .expressions = expressions, .scopes = scps };
+    }
+
+    const BodyElementTag = enum {
+        predicate,
+        expression,
+    };
+
+    /// Try to parse a rule body element (a predicate or an expression)
+    ///
+    /// Does not consume `parser` input on failure.
+    fn ruleBodyElement(parser: *Parser) !union(BodyElementTag) { predicate: Predicate, expression: Expression } {
+        blk: {
+            var tmp = parser.temporary();
+
+            const p = tmp.predicate(.rule) catch break :blk;
+
+            parser.offset += tmp.offset;
+
+            return .{ .predicate = p };
+        }
+
+        // Otherwise try parsing an expression
+        blk: {
+            var tmp = parser.temporary();
+
+            const e = tmp.expression() catch break :blk;
+
+            parser.offset += tmp.offset;
+
+            return .{ .expression = e };
+        }
+
+        return error.ExpectedPredicateOrExpression;
     }
 
     fn variable(parser: *Parser) ![]const u8 {
-        try parser.expect('$');
+        try parser.consume("$");
 
-        const start = parser.offset;
-
-        for (parser.rest()) |c| {
-            if (ziglyph.isAlphaNum(c) or c == '_') {
-                parser.offset += 1;
-                continue;
-            }
-
-            break;
-        }
-
-        return parser.input[start..parser.offset];
+        return try parser.variableName();
     }
 
     // FIXME: properly implement string parsing
     fn string(parser: *Parser) ![]const u8 {
-        try parser.expect('"');
+        try parser.consume("\"");
 
         const start = parser.offset;
 
@@ -252,32 +319,32 @@ pub const Parser = struct {
     fn date(parser: *Parser) !u64 {
         const year = try parser.number(i32);
 
-        try parser.expect('-');
+        try parser.consume("-");
 
         const month = try parser.number(u8);
         if (month < 1 or month > 12) return error.MonthOutOfRange;
 
-        try parser.expect('-');
+        try parser.consume("-");
 
         const day = try parser.number(u8);
         if (!Date.isDayMonthYearValid(i32, year, month, day)) return error.InvalidDayMonthYearCombination;
 
-        try parser.expect('T');
+        try parser.consume("T");
 
         const hour = try parser.number(u8);
         if (hour > 23) return error.HoyrOutOfRange;
 
-        try parser.expect(':');
+        try parser.consume(":");
 
         const minute = try parser.number(u8);
         if (minute > 59) return error.MinuteOutOfRange;
 
-        try parser.expect(':');
+        try parser.consume(":");
 
         const second = try parser.number(u8);
         if (second > 59) return error.SecondOutOfRange;
 
-        try parser.expect('Z');
+        try parser.consume("Z");
 
         const d: Date = .{
             .year = year,
@@ -296,8 +363,14 @@ pub const Parser = struct {
     fn number(parser: *Parser, comptime T: type) !T {
         const start = parser.offset;
 
+        if (parser.rest().len == 0) return error.ParsingNumberExpectsAtLeastOneCharacter;
+        const first_char = parser.rest()[0];
+
+        if (!(isDigit(first_char) or first_char == '-')) return error.ParsingNameFirstCharacterMustBeLetter;
+        parser.offset += 1;
+
         for (parser.rest()) |c| {
-            if (ziglyph.isAsciiDigit(c)) {
+            if (isDigit(c)) {
                 parser.offset += 1;
                 continue;
             }
@@ -311,202 +384,64 @@ pub const Parser = struct {
     }
 
     fn boolean(parser: *Parser) !bool {
-        if (std.mem.startsWith(u8, parser.rest(), "true")) {
-            parser.offset += "term".len;
-            return true;
-        }
-
-        if (std.mem.startsWith(u8, parser.rest(), "false")) {
-            parser.offset += "false".len;
-            return false;
-        }
+        if (parser.startsWithConsuming("true")) return true;
+        if (parser.startsWithConsuming("false")) return false;
 
         return error.ExpectedBooleanTerm;
     }
 
-    pub fn policy(parser: *Parser) !Policy {
-        var kind: Policy.Kind = undefined;
+    fn bytes(parser: *Parser) ![]const u8 {
+        try parser.consume("hex:");
 
-        if (std.mem.startsWith(u8, parser.rest(), "allow if")) {
-            parser.offset += "allow if".len;
-            kind = .allow;
-        } else if (std.mem.startsWith(u8, parser.rest(), "deny if")) {
-            parser.offset += "deny if".len;
-            kind = .deny;
-        } else {
-            return error.UnexpectedPolicyKind;
-        }
+        const hex_string = try parser.hex();
 
-        const queries = try parser.checkBody();
+        if (!(hex_string.len % 2 == 0)) return error.ExpectedEvenNumberOfHexDigis;
 
-        return .{ .kind = kind, .queries = queries };
+        const out = try parser.allocator.alloc(u8, hex_string.len / 2);
+
+        return try std.fmt.hexToBytes(out, hex_string);
     }
 
-    pub fn check(parser: *Parser) !Check {
-        var kind: datalog.Check.Kind = undefined;
+    fn set(parser: *Parser, variables: AllowVariables) !Set(Term) {
+        var new_set = Set(Term).init(parser.allocator);
 
-        if (std.mem.startsWith(u8, parser.rest(), "check if")) {
-            parser.offset += "check if".len;
-            kind = .one;
-        } else if (std.mem.startsWith(u8, parser.rest(), "check all")) {
-            parser.offset += "check all".len;
-            kind = .all;
-        } else {
-            return error.UnexpectedCheckKind;
-        }
-
-        const queries = try parser.checkBody();
-
-        return .{ .kind = kind, .queries = queries };
-    }
-
-    fn checkBody(parser: *Parser) !std.ArrayList(Rule) {
-        var queries = std.ArrayList(Rule).init(parser.allocator);
-
-        const required_body = try parser.ruleBody();
-
-        try queries.append(.{
-            .head = .{ .name = "query", .terms = std.ArrayList(Term).init(parser.allocator) },
-            .body = required_body.predicates,
-            .expressions = required_body.expressions,
-            .scopes = required_body.scopes,
-            .variables = null,
-        });
+        try parser.consume("[");
 
         while (true) {
             parser.skipWhiteSpace();
 
-            if (!std.mem.startsWith(u8, parser.rest(), "or")) break;
+            // Try to parse a term. Since sets can be empty we break on catch;
+            const trm = parser.term(variables) catch break;
+            try new_set.add(trm);
 
-            parser.offset += "or".len;
-
-            const body = try parser.ruleBody();
-
-            try queries.append(.{
-                .head = .{ .name = "query", .terms = std.ArrayList(Term).init(parser.allocator) },
-                .body = body.predicates,
-                .expressions = body.expressions,
-                .scopes = body.scopes,
-                .variables = null,
-            });
-        }
-
-        return queries;
-    }
-
-    pub fn rule(parser: *Parser) !Rule {
-        const head = try parser.predicate();
-
-        parser.skipWhiteSpace();
-
-        if (!std.mem.startsWith(u8, parser.rest(), "<-")) return error.ExpectedArrow;
-
-        parser.offset += "<-".len;
-
-        const body = try parser.ruleBody();
-
-        return .{
-            .head = head,
-            .body = body.predicates,
-            .expressions = body.expressions,
-            .scopes = body.scopes,
-            .variables = null,
-        };
-    }
-
-    pub fn ruleBody(parser: *Parser) !struct { predicates: std.ArrayList(Predicate), expressions: std.ArrayList(Expression), scopes: std.ArrayList(Scope) } {
-        var predicates = std.ArrayList(Predicate).init(parser.allocator);
-        var expressions = std.ArrayList(Expression).init(parser.allocator);
-        var scps = std.ArrayList(Scope).init(parser.allocator);
-
-        while (true) {
             parser.skipWhiteSpace();
-            std.debug.print("{s}: \"{s}\"\n", .{ @src().fn_name, parser.rest() });
 
-            // Try parsing a predicate
-            predicate_blk: {
-                var predicate_parser = Parser.init(parser.allocator, parser.rest());
-
-                const p = predicate_parser.predicate() catch break :predicate_blk;
-
-                parser.offset += predicate_parser.offset;
-
-                try predicates.append(p);
-
-                parser.skipWhiteSpace();
-
-                if (parser.peek()) |peeked| {
-                    if (peeked == ',') {
-                        parser.offset += 1;
-                        continue;
-                    }
-                }
-            }
-
-            // Otherwise try parsing an expression
-            expression_blk: {
-                var expression_parser = Parser.init(parser.allocator, parser.rest());
-
-                const e = expression_parser.expression() catch break :expression_blk;
-
-                parser.offset += expression_parser.offset;
-
-                try expressions.append(e);
-
-                parser.skipWhiteSpace();
-
-                if (parser.peek()) |peeked| {
-                    if (peeked == ',') {
-                        parser.offset += 1;
-                        continue;
-                    }
-                }
-            }
-
-            // We haven't found a predicate or expression so we're done,
-            // other than potentially parsing a scope
-            break;
+            if (!parser.startsWithConsuming(",")) break;
         }
 
-        scopes_blk: {
-            var scope_parser = Parser.init(parser.allocator, parser.rest());
+        try parser.consume("]");
 
-            const s = scope_parser.scopes(parser.allocator) catch break :scopes_blk;
-
-            parser.offset += scope_parser.offset;
-
-            scps = s;
-        }
-
-        return .{ .predicates = predicates, .expressions = expressions, .scopes = scps };
+        return new_set;
     }
 
+    /// Parse an expression
+    ///
+    /// This is the top-level expression parsing function. Where
+    /// other parts of the code call `parser.expression` you know
+    /// they are parsing a "full" expression.
+    ///
+    /// The code uses the "precedence climbing" approach.
     fn expression(parser: *Parser) ParserError!Expression {
-        std.debug.print("Attempting to parser {s}\n", .{parser.rest()});
-        parser.skipWhiteSpace();
-        const e = try parser.expr();
-
-        std.debug.print("parsed expression = {any}\n", .{e});
-
-        return e;
-    }
-
-    fn expr(parser: *Parser) ParserError!Expression {
-        std.debug.print("[{s}]\n", .{@src().fn_name});
         var e = try parser.expr1();
 
-        std.debug.print("[{s}] e = {any}\n", .{ @src().fn_name, e });
-
         while (true) {
             parser.skipWhiteSpace();
-            if (parser.rest().len == 0) break;
 
             const op = parser.binaryOp0() catch break;
 
             parser.skipWhiteSpace();
 
             const e2 = try parser.expr1();
-            std.debug.print("[{s}] e2 = {any}\n", .{ @src().fn_name, e2 });
 
             e = try Expression.binary(parser.allocator, op, e, e2);
         }
@@ -515,21 +450,16 @@ pub const Parser = struct {
     }
 
     fn expr1(parser: *Parser) ParserError!Expression {
-        std.debug.print("[{s}]\n", .{@src().fn_name});
         var e = try parser.expr2();
-
-        std.debug.print("[{s}] e = {any}\n", .{ @src().fn_name, e });
 
         while (true) {
             parser.skipWhiteSpace();
-            if (parser.rest().len == 0) break;
 
             const op = parser.binaryOp1() catch break;
 
             parser.skipWhiteSpace();
 
             const e2 = try parser.expr2();
-            std.debug.print("[{s}] e2 = {any}\n", .{ @src().fn_name, e2 });
 
             e = try Expression.binary(parser.allocator, op, e, e2);
         }
@@ -538,21 +468,16 @@ pub const Parser = struct {
     }
 
     fn expr2(parser: *Parser) ParserError!Expression {
-        std.debug.print("[{s}]\n", .{@src().fn_name});
         var e = try parser.expr3();
-
-        std.debug.print("[{s}] e = {any}\n", .{ @src().fn_name, e });
 
         while (true) {
             parser.skipWhiteSpace();
-            if (parser.rest().len == 0) break;
 
             const op = parser.binaryOp2() catch break;
 
             parser.skipWhiteSpace();
 
             const e2 = try parser.expr3();
-            std.debug.print("[{s}] e2 = {any}\n", .{ @src().fn_name, e2 });
 
             e = try Expression.binary(parser.allocator, op, e, e2);
         }
@@ -561,21 +486,16 @@ pub const Parser = struct {
     }
 
     fn expr3(parser: *Parser) ParserError!Expression {
-        std.debug.print("[{s}]\n", .{@src().fn_name});
         var e = try parser.expr4();
-
-        std.debug.print("[{s}] e = {any}\n", .{ @src().fn_name, e });
 
         while (true) {
             parser.skipWhiteSpace();
-            if (parser.rest().len == 0) break;
 
             const op = parser.binaryOp3() catch break;
 
             parser.skipWhiteSpace();
 
             const e2 = try parser.expr4();
-            std.debug.print("[{s}] e2 = {any}\n", .{ @src().fn_name, e2 });
 
             e = try Expression.binary(parser.allocator, op, e, e2);
         }
@@ -584,21 +504,16 @@ pub const Parser = struct {
     }
 
     fn expr4(parser: *Parser) ParserError!Expression {
-        std.debug.print("[{s}]\n", .{@src().fn_name});
         var e = try parser.expr5();
-
-        std.debug.print("[{s}] e = {any}\n", .{ @src().fn_name, e });
 
         while (true) {
             parser.skipWhiteSpace();
-            if (parser.rest().len == 0) break;
 
             const op = parser.binaryOp4() catch break;
 
             parser.skipWhiteSpace();
 
             const e2 = try parser.expr5();
-            std.debug.print("[{s}] e2 = {any}\n", .{ @src().fn_name, e2 });
 
             e = try Expression.binary(parser.allocator, op, e, e2);
         }
@@ -607,22 +522,16 @@ pub const Parser = struct {
     }
 
     fn expr5(parser: *Parser) ParserError!Expression {
-        std.debug.print("[{s}]\n", .{@src().fn_name});
         var e = try parser.expr6();
-
-        std.debug.print("[{s}] e = {any}\n", .{ @src().fn_name, e });
 
         while (true) {
             parser.skipWhiteSpace();
-            if (parser.rest().len == 0) break;
 
             const op = parser.binaryOp5() catch break;
 
             parser.skipWhiteSpace();
 
             const e2 = try parser.expr6();
-
-            std.debug.print("[{s}] e2 = {any}\n", .{ @src().fn_name, e2 });
 
             e = try Expression.binary(parser.allocator, op, e, e2);
         }
@@ -631,21 +540,16 @@ pub const Parser = struct {
     }
 
     fn expr6(parser: *Parser) ParserError!Expression {
-        std.debug.print("[{s}]\n", .{@src().fn_name});
         var e = try parser.expr7();
-
-        std.debug.print("[{s}] e = {any}\n", .{ @src().fn_name, e });
 
         while (true) {
             parser.skipWhiteSpace();
-            if (parser.rest().len == 0) break;
 
             const op = parser.binaryOp6() catch break;
 
             parser.skipWhiteSpace();
 
             const e2 = try parser.expr7();
-            std.debug.print("[{s}] e2 = {any}\n", .{ @src().fn_name, e2 });
 
             e = try Expression.binary(parser.allocator, op, e, e2);
         }
@@ -654,116 +558,181 @@ pub const Parser = struct {
     }
 
     fn expr7(parser: *Parser) ParserError!Expression {
-        std.debug.print("[{s}]\n", .{@src().fn_name});
-        const e1 = try parser.exprTerm();
+        var e = try parser.expr8();
 
-        std.debug.print("[{s}] e1 = {any}\n", .{ @src().fn_name, e1 });
+        while (true) {
+            parser.skipWhiteSpace();
+
+            const op = parser.binaryOp7() catch break;
+
+            parser.skipWhiteSpace();
+
+            const e2 = try parser.expr8();
+
+            e = try Expression.binary(parser.allocator, op, e, e2);
+        }
+
+        return e;
+    }
+
+    fn expr8(parser: *Parser) ParserError!Expression {
+        blk: {
+            var tmp = parser.temporary();
+
+            const e = tmp.unaryNegate() catch break :blk;
+
+            parser.offset += tmp.offset;
+
+            return e;
+        }
+
+        blk: {
+            var tmp = parser.temporary();
+
+            const e = tmp.expr9() catch break :blk;
+
+            parser.offset += tmp.offset;
+
+            return e;
+        }
+
+        return error.ExpectedUnaryNegateOrMethod;
+    }
+
+    /// Parse a unary or binary method
+    fn expr9(parser: *Parser) ParserError!Expression {
+        var e1 = try parser.exprTerm();
 
         parser.skipWhiteSpace();
 
-        if (!parser.startsWith(".")) return e1;
-        try parser.expect('.');
+        if (!parser.startsWithConsuming(".")) return e1;
 
-        const op = try parser.binaryOp7();
+        while (true) {
+            blk: {
+                var tmp = parser.temporary();
+
+                e1 = tmp.binaryMethod(e1) catch break :blk;
+
+                parser.offset += tmp.offset;
+
+                if (parser.startsWithConsuming(".")) continue;
+            }
+
+            blk: {
+                var tmp = parser.temporary();
+
+                e1 = tmp.unaryMethod(e1) catch break :blk;
+
+                parser.offset += tmp.offset;
+
+                if (parser.startsWithConsuming(".")) continue;
+            }
+
+            break;
+        }
+
+        return e1;
+    }
+
+    fn exprTerm(parser: *Parser) ParserError!Expression {
+        blk: {
+            var tmp = parser.temporary();
+
+            const p = tmp.unaryParens() catch break :blk;
+
+            parser.offset += tmp.offset;
+
+            return p;
+        }
+
+        // Otherwise we expect term
+        const term1 = try parser.term(.allow);
+
+        return try Expression.value(term1);
+    }
+
+    fn binaryMethod(parser: *Parser, e1: Expression) ParserError!Expression {
+        const op = try parser.binaryOp8();
+
         parser.skipWhiteSpace();
 
-        std.debug.print("[{s}] op = {any}, rest = \"{s}\"\n", .{ @src().fn_name, op, parser.rest() });
-
-        // if (!parser.startsWith("(")) return error.MissingLeftParen;
-        try parser.expect('(');
+        try parser.consume("(");
 
         parser.skipWhiteSpace();
 
-        std.debug.print("here\n", .{});
-
-        const e2 = try parser.expr();
-
-        std.debug.print("[{s}] e2 = {any}\n", .{ @src().fn_name, e2 });
+        const e2 = try parser.expression();
 
         parser.skipWhiteSpace();
 
-        // if (!parser.startsWith(")")) return error.MissingRightParen;
-        try parser.expect(')');
+        try parser.consume(")");
 
         parser.skipWhiteSpace();
 
         return try Expression.binary(parser.allocator, op, e1, e2);
     }
 
-    fn binaryOp0(parser: *Parser) ParserError!Expression.BinaryOp {
-        if (parser.startsWith("&&")) {
-            try parser.expectString("&&");
-            return .@"and";
-        }
+    fn unaryMethod(parser: *Parser, e1: Expression) ParserError!Expression {
+        try parser.consume("length()");
 
-        if (parser.startsWith("||")) {
-            try parser.expectString("||");
-            return .@"or";
-        }
+        return try Expression.unary(parser.allocator, .length, e1);
+    }
+
+    fn unaryNegate(parser: *Parser) ParserError!Expression {
+        try parser.consume("!");
+
+        parser.skipWhiteSpace();
+
+        const e = try parser.expression();
+
+        return try Expression.unary(parser.allocator, .negate, e);
+    }
+
+    fn unaryParens(parser: *Parser) ParserError!Expression {
+        try parser.consume("(");
+
+        parser.skipWhiteSpace();
+
+        const e = try parser.expression();
+
+        parser.skipWhiteSpace();
+
+        try parser.consume(")");
+
+        return try Expression.unary(parser.allocator, .parens, e);
+    }
+
+    fn binaryOp0(parser: *Parser) ParserError!Expression.BinaryOp {
+        if (parser.startsWithConsuming("||")) return .@"or";
 
         return error.UnexpectedOp;
     }
 
     fn binaryOp1(parser: *Parser) ParserError!Expression.BinaryOp {
-        if (parser.startsWith("<=")) {
-            try parser.expectString("<=");
-            return .less_or_equal;
-        }
-
-        if (parser.startsWith(">=")) {
-            try parser.expectString(">=");
-            return .greater_or_equal;
-        }
-
-        if (parser.startsWith("<")) {
-            try parser.expectString("<");
-            return .less_than;
-        }
-
-        if (parser.startsWith(">")) {
-            try parser.expectString(">");
-            return .greater_than;
-        }
-
-        if (parser.startsWith("==")) {
-            try parser.expectString("==");
-            return .equal;
-        }
-
-        if (parser.startsWith("!=")) {
-            try parser.expectString("!=");
-            return .not_equal;
-        }
+        if (parser.startsWithConsuming("&&")) return .@"and";
 
         return error.UnexpectedOp;
     }
 
     fn binaryOp2(parser: *Parser) ParserError!Expression.BinaryOp {
-        if (parser.startsWith("+")) {
-            try parser.expectString("+");
-            return .add;
-        }
-
-        if (parser.startsWith("-")) {
-            try parser.expectString("-");
-            return .sub;
-        }
+        if (parser.startsWithConsuming("<=")) return .less_or_equal;
+        if (parser.startsWithConsuming(">=")) return .greater_or_equal;
+        if (parser.startsWithConsuming("<")) return .less_than;
+        if (parser.startsWithConsuming(">")) return .greater_than;
+        if (parser.startsWithConsuming("==")) return .equal;
+        if (parser.startsWithConsuming("!=")) return .not_equal;
 
         return error.UnexpectedOp;
     }
 
     fn binaryOp3(parser: *Parser) ParserError!Expression.BinaryOp {
-        if (parser.startsWith("^")) {
-            try parser.expectString("^");
-            return .bitwise_xor;
-        }
+        if (parser.startsWithConsuming("^")) return .bitwise_xor;
 
         return error.UnexpectedOp;
     }
 
     fn binaryOp4(parser: *Parser) ParserError!Expression.BinaryOp {
         if (parser.startsWith("|") and !parser.startsWith("||")) {
-            try parser.expectString("|");
+            try parser.consume("|");
             return .bitwise_or;
         }
 
@@ -772,7 +741,7 @@ pub const Parser = struct {
 
     fn binaryOp5(parser: *Parser) ParserError!Expression.BinaryOp {
         if (parser.startsWith("&") and !parser.startsWith("&&")) {
-            try parser.expectString("&");
+            try parser.consume("&");
             return .bitwise_and;
         }
 
@@ -780,113 +749,32 @@ pub const Parser = struct {
     }
 
     fn binaryOp6(parser: *Parser) ParserError!Expression.BinaryOp {
-        if (parser.startsWith("*")) {
-            try parser.expectString("*");
-            return .mul;
-        }
-
-        if (parser.startsWith("/")) {
-            try parser.expectString("/");
-            return .div;
-        }
+        if (parser.startsWithConsuming("+")) return .add;
+        if (parser.startsWithConsuming("-")) return .sub;
 
         return error.UnexpectedOp;
     }
 
     fn binaryOp7(parser: *Parser) ParserError!Expression.BinaryOp {
-        if (parser.startsWith("contains")) {
-            try parser.expectString("contains");
-            return .contains;
-        }
-
-        if (parser.startsWith("starts_with")) {
-            try parser.expectString("starts_with");
-            return .prefix;
-        }
-
-        if (parser.startsWith("ends_with")) {
-            try parser.expectString("ends_with");
-            return .suffix;
-        }
-
-        if (parser.startsWith("matches")) {
-            try parser.expectString("matches");
-            return .regex;
-        }
+        if (parser.startsWithConsuming("*")) return .mul;
+        if (parser.startsWithConsuming("/")) return .div;
 
         return error.UnexpectedOp;
     }
 
-    fn exprTerm(parser: *Parser) ParserError!Expression {
-        // Try to parse unary
-        unary_blk: {
-            var unary_parser = Parser.init(parser.allocator, parser.rest());
+    fn binaryOp8(parser: *Parser) ParserError!Expression.BinaryOp {
+        if (parser.startsWithConsuming("contains")) return .contains;
+        if (parser.startsWithConsuming("starts_with")) return .prefix;
+        if (parser.startsWithConsuming("ends_with")) return .suffix;
+        if (parser.startsWithConsuming("matches")) return .regex;
+        if (parser.startsWithConsuming("intersection")) return .intersection;
+        if (parser.startsWithConsuming("union")) return .@"union";
 
-            const p = unary_parser.unary() catch break :unary_blk;
-
-            parser.offset += unary_parser.offset;
-
-            return p;
-        }
-
-        // Otherwise we expect term
-        const term1 = try parser.term();
-
-        return try Expression.value(term1);
-    }
-
-    fn unary(parser: *Parser) ParserError!Expression {
-        parser.skipWhiteSpace();
-
-        if (parser.peek()) |c| {
-            if (c == '!') {
-                try parser.expect('!');
-                parser.skipWhiteSpace();
-
-                const e = try parser.expr();
-
-                return try Expression.unary(parser.allocator, .negate, e);
-            }
-
-            if (c == '(') {
-                return try parser.unaryParens();
-            }
-        }
-
-        var e: Expression = undefined;
-        if (parser.term()) |t1| {
-            parser.skipWhiteSpace();
-            e = try Expression.value(t1);
-        } else |_| {
-            e = try parser.unaryParens();
-            parser.skipWhiteSpace();
-        }
-
-        if (parser.expectString(".length()")) |_| {
-            return try Expression.unary(parser.allocator, .length, e);
-        } else |_| {
-            return error.UnexpectedToken;
-        }
-
-        return error.UnexpectedToken;
-    }
-
-    fn unaryParens(parser: *Parser) ParserError!Expression {
-        try parser.expectString("(");
-
-        parser.skipWhiteSpace();
-
-        const e = try parser.expr();
-
-        parser.skipWhiteSpace();
-
-        try parser.expectString(")");
-
-        return try Expression.unary(parser.allocator, .parens, e);
+        return error.UnexpectedOp;
     }
 
     fn scopes(parser: *Parser, allocator: std.mem.Allocator) !std.ArrayList(Scope) {
-        try parser.expectString("trusting");
+        try parser.consume("trusting");
 
         parser.skipWhiteSpace();
 
@@ -901,35 +789,20 @@ pub const Parser = struct {
 
             parser.skipWhiteSpace();
 
-            if (!parser.startsWith(",")) break;
-
-            try parser.expectString(",");
+            if (!parser.startsWithConsuming(",")) break;
         }
 
         return scps;
     }
 
     fn scope(parser: *Parser, _: std.mem.Allocator) !Scope {
-        parser.skipWhiteSpace();
+        if (parser.startsWithConsuming("authority")) return .{ .authority = {} };
+        if (parser.startsWithConsuming("previous")) return .{ .previous = {} };
 
-        if (parser.startsWith("authority")) {
-            try parser.expectString("authority");
+        if (parser.startsWithConsuming("{")) {
+            const parameter = try parser.name();
 
-            return .{ .authority = {} };
-        }
-
-        if (parser.startsWith("previous")) {
-            try parser.expectString("previous");
-
-            return .{ .previous = {} };
-        }
-
-        if (parser.startsWith("{")) {
-            try parser.expectString("{");
-
-            const parameter = parser.readName();
-
-            try parser.expectString("}");
+            try parser.consume("}");
 
             return .{ .parameter = parameter };
         }
@@ -937,12 +810,11 @@ pub const Parser = struct {
         return .{ .public_key = try parser.publicKey() };
     }
 
+    /// Parser a public key. Currently only supports ed25519.
     fn publicKey(parser: *Parser) !Ed25519.PublicKey {
-        try parser.expectString("ed25519/");
+        try parser.consume("ed25519/");
 
         const h = try parser.hex();
-
-        std.debug.print("publickey = {s}\n", .{h});
 
         var out_buf: [Ed25519.PublicKey.encoded_length]u8 = undefined;
 
@@ -961,36 +833,102 @@ pub const Parser = struct {
         return parser.input[parser.offset..];
     }
 
-    /// Expect (and consume) char.
-    fn expect(parser: *Parser, char: u8) !void {
-        const peeked = parser.peek() orelse return error.ExpectedMoreInput;
-        if (peeked != char) return error.ExpectedChar;
-
-        parser.offset += 1;
-    }
-
-    /// Expect and consume string.
-    fn expectString(parser: *Parser, str: []const u8) !void {
+    /// Expect and consume string. Return error.UnexpectedString if
+    /// str is not the start of remaining parser input.
+    fn consume(parser: *Parser, str: []const u8) !void {
         if (!std.mem.startsWith(u8, parser.rest(), str)) return error.UnexpectedString;
 
         parser.offset += str.len;
     }
 
+    /// Returns true if the remaining parser input starts with str
+    ///
+    /// Does not consume any input.
+    ///
+    /// See also `fn startsWithConsuming`
     fn startsWith(parser: *Parser, str: []const u8) bool {
         return std.mem.startsWith(u8, parser.rest(), str);
     }
 
+    /// Returns true if the remaining parse input starts with str. If
+    /// it does start with that string, the parser consumes the string.
+    ///
+    /// See also `fn startsWith`
+    fn startsWithConsuming(parser: *Parser, str: []const u8) bool {
+        if (parser.startsWith(str)) {
+            parser.offset += str.len; // Consume
+            return true;
+        }
+
+        return false;
+    }
+
     /// Reject char. Does not consume the character
-    fn reject(parser: *Parser, char: u8) !void {
-        const peeked = parser.peek() orelse return error.ExpectedMoreInput;
-        if (peeked == char) return error.DisallowedChar;
+    fn reject(parser: *Parser, str: []const u8) !void {
+        if (parser.startsWith(str)) return error.DisallowedChar;
+    }
+
+    fn name(parser: *Parser) ![]const u8 {
+        const start = parser.offset;
+
+        if (parser.rest().len == 0) return error.ParsingNameExpectsAtLeastOneCharacter;
+
+        const first_codepoint = try nextCodepoint(parser.rest());
+
+        if (!ziglyph.isLetter(first_codepoint.codepoint)) return error.ParsingNameFirstCharacterMustBeLetter;
+
+        parser.offset += first_codepoint.len;
+
+        while (true) {
+            const next_codepoint = try nextCodepoint(parser.rest());
+
+            if (ziglyph.isAlphaNum(next_codepoint.codepoint)) {
+                parser.offset += next_codepoint.len;
+                continue;
+            } else if (parser.startsWith("_") or parser.startsWith(":")) {
+                parser.offset += 1;
+                continue;
+            }
+
+            break;
+        }
+
+        return parser.input[start..parser.offset];
+    }
+
+    fn variableName(parser: *Parser) ![]const u8 {
+        const start = parser.offset;
+
+        if (parser.rest().len == 0) return error.ParsingNameExpectsAtLeastOneCharacter;
+
+        const first_codepoint = try nextCodepoint(parser.rest());
+
+        if (!ziglyph.isAlphaNum(first_codepoint.codepoint)) return error.ParsingNameFirstCharacterMustBeLetter;
+
+        parser.offset += first_codepoint.len;
+
+        while (true) {
+            const next_codepoint = try nextCodepoint(parser.rest());
+
+            if (ziglyph.isAlphaNum(next_codepoint.codepoint)) {
+                parser.offset += next_codepoint.len;
+                continue;
+            } else if (parser.startsWith("_") or parser.startsWith(":")) {
+                parser.offset += 1;
+                continue;
+            }
+
+            break;
+        }
+
+        return parser.input[start..parser.offset];
     }
 
     fn hex(parser: *Parser) ![]const u8 {
         const start = parser.offset;
 
         for (parser.rest()) |c| {
-            if (ziglyph.isHexDigit(c)) {
+            if (isHexDigit(c)) {
                 parser.offset += 1;
                 continue;
             }
@@ -1001,25 +939,17 @@ pub const Parser = struct {
         return parser.input[start..parser.offset];
     }
 
-    // FIXME: this should error?
-    fn readName(parser: *Parser) []const u8 {
-        const start = parser.offset;
+    /// Skip whitespace but the whitespace is required (i.e. we need at least one space, tab or newline)
+    // fn requiredWhiteSpace(parser: *Parser) !void {
+    //     if (!(parser.startsWith(" ") or parser.startsWith("\t") or parser.startsWith("\n"))) return error.ExpectedWhiteSpace;
 
-        for (parser.rest()) |c| {
-            if (ziglyph.isAlphaNum(c) or c == '_' or c == ':') {
-                parser.offset += 1;
-                continue;
-            }
+    //     parser.skipWhiteSpace();
+    // }
 
-            break;
-        }
-
-        return parser.input[start..parser.offset];
-    }
-
+    /// Skip (optional) whitespace
     fn skipWhiteSpace(parser: *Parser) void {
         for (parser.rest()) |c| {
-            if (ziglyph.isWhiteSpace(c)) {
+            if (c == ' ' or c == '\t' or c == '\n') {
                 parser.offset += 1;
                 continue;
             }
@@ -1029,11 +959,54 @@ pub const Parser = struct {
     }
 };
 
+const AllowVariables = enum {
+    allow,
+    disallow,
+};
+
+fn isHexDigit(char: u8) bool {
+    switch (char) {
+        'a', 'b', 'c', 'd', 'e', 'f', 'A', 'B', 'C', 'D', 'E', 'F', '0', '1', '2', '3', '4', '5', '6', '7', '8', '9' => return true,
+        else => return false,
+    }
+}
+
+fn isDigit(char: u8) bool {
+    switch (char) {
+        '0', '1', '2', '3', '4', '5', '6', '7', '8', '9' => return true,
+        else => return false,
+    }
+}
+
+/// Try to get the next UTF-8 codepoint from input. Returns the codepoint
+/// and the number of bytes that codepoint takes up.
+fn nextCodepoint(input: []const u8) !struct { codepoint: u21, len: u32 } {
+    if (input.len == 0) return error.NextCodePointExpectsAtLeastOneByte;
+
+    const first_byte = input[0];
+
+    const byte_len = try std.unicode.utf8ByteSequenceLength(first_byte);
+
+    if (input.len < byte_len) return error.NotEnoughInputForCodepoint;
+
+    const codepoint = switch (byte_len) {
+        1 => try std.unicode.utf8Decode(input[0..1]),
+        2 => try std.unicode.utf8Decode2(input[0..2]),
+        3 => try std.unicode.utf8Decode3(input[0..3]),
+        4 => try std.unicode.utf8Decode4(input[0..4]),
+        else => return error.IncorrectUtfDecodeLength,
+    };
+
+    return .{ .len = byte_len, .codepoint = codepoint };
+}
+
 const ParserError = error{
     ExpectedMoreInput,
     DisallowedChar,
     UnexpectedString,
     ExpectedChar,
+    ExpectedUnaryNegateOrMethod,
+    ExpectedUnaryOrBinaryMethod,
     NoFactTermFound,
     UnexpectedOp,
     MissingLeftParen,
@@ -1042,72 +1015,423 @@ const ParserError = error{
     UnexpectedToken,
 };
 
-// test "parse fact predicate" {
-//     const testing = std.testing;
-//     const input: []const u8 =
-//         \\read(true)
-//     ;
-
-//     var parser = Parser.init(input);
-
-//     const r = try parser.factPredicate(testing.allocator);
-//     defer r.deinit();
-
-//     std.debug.print("{any}\n", .{r});
-// }
-
-// test "parse rule body" {
-//     const testing = std.testing;
-//     const input: []const u8 =
-//         \\query(false) <- read(true), write(false)
-//     ;
-
-//     var parser = Parser.init(testing.allocator, input);
-
-//     const r = try parser.rule();
-//     defer r.deinit();
-
-//     std.debug.print("{any}\n", .{r});
-// }
-
-// test "parse rule body with variables" {
-//     const testing = std.testing;
-//     const input: []const u8 =
-//         \\query($0) <- read($0), write(false)
-//     ;
-
-//     var parser = Parser.init(testing.allocator, input);
-
-//     const r = try parser.rule();
-//     defer r.deinit();
-
-//     std.debug.print("{any}\n", .{r});
-// }
-
-// test "parse check" {
-//     const testing = std.testing;
-//     const input: []const u8 =
-//         \\check if right($0, $1), resource($0), operation($1)
-//     ;
-
-//     var parser = Parser.init(testing.allocator, input);
-
-//     const r = try parser.check();
-//     defer r.deinit();
-
-//     std.debug.print("{any}\n", .{r});
-// }
-
-test "parse check with expression" {
+test "parse predicates" {
     const testing = std.testing;
-    const input: []const u8 =
-        \\check if right($0, $1), resource($0), operation($1), $0.contains("file")
-    ;
 
-    var parser = Parser.init(testing.allocator, input);
+    var arena_state = std.heap.ArenaAllocator.init(testing.allocator);
+    defer arena_state.deinit();
+    const arena = arena_state.allocator();
 
-    const r = try parser.check();
-    defer r.deinit();
+    {
+        var parser = Parser.init(arena, "read(-1, 1, \"hello world\", hex:abcd, true, false, $foo, 2024-03-30T20:48:00Z, [1, 2, 3], [], hex:)");
+        const predicate = try parser.predicate(.rule);
 
-    std.debug.print("{any}\n", .{r});
+        try testing.expectEqualStrings("read", predicate.name);
+        try testing.expectEqual(-1, predicate.terms.items[0].integer);
+        try testing.expectEqual(1, predicate.terms.items[1].integer);
+        try testing.expectEqualStrings("hello world", predicate.terms.items[2].string);
+        try testing.expectEqualStrings("\xab\xcd", predicate.terms.items[3].bytes);
+        try testing.expectEqual(true, predicate.terms.items[4].bool);
+        try testing.expectEqual(false, predicate.terms.items[5].bool);
+        try testing.expectEqualStrings("foo", predicate.terms.items[6].variable);
+        try testing.expectEqual(1711831680, predicate.terms.items[7].date);
+
+        const set = predicate.terms.items[8].set;
+        try testing.expect(set.contains(.{ .integer = 1 }));
+        try testing.expect(set.contains(.{ .integer = 2 }));
+        try testing.expect(set.contains(.{ .integer = 3 }));
+
+        const empty_set = predicate.terms.items[9].set;
+        try testing.expectEqual(0, empty_set.count());
+
+        try testing.expectEqualStrings("", predicate.terms.items[10].bytes);
+    }
+
+    {
+        var parser = Parser.init(arena, "read(true)");
+        const predicate = try parser.predicate(.fact);
+
+        try testing.expectEqualStrings("read", predicate.name);
+        try testing.expectEqual(true, predicate.terms.items[0].bool);
+    }
+
+    {
+        // Names can contain : and _
+        var parser = Parser.init(arena, "read:write_admin(true)");
+        const predicate = try parser.predicate(.fact);
+
+        try testing.expectEqualStrings("read:write_admin", predicate.name);
+        try testing.expectEqual(true, predicate.terms.items[0].bool);
+    }
+
+    {
+        var parser = Parser.init(arena, "read(true, false)");
+        const predicate = try parser.predicate(.fact);
+
+        try testing.expectEqualStrings("read", predicate.name);
+        try testing.expectEqual(true, predicate.terms.items[0].bool);
+        try testing.expectEqual(false, predicate.terms.items[1].bool);
+    }
+
+    {
+        var parser = Parser.init(arena, "read(true,false)");
+        const predicate = try parser.predicate(.fact);
+
+        try testing.expectEqualStrings("read", predicate.name);
+        try testing.expectEqual(true, predicate.terms.items[0].bool);
+        try testing.expectEqual(false, predicate.terms.items[1].bool);
+    }
+
+    {
+        // We are allowed spaces around predicate terms
+        var parser = Parser.init(arena, "read( true , false )");
+        const predicate = try parser.predicate(.fact);
+
+        try testing.expectEqualStrings("read", predicate.name);
+        try testing.expectEqual(true, predicate.terms.items[0].bool);
+        try testing.expectEqual(false, predicate.terms.items[1].bool);
+    }
+
+    {
+        // We don't allow a space between the predicate name and its opening paren
+        var parser = Parser.init(arena, "read  (true, false )");
+
+        try testing.expectError(error.UnexpectedString, parser.predicate(.fact));
+    }
+
+    {
+        // We don't allow variables in fact predicates
+        var parser = Parser.init(arena, "read(true, $foo)");
+
+        try testing.expectError(error.DisallowedChar, parser.predicate(.fact));
+    }
+
+    {
+        // Non-fact predicates can contain variables
+        var parser = Parser.init(arena, "read(true, $foo)");
+
+        const predicate = try parser.predicate(.rule);
+
+        try testing.expectEqualStrings("read", predicate.name);
+        try testing.expectEqual(true, predicate.terms.items[0].bool);
+        try testing.expectEqualStrings("foo", predicate.terms.items[1].variable);
+    }
+
+    {
+        // Facts must have at least one term
+        var parser = Parser.init(arena, "read()");
+
+        try testing.expectError(error.NoFactTermFound, parser.predicate(.fact));
+    }
+
+    {
+        // Facts must start with a (UTF-8) letter
+        var parser = Parser.init(arena, "3read(true)");
+
+        try testing.expectError(error.ParsingNameFirstCharacterMustBeLetter, parser.predicate(.fact));
+    }
+
+    {
+        // Names can be UTF-8
+        const input = "ビスケット(true)";
+        var parser = Parser.init(arena, input);
+
+        const predicate = try parser.predicate(.fact);
+
+        try testing.expectEqualStrings("ビスケット", predicate.name);
+        try testing.expectEqual(true, predicate.terms.items[0].bool);
+    }
+}
+
+test "parse numbers" {
+    const testing = std.testing;
+
+    var arena_state = std.heap.ArenaAllocator.init(testing.allocator);
+    defer arena_state.deinit();
+    const arena = arena_state.allocator();
+
+    {
+        var parser = Parser.init(arena, "1");
+        const integer = try parser.number(i64);
+
+        try testing.expectEqual(1, integer);
+    }
+
+    {
+        var parser = Parser.init(arena, "12345");
+        const integer = try parser.number(i64);
+
+        try testing.expectEqual(12345, integer);
+    }
+
+    {
+        var parser = Parser.init(arena, "-1");
+        const integer = try parser.number(i64);
+
+        try testing.expectEqual(-1, integer);
+    }
+
+    {
+        var parser = Parser.init(arena, "-");
+
+        try testing.expectError(error.InvalidCharacter, parser.number(i64));
+    }
+}
+
+test "parse boolean" {
+    const testing = std.testing;
+
+    var arena_state = std.heap.ArenaAllocator.init(testing.allocator);
+    defer arena_state.deinit();
+    const arena = arena_state.allocator();
+
+    {
+        var parser = Parser.init(arena, "true");
+        const boolean = try parser.boolean();
+
+        try testing.expectEqual(true, boolean);
+    }
+
+    {
+        var parser = Parser.init(arena, "false");
+        const boolean = try parser.boolean();
+
+        try testing.expectEqual(false, boolean);
+    }
+}
+
+test "parse hex" {
+    const testing = std.testing;
+
+    var arena_state = std.heap.ArenaAllocator.init(testing.allocator);
+    defer arena_state.deinit();
+    const arena = arena_state.allocator();
+
+    {
+        var parser = Parser.init(arena, "hex:BeEf");
+        const bytes = try parser.bytes();
+
+        try testing.expectEqualStrings("\xbe\xef", bytes);
+    }
+
+    {
+        var parser = Parser.init(arena, "hex:BeE");
+
+        try testing.expectError(error.ExpectedEvenNumberOfHexDigis, parser.bytes());
+    }
+}
+
+test "parse rule" {
+    const testing = std.testing;
+
+    var arena_state = std.heap.ArenaAllocator.init(testing.allocator);
+    defer arena_state.deinit();
+    const arena = arena_state.allocator();
+
+    {
+        var parser = Parser.init(arena, "read($0, $1) <- operation($0), file($1)");
+        const rule = try parser.rule();
+
+        try testing.expectEqualStrings("read", rule.head.name);
+        try testing.expectEqualStrings("0", rule.head.terms.items[0].variable);
+        try testing.expectEqualStrings("1", rule.head.terms.items[1].variable);
+
+        try testing.expectEqualStrings("operation", rule.body.items[0].name);
+        try testing.expectEqualStrings("0", rule.body.items[0].terms.items[0].variable);
+
+        try testing.expectEqualStrings("file", rule.body.items[1].name);
+        try testing.expectEqualStrings("1", rule.body.items[1].terms.items[0].variable);
+    }
+
+    {
+        // Remove some spaces
+        var parser = Parser.init(arena, "read($0, $1)<-operation($0),file($1)");
+        const rule = try parser.rule();
+
+        try testing.expectEqualStrings("read", rule.head.name);
+        try testing.expectEqualStrings("0", rule.head.terms.items[0].variable);
+        try testing.expectEqualStrings("1", rule.head.terms.items[1].variable);
+
+        try testing.expectEqualStrings("operation", rule.body.items[0].name);
+        try testing.expectEqualStrings("0", rule.body.items[0].terms.items[0].variable);
+
+        try testing.expectEqualStrings("file", rule.body.items[1].name);
+        try testing.expectEqualStrings("1", rule.body.items[1].terms.items[0].variable);
+    }
+
+    {
+        // Remove some spaces
+        var parser = Parser.init(arena, "read($0, $1) <- operation($0), 1 < 3, file($1)");
+        const rule = try parser.rule();
+
+        try testing.expectEqualStrings("read", rule.head.name);
+        try testing.expectEqualStrings("0", rule.head.terms.items[0].variable);
+        try testing.expectEqualStrings("1", rule.head.terms.items[1].variable);
+
+        try testing.expectEqualStrings("operation", rule.body.items[0].name);
+        try testing.expectEqualStrings("0", rule.body.items[0].terms.items[0].variable);
+
+        try testing.expectEqualStrings("file", rule.body.items[1].name);
+        try testing.expectEqualStrings("1", rule.body.items[1].terms.items[0].variable);
+
+        try testing.expectEqualStrings("1 < 3", try std.fmt.allocPrint(arena, "{any}", .{rule.expressions.items[0]}));
+    }
+
+    {
+        // We need at least one predicate or expression in the body
+        var parser = Parser.init(arena, "read($0, $1) <- ");
+
+        try testing.expectError(error.ExpectedPredicateOrExpression, parser.rule());
+    }
+}
+
+test "parse check" {
+    const testing = std.testing;
+
+    var arena_state = std.heap.ArenaAllocator.init(testing.allocator);
+    defer arena_state.deinit();
+    const arena = arena_state.allocator();
+
+    {
+        var parser = Parser.init(arena, "check if right($0, $1), resource($0), operation($1), $0.contains(\"file\")");
+        const check = try parser.check();
+
+        try testing.expectEqual(.one, check.kind);
+        try testing.expectEqual(1, check.queries.items.len);
+
+        try testing.expectEqualStrings("query", check.queries.items[0].head.name);
+        try testing.expectEqualStrings("right", check.queries.items[0].body.items[0].name);
+        try testing.expectEqualStrings("resource", check.queries.items[0].body.items[1].name);
+        try testing.expectEqualStrings("operation", check.queries.items[0].body.items[2].name);
+
+        try testing.expectEqualStrings("$0.contains(\"file\")", try std.fmt.allocPrint(arena, "{any}", .{check.queries.items[0].expressions.items[0]}));
+    }
+
+    {
+        // Check with or
+        var parser = Parser.init(arena, "check if right($0, $1), resource($0), operation($1), $0.contains(\"file\") or admin(true)");
+        const check = try parser.check();
+
+        try testing.expectEqual(.one, check.kind);
+        try testing.expectEqual(2, check.queries.items.len);
+
+        try testing.expectEqualStrings("query", check.queries.items[0].head.name);
+        try testing.expectEqualStrings("right", check.queries.items[0].body.items[0].name);
+        try testing.expectEqualStrings("resource", check.queries.items[0].body.items[1].name);
+        try testing.expectEqualStrings("operation", check.queries.items[0].body.items[2].name);
+
+        try testing.expectEqualStrings("query", check.queries.items[1].head.name);
+        try testing.expectEqualStrings("admin", check.queries.items[1].body.items[0].name);
+    }
+
+    {
+        // Check all
+        var parser = Parser.init(arena, "check all right($0, $1), resource($0), operation($1), $0.contains(\"file\") or admin(true)");
+        const check = try parser.check();
+
+        try testing.expectEqual(.all, check.kind);
+        try testing.expectEqual(2, check.queries.items.len);
+
+        try testing.expectEqualStrings("query", check.queries.items[0].head.name);
+        try testing.expectEqualStrings("right", check.queries.items[0].body.items[0].name);
+        try testing.expectEqualStrings("resource", check.queries.items[0].body.items[1].name);
+        try testing.expectEqualStrings("operation", check.queries.items[0].body.items[2].name);
+
+        try testing.expectEqualStrings("query", check.queries.items[1].head.name);
+        try testing.expectEqualStrings("admin", check.queries.items[1].body.items[0].name);
+    }
+
+    {
+        var parser = Parser.init(arena, "check if");
+
+        try testing.expectError(error.ExpectedPredicateOrExpression, parser.check());
+    }
+
+    {
+        var parser = Parser.init(arena, "check if ");
+
+        try testing.expectError(error.ExpectedPredicateOrExpression, parser.check());
+    }
+
+    {
+        const input = "check if query(1, 2) trusting ed25519/acdd6d5b53bfee478bf689f8e012fe7988bf755e3d7c5152947abc149bc20189, ed25519/a060270db7e9c9f06e8f9cc33a64e99f6596af12cb01c4b638df8afc7b642463";
+        var parser = Parser.init(arena, input);
+        const check = try parser.check();
+
+        try testing.expectEqual(.one, check.kind);
+        try testing.expectEqual(1, check.queries.items.len);
+
+        try testing.expectEqualStrings("query", check.queries.items[0].head.name);
+        try testing.expectEqualStrings("query", check.queries.items[0].body.items[0].name);
+
+        try testing.expectEqual(2, check.queries.items[0].scopes.items.len);
+        try testing.expectEqualStrings("acdd6d5b53bfee478bf689f8e012fe7988bf755e3d7c5152947abc149bc20189", &std.fmt.bytesToHex(check.queries.items[0].scopes.items[0].public_key.toBytes(), .lower));
+        try testing.expectEqualStrings("a060270db7e9c9f06e8f9cc33a64e99f6596af12cb01c4b638df8afc7b642463", &std.fmt.bytesToHex(check.queries.items[0].scopes.items[1].public_key.toBytes(), .lower));
+    }
+}
+
+test "parse policy" {
+    const testing = std.testing;
+
+    var arena_state = std.heap.ArenaAllocator.init(testing.allocator);
+    defer arena_state.deinit();
+    const arena = arena_state.allocator();
+
+    {
+        var parser = Parser.init(arena, "allow if right($0, $1), resource($0), operation($1), $0.contains(\"file\")");
+        const policy = try parser.policy();
+
+        try testing.expectEqual(.allow, policy.kind);
+        try testing.expectEqual(1, policy.queries.items.len);
+
+        try testing.expectEqualStrings("query", policy.queries.items[0].head.name);
+        try testing.expectEqualStrings("right", policy.queries.items[0].body.items[0].name);
+        try testing.expectEqualStrings("resource", policy.queries.items[0].body.items[1].name);
+        try testing.expectEqualStrings("operation", policy.queries.items[0].body.items[2].name);
+
+        try testing.expectEqualStrings("$0.contains(\"file\")", try std.fmt.allocPrint(arena, "{any}", .{policy.queries.items[0].expressions.items[0]}));
+    }
+
+    {
+        var parser = Parser.init(arena, "deny if right($0, $1), resource($0), operation($1), $0.contains(\"file\")");
+        const policy = try parser.policy();
+
+        try testing.expectEqual(.deny, policy.kind);
+        try testing.expectEqual(1, policy.queries.items.len);
+
+        try testing.expectEqualStrings("query", policy.queries.items[0].head.name);
+        try testing.expectEqualStrings("right", policy.queries.items[0].body.items[0].name);
+        try testing.expectEqualStrings("resource", policy.queries.items[0].body.items[1].name);
+        try testing.expectEqualStrings("operation", policy.queries.items[0].body.items[2].name);
+
+        try testing.expectEqualStrings("$0.contains(\"file\")", try std.fmt.allocPrint(arena, "{any}", .{policy.queries.items[0].expressions.items[0]}));
+    }
+}
+
+test "parse expression" {
+    const testing = std.testing;
+
+    var arena_state = std.heap.ArenaAllocator.init(testing.allocator);
+    defer arena_state.deinit();
+    const arena = arena_state.allocator();
+
+    const inputs = [_][]const u8{
+        "1",
+        "[2]",
+        "$0.contains(\"file\")",
+        "!(1 + 2)",
+        "1 ^ (4 + 6)",
+        "[1].intersection([2])",
+        "[1].intersection([2]).length().union([3])",
+        "1 + 2 * 3 / (4 + 5)",
+        "[1].length()",
+        "\"hello\".length()",
+    };
+
+    for (inputs) |input| {
+        var parser = Parser.init(arena, input);
+        const expression = try parser.expression();
+
+        try testing.expectEqualStrings(input, try std.fmt.allocPrint(arena, "{any}", .{expression}));
+    }
 }

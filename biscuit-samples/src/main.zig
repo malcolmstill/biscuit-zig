@@ -6,6 +6,8 @@ const AuthorizerError = @import("biscuit").AuthorizerError;
 const Samples = @import("sample.zig").Samples;
 const Result = @import("sample.zig").Result;
 
+const log = std.log.scoped(.samples);
+
 var gpa = std.heap.GeneralPurposeAllocator(.{}){};
 
 pub fn main() anyerror!void {
@@ -41,7 +43,7 @@ pub fn main() anyerror!void {
         const token = try std.fs.cwd().readFileAlloc(alloc, testcase.filename, 0xFFFFFFF);
 
         for (testcase.validations.map.values(), 0..) |validation, i| {
-            errdefer std.debug.print("Error on validation {} of {s}\n", .{ i, testcase.filename });
+            errdefer log.err("Error on validation {} of {s}\n", .{ i, testcase.filename });
             try validate(alloc, token, public_key, validation.result, validation.authorizer_code);
         }
     }
@@ -169,7 +171,7 @@ pub fn runValidation(alloc: mem.Allocator, token: []const u8, public_key: std.cr
     }
 
     _ = a.authorize(errors) catch |err| {
-        std.debug.print("Authorization failed with errors: {any}\n", .{errors.items});
+        log.debug("authorize() returned with errors: {any}\n", .{errors.items});
         return err;
     };
 }

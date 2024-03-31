@@ -15,18 +15,24 @@ pub const Check = @import("check.zig").Check;
 pub const Origin = @import("origin.zig").Origin;
 pub const TrustedOrigins = @import("trusted_origins.zig").TrustedOrigins;
 pub const world = @import("world.zig");
+pub const Set = @import("set.zig").Set;
 
 test {
     _ = @import("check.zig");
     _ = @import("combinator.zig");
     _ = @import("expression.zig");
+    _ = @import("fact_set.zig");
     _ = @import("fact.zig");
     _ = @import("matched_variables.zig");
+    _ = @import("origin.zig");
     _ = @import("predicate.zig");
+    _ = @import("rule_set.zig");
     _ = @import("rule.zig");
     _ = @import("run_limits.zig");
+    _ = @import("scope.zig");
     _ = @import("set.zig");
     _ = @import("symbol_table.zig");
     _ = @import("term.zig");
+    _ = @import("trusted_origins.zig");
     _ = @import("world.zig");
 }

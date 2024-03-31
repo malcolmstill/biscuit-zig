@@ -5,25 +5,35 @@ const Term = @import("term.zig").Term;
 const Rule = @import("rule.zig").Rule;
 
 pub const Check = struct {
-    kind: datalog.Check.Kind,
+    kind: Kind,
     queries: std.ArrayList(Rule),
 
-    pub fn deinit(check: Check) void {
-        for (check.queries.items) |query| {
-            query.deinit();
-        }
+    pub const Kind = enum {
+        one,
+        all,
+    };
 
-        check.queries.deinit();
+    pub fn deinit(_: Check) void {
+        // for (check.queries.items) |query| {
+        //     query.deinit();
+        // }
+
+        // check.queries.deinit();
     }
 
-    pub fn convert(check: Check, allocator: std.mem.Allocator, symbols: *datalog.SymbolTable) !datalog.Check {
+    pub fn toDatalog(check: Check, allocator: std.mem.Allocator, symbols: *datalog.SymbolTable) !datalog.Check {
         var queries = std.ArrayList(datalog.Rule).init(allocator);
 
         for (check.queries.items) |query| {
-            try queries.append(try query.convert(allocator, symbols));
+            try queries.append(try query.toDatalog(allocator, symbols));
         }
 
-        return .{ .kind = check.kind, .queries = queries };
+        const kind: datalog.Check.Kind = switch (check.kind) {
+            .one => .one,
+            .all => .all,
+        };
+
+        return .{ .kind = kind, .queries = queries };
     }
 
     pub fn format(check: Check, comptime _: []const u8, _: std.fmt.FormatOptions, writer: anytype) !void {

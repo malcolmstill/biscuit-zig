@@ -24,9 +24,9 @@ pub const Check = struct {
         return .{ .queries = rules, .kind = kind };
     }
 
-    pub fn deinit(check: *Check) void {
+    pub fn testDeinit(check: *Check) void {
         for (check.queries.items) |*query| {
-            query.deinit();
+            query.testDeinit();
         }
 
         check.queries.deinit();
@@ -41,11 +41,11 @@ pub const Check = struct {
         return writer.print("", .{});
     }
 
-    pub fn convert(check: Check, old_symbols: *const SymbolTable, new_symbols: *SymbolTable) !Check {
+    pub fn remap(check: Check, old_symbols: *const SymbolTable, new_symbols: *SymbolTable) !Check {
         var queries = try check.queries.clone();
 
         for (queries.items, 0..) |query, i| {
-            queries.items[i] = try query.convert(old_symbols, new_symbols);
+            queries.items[i] = try query.remap(old_symbols, new_symbols);
         }
 
         return .{

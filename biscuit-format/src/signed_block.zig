@@ -34,7 +34,7 @@ pub const SignedBlock = struct {
 
             const algo = required_block_external_key.algorithm;
 
-            std.debug.print("ALGORITHM = {}\n", .{algo});
+            _ = algo; // FIXME: we need to use algorithm (at least at the point that support for things other than Ed25519)
 
             if (block_external_signature.len != Ed25519.Signature.encoded_length) return error.IncorrectBlockExternalSignatureLength;
             if (block_external_public_key.len != Ed25519.PublicKey.encoded_length) return error.IncorrectBlockExternalPublicKeyLength;

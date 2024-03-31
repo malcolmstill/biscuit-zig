@@ -11,19 +11,19 @@ pub const Policy = struct {
         deny,
     };
 
-    pub fn deinit(policy: Policy) void {
-        for (policy.queries.items) |query| {
-            query.deinit();
-        }
+    pub fn deinit(_: Policy) void {
+        // for (policy.queries.items) |query| {
+        //     query.deinit();
+        // }
 
-        policy.queries.deinit();
+        // policy.queries.deinit();
     }
 
-    // pub fn convert(policy: Policy, allocator: std.mem.Allocator, symbols: *datalog.SymbolTable) !Policy {
+    // pub fn toDatalog(policy: Policy, allocator: std.mem.Allocator, symbols: *datalog.SymbolTable) !Policy {
     //     var queries = std.ArrayList(Rule).init(allocator);
 
     //     for (policy.queries.items) |query| {
-    //         try queries.append(try query.convert(allocator, symbols));
+    //         try queries.append(try query.toDatalog(allocator, symbols));
     //     }
 
     //     return .{ .kind = policy.kind, .queries = queries };

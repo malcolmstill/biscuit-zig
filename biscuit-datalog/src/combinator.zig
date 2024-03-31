@@ -11,6 +11,8 @@ const Expression = @import("expression.zig").Expression;
 const MatchedVariables = @import("matched_variables.zig").MatchedVariables;
 const SymbolTable = @import("symbol_table.zig").SymbolTable;
 
+const log = std.log.scoped(.combinator);
+
 /// Combinator is an iterator that will generate MatchedVariables from
 /// the body of a rule.
 ///
@@ -103,7 +105,7 @@ pub const Combinator = struct {
             // Lookup the next (trusted) fact
             const origin_fact = combinator.trusted_fact_iterator.next() orelse return null;
 
-            std.debug.print("combinator next trusted fact: {any}\n", .{origin_fact.fact});
+            log.debug("[{}] next trusted fact: {any}", .{ combinator.id, origin_fact.fact });
 
             const origin = origin_fact.origin.*;
             const fact = origin_fact.fact.*;

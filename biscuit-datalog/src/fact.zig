@@ -17,13 +17,13 @@ pub const Fact = struct {
         return .{ .predicate = predicate };
     }
 
-    pub fn deinit(fact: *Fact) void {
-        fact.predicate.deinit();
+    pub fn deinit(_: *Fact) void {
+        // fact.predicate.deinit();
     }
 
     /// Convert fact to new symbol space
-    pub fn convert(fact: Fact, old_symbols: *const SymbolTable, new_symbols: *SymbolTable) !Fact {
-        return .{ .predicate = try fact.predicate.convert(old_symbols, new_symbols) };
+    pub fn remap(fact: Fact, old_symbols: *const SymbolTable, new_symbols: *SymbolTable) !Fact {
+        return .{ .predicate = try fact.predicate.remap(old_symbols, new_symbols) };
     }
 
     pub fn clone(fact: Fact) !Fact {
