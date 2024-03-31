@@ -23,6 +23,15 @@ pub const Parser = struct {
         return .{ .input = input, .allocator = allocator };
     }
 
+    /// Return a new temporary parser with the current state of parent parser
+    /// for attempting to parse one of choice of things.
+    ///
+    /// E.g. when we parse a term we try parse each subtype of term with a temporary
+    /// parser.
+    pub fn temporary(parser: *Parser) Parser {
+        return Parser.init(parser.allocator, parser.rest());
+    }
+
     /// Try to parse fact
     ///
     /// E.g. read(1, "hello") will parse successfully, but read($foo, "hello")
@@ -60,13 +69,11 @@ pub const Parser = struct {
     ///
     /// Does not consume `parser` input on failure.
     fn term(parser: *Parser, variables: AllowVariables) ParserError!Term {
-        const rst = parser.rest();
-
         if (variables == .disallow) {
             try parser.reject("$"); // Variables are disallowed in a fact term
         } else {
             variable_blk: {
-                var term_parser = Parser.init(parser.allocator, rst);
+                var term_parser = parser.temporary();
 
                 const value = term_parser.variable() catch break :variable_blk;
 
@@ -77,7 +84,7 @@ pub const Parser = struct {
         }
 
         string_blk: {
-            var term_parser = Parser.init(parser.allocator, rst);
+            var term_parser = parser.temporary();
 
             const value = term_parser.string() catch break :string_blk;
 
@@ -87,7 +94,7 @@ pub const Parser = struct {
         }
 
         date_blk: {
-            var term_parser = Parser.init(parser.allocator, rst);
+            var term_parser = parser.temporary();
 
             const value = term_parser.date() catch break :date_blk;
 
@@ -97,7 +104,7 @@ pub const Parser = struct {
         }
 
         number_blk: {
-            var term_parser = Parser.init(parser.allocator, rst);
+            var term_parser = parser.temporary();
 
             const value = term_parser.number(i64) catch break :number_blk;
 
@@ -107,7 +114,7 @@ pub const Parser = struct {
         }
 
         bool_blk: {
-            var term_parser = Parser.init(parser.allocator, rst);
+            var term_parser = parser.temporary();
 
             const value = term_parser.boolean() catch break :bool_blk;
 
@@ -117,7 +124,7 @@ pub const Parser = struct {
         }
 
         bytes_blk: {
-            var term_parser = Parser.init(parser.allocator, rst);
+            var term_parser = parser.temporary();
 
             const value = term_parser.bytes() catch break :bytes_blk;
 
@@ -127,7 +134,7 @@ pub const Parser = struct {
         }
 
         set_blk: {
-            var term_parser = Parser.init(parser.allocator, rst);
+            var term_parser = parser.temporary();
 
             const value = term_parser.set(variables) catch break :set_blk;
 
@@ -155,7 +162,6 @@ pub const Parser = struct {
     }
 
     pub fn check(parser: *Parser) !Check {
-        // Note the space after
         const kind: Check.Kind = if (parser.startsWithConsuming("check if"))
             .one
         else if (parser.startsWithConsuming("check all"))
@@ -241,7 +247,7 @@ pub const Parser = struct {
         }
 
         scopes_blk: {
-            var scope_parser = Parser.init(parser.allocator, parser.rest());
+            var scope_parser = parser.temporary();
 
             const s = scope_parser.scopes(parser.allocator) catch break :scopes_blk;
 
@@ -263,7 +269,7 @@ pub const Parser = struct {
     /// Does not consume `parser` input on failure.
     fn ruleBodyElement(parser: *Parser) !union(BodyElementTag) { predicate: Predicate, expression: Expression } {
         predicate_blk: {
-            var predicate_parser = Parser.init(parser.allocator, parser.rest());
+            var predicate_parser = parser.temporary();
 
             const p = predicate_parser.predicate(.rule) catch break :predicate_blk;
 
@@ -274,7 +280,7 @@ pub const Parser = struct {
 
         // Otherwise try parsing an expression
         expression_blk: {
-            var expression_parser = Parser.init(parser.allocator, parser.rest());
+            var expression_parser = parser.temporary();
 
             const e = expression_parser.expression() catch break :expression_blk;
 
@@ -617,10 +623,10 @@ pub const Parser = struct {
 
         parser.skipWhiteSpace();
 
-        if (!parser.startsWith(".")) return e1;
-        try parser.consume(".");
+        if (!parser.startsWithConsuming(".")) return e1;
 
         const op = try parser.binaryOp7();
+
         parser.skipWhiteSpace();
 
         try parser.consume("(");
@@ -650,7 +656,7 @@ pub const Parser = struct {
     fn exprTerm(parser: *Parser) ParserError!Expression {
         // Try to parse unary
         unary_blk: {
-            var unary_parser = Parser.init(parser.allocator, parser.rest());
+            var unary_parser = parser.temporary();
 
             const p = unary_parser.unary() catch break :unary_blk;
 
