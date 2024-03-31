@@ -72,10 +72,10 @@ pub const Parser = struct {
         if (variables == .disallow) {
             try parser.reject("$"); // Variables are disallowed in a fact term
         } else {
-            variable_blk: {
+            blk: {
                 var tmp = parser.temporary();
 
-                const value = tmp.variable() catch break :variable_blk;
+                const value = tmp.variable() catch break :blk;
 
                 parser.offset += tmp.offset;
 
@@ -83,60 +83,60 @@ pub const Parser = struct {
             }
         }
 
-        string_blk: {
+        blk: {
             var tmp = parser.temporary();
 
-            const value = tmp.string() catch break :string_blk;
+            const value = tmp.string() catch break :blk;
 
             parser.offset += tmp.offset;
 
             return .{ .string = value };
         }
 
-        date_blk: {
+        blk: {
             var tmp = parser.temporary();
 
-            const value = tmp.date() catch break :date_blk;
+            const value = tmp.date() catch break :blk;
 
             parser.offset += tmp.offset;
 
             return .{ .date = value };
         }
 
-        number_blk: {
+        blk: {
             var tmp = parser.temporary();
 
-            const value = tmp.number(i64) catch break :number_blk;
+            const value = tmp.number(i64) catch break :blk;
 
             parser.offset += tmp.offset;
 
             return .{ .integer = value };
         }
 
-        bool_blk: {
+        blk: {
             var tmp = parser.temporary();
 
-            const value = tmp.boolean() catch break :bool_blk;
+            const value = tmp.boolean() catch break :blk;
 
             parser.offset += tmp.offset;
 
             return .{ .bool = value };
         }
 
-        bytes_blk: {
+        blk: {
             var tmp = parser.temporary();
 
-            const value = tmp.bytes() catch break :bytes_blk;
+            const value = tmp.bytes() catch break :blk;
 
             parser.offset += tmp.offset;
 
             return .{ .bytes = value };
         }
 
-        set_blk: {
+        blk: {
             var tmp = parser.temporary();
 
-            const value = tmp.set(variables) catch break :set_blk;
+            const value = tmp.set(variables) catch break :blk;
 
             parser.offset += tmp.offset;
 
@@ -246,10 +246,10 @@ pub const Parser = struct {
             if (!parser.startsWithConsuming(",")) break;
         }
 
-        scopes_blk: {
+        blk: {
             var tmp = parser.temporary();
 
-            const s = tmp.scopes(parser.allocator) catch break :scopes_blk;
+            const s = tmp.scopes(parser.allocator) catch break :blk;
 
             parser.offset += tmp.offset;
 
@@ -268,10 +268,10 @@ pub const Parser = struct {
     ///
     /// Does not consume `parser` input on failure.
     fn ruleBodyElement(parser: *Parser) !union(BodyElementTag) { predicate: Predicate, expression: Expression } {
-        predicate_blk: {
+        blk: {
             var tmp = parser.temporary();
 
-            const p = tmp.predicate(.rule) catch break :predicate_blk;
+            const p = tmp.predicate(.rule) catch break :blk;
 
             parser.offset += tmp.offset;
 
@@ -279,10 +279,10 @@ pub const Parser = struct {
         }
 
         // Otherwise try parsing an expression
-        expression_blk: {
+        blk: {
             var tmp = parser.temporary();
 
-            const e = tmp.expression() catch break :expression_blk;
+            const e = tmp.expression() catch break :blk;
 
             parser.offset += tmp.offset;
 
@@ -574,20 +574,20 @@ pub const Parser = struct {
     }
 
     fn expr8(parser: *Parser) ParserError!Expression {
-        unary_negate_blk: {
+        blk: {
             var tmp = parser.temporary();
 
-            const e = tmp.unaryNegate() catch break :unary_negate_blk;
+            const e = tmp.unaryNegate() catch break :blk;
 
             parser.offset += tmp.offset;
 
             return e;
         }
 
-        expr9_blk: {
+        blk: {
             var tmp = parser.temporary();
 
-            const e = tmp.expr9() catch break :expr9_blk;
+            const e = tmp.expr9() catch break :blk;
 
             parser.offset += tmp.offset;
 
@@ -1413,7 +1413,6 @@ test "parse expression" {
     for (inputs) |input| {
         var parser = Parser.init(arena, input);
         const expression = try parser.expression();
-        std.debug.print("input = \"{s}\", output = \"{}\"\n", .{ input, expression });
 
         try testing.expectEqualStrings(input, try std.fmt.allocPrint(arena, "{any}", .{expression}));
     }
