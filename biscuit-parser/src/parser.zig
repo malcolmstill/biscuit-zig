@@ -225,28 +225,19 @@ pub const Parser = struct {
         var expressions = std.ArrayList(Expression).init(parser.allocator);
         var scps = std.ArrayList(Scope).init(parser.allocator);
 
-        const required_rule_body = try parser.ruleBodyElement();
-
-        switch (required_rule_body) {
-            .predicate => |p| try predicates.append(p),
-            .expression => |e| try expressions.append(e),
-        }
-
         while (true) {
             parser.skipWhiteSpace();
 
-            if (!parser.startsWith(",")) break;
+            const rule_body = try parser.ruleBodyElement();
 
-            try parser.consume(",");
-
-            parser.skipWhiteSpace();
-
-            const next_rule_body = try parser.ruleBodyElement();
-
-            switch (next_rule_body) {
+            switch (rule_body) {
                 .predicate => |p| try predicates.append(p),
                 .expression => |e| try expressions.append(e),
             }
+
+            parser.skipWhiteSpace();
+
+            if (!parser.startsWithConsuming(",")) break;
         }
 
         scopes_blk: {
