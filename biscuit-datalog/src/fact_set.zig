@@ -38,15 +38,15 @@ pub const FactSet = struct {
     // value as a key, and we try to insert into hashmap that already contains that value,
     // we will leak the key if we don't detect the existing version and deallocate one of the
     // keys.
-    pub fn deinit(_: *FactSet) void {
-        // var it = fact_set.sets.iterator();
+    pub fn deinit(fact_set: *FactSet) void {
+        var it = fact_set.sets.iterator();
 
-        // while (it.next()) |origin_facts| {
-        //     origin_facts.key_ptr.deinit(); // Okay, in practice this is also giving us incorrect alignment issues
-        //     origin_facts.value_ptr.deinit();
-        // }
+        while (it.next()) |origin_facts| {
+            origin_facts.key_ptr.deinit(); // Okay, in practice this is also giving us incorrect alignment issues
+            origin_facts.value_ptr.deinit();
+        }
 
-        // fact_set.sets.deinit();
+        fact_set.sets.deinit();
     }
 
     pub const Iterator = struct {

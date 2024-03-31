@@ -45,8 +45,8 @@ pub fn Set(comptime K: type) type {
             };
         }
 
-        pub fn deinit(_: *Self) void {
-            // set.inner.deinit();
+        pub fn deinit(set: *Self) void {
+            set.inner.deinit();
         }
 
         pub fn clone(set: *const Self) !Self {

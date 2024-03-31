@@ -24,12 +24,12 @@ pub const Check = struct {
         return .{ .queries = rules, .kind = kind };
     }
 
-    pub fn deinit(_: *Check) void {
-        // for (check.queries.items) |*query| {
-        //     query.deinit();
-        // }
+    pub fn deinit(check: *Check) void {
+        for (check.queries.items) |*query| {
+            query.deinit();
+        }
 
-        // check.queries.deinit();
+        check.queries.deinit();
     }
 
     pub fn format(check: Check, comptime _: []const u8, _: std.fmt.FormatOptions, writer: anytype) !void {

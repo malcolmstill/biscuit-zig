@@ -15,15 +15,15 @@ pub const RuleSet = struct {
         };
     }
 
-    pub fn deinit(_: *RuleSet) void {
-        // var it = rule_set.rules.iterator();
+    pub fn deinit(rule_set: *RuleSet) void {
+        var it = rule_set.rules.iterator();
 
-        // while (it.next()) |entry| {
-        //     entry.key_ptr.deinit();
-        //     entry.value_ptr.deinit();
-        // }
+        while (it.next()) |entry| {
+            entry.key_ptr.deinit();
+            entry.value_ptr.deinit();
+        }
 
-        // rule_set.rules.deinit();
+        rule_set.rules.deinit();
     }
 
     pub fn add(rule_set: *RuleSet, origin: u64, scope: TrustedOrigins, rule: Rule) !void {

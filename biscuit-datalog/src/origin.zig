@@ -23,8 +23,10 @@ pub const Origin = struct {
         return .{ .block_ids = block_ids };
     }
 
-    pub fn deinit(_: *Origin) void {
-        // origin.block_ids.deinit();
+    pub fn deinit(origin: *Origin) void {
+        if (@import("builtin").mode != .Debug) unreachable; // .deinit only used in tests
+
+        origin.block_ids.deinit();
     }
 
     pub fn format(origin: Origin, comptime _: []const u8, _: std.fmt.FormatOptions, writer: anytype) !void {
