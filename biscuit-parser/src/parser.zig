@@ -170,26 +170,16 @@ pub const Parser = struct {
         return .{ .kind = kind, .queries = queries };
     }
 
+    /// Parse check body
+    ///
+    /// E.g. given check if right($0, $1), resource($0), operation($1), $0.contains(\"file\") or admin(true)
+    /// this will (attempt to) parse `right($0, $1), resource($0), operation($1), $0.contains(\"file\") or admin(true)`
+    ///
+    /// Requires at least one rule body.
     fn checkBody(parser: *Parser) !std.ArrayList(Rule) {
         var queries = std.ArrayList(Rule).init(parser.allocator);
 
-        const required_body = try parser.ruleBody();
-
-        try queries.append(.{
-            .head = .{ .name = "query", .terms = std.ArrayList(Term).init(parser.allocator) },
-            .body = required_body.predicates,
-            .expressions = required_body.expressions,
-            .scopes = required_body.scopes,
-            .variables = null,
-        });
-
         while (true) {
-            parser.skipWhiteSpace();
-
-            if (!parser.startsWith("or")) break;
-
-            try parser.consume("or");
-
             parser.skipWhiteSpace();
 
             const body = try parser.ruleBody();
@@ -201,6 +191,10 @@ pub const Parser = struct {
                 .scopes = body.scopes,
                 .variables = null,
             });
+
+            parser.skipWhiteSpace();
+
+            if (!parser.startsWithConsuming("or")) break;
         }
 
         return queries;
