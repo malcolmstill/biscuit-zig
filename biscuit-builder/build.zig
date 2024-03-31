@@ -15,6 +15,7 @@ pub fn build(b: *std.Build) void {
     // set a preferred release mode, allowing the user to decide how to optimize.
     const optimize = b.standardOptimizeOption(.{});
 
+    const ziglyph = b.dependency("ziglyph", .{ .optimize = optimize, .target = target });
     const schema = b.dependency("biscuit-schema", .{ .target = target, .optimize = optimize });
     const format = b.dependency("biscuit-format", .{ .target = target, .optimize = optimize });
     const datalog = b.dependency("biscuit-datalog", .{ .target = target, .optimize = optimize });
@@ -25,6 +26,7 @@ pub fn build(b: *std.Build) void {
             .{ .name = "biscuit-schema", .module = schema.module("biscuit-schema") },
             .{ .name = "biscuit-format", .module = format.module("biscuit-format") },
             .{ .name = "biscuit-datalog", .module = datalog.module("biscuit-datalog") },
+            .{ .name = "ziglyph", .module = ziglyph.module("ziglyph") },
         },
     });
 
@@ -37,6 +39,7 @@ pub fn build(b: *std.Build) void {
     });
     lib_unit_tests.root_module.addImport("biscuit-schema", schema.module("biscuit-schema"));
     lib_unit_tests.root_module.addImport("biscuit-format", format.module("biscuit-format"));
+    lib_unit_tests.root_module.addImport("ziglyph", ziglyph.module("ziglyph"));
 
     const run_lib_unit_tests = b.addRunArtifact(lib_unit_tests);
 

@@ -42,7 +42,6 @@
         .biscuit_schema = .{ .path = "../biscuit-schema" },
         .biscuit_format = .{ .path = "../biscuit-format" },
         .@"biscuit-builder" = .{ .path = "../biscuit-builder" },
-        .@"biscuit-parser" = .{ .path = "../biscuit-parser" },
         .biscuit_datalog = .{ .path = "../biscuit-datalog" },
     },
 

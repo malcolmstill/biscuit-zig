@@ -7,7 +7,7 @@ const TrustedOrigins = @import("biscuit-datalog").TrustedOrigins;
 const Check = @import("biscuit-datalog").check.Check;
 const SymbolTable = @import("biscuit-datalog").symbol_table.SymbolTable;
 const Scope = @import("biscuit-datalog").Scope;
-const Parser = @import("biscuit-parser").Parser;
+const Parser = @import("biscuit-builder").Parser;
 const builder = @import("biscuit-builder");
 const PolicyResult = @import("biscuit-builder").PolicyResult;
 

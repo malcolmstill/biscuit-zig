@@ -18,7 +18,6 @@ pub fn build(b: *std.Build) void {
     const schema = b.dependency("biscuit_schema", .{ .target = target, .optimize = optimize });
     const format = b.dependency("biscuit_format", .{ .target = target, .optimize = optimize });
     const builder = b.dependency("biscuit-builder", .{ .target = target, .optimize = optimize });
-    const parser = b.dependency("biscuit-parser", .{ .target = target, .optimize = optimize });
     const datalog = b.dependency("biscuit_datalog", .{ .target = target, .optimize = optimize });
 
     _ = b.addModule("biscuit", .{
@@ -27,7 +26,6 @@ pub fn build(b: *std.Build) void {
             .{ .name = "biscuit-schema", .module = schema.module("biscuit-schema") },
             .{ .name = "biscuit-format", .module = format.module("biscuit-format") },
             .{ .name = "biscuit-builder", .module = builder.module("biscuit-builder") },
-            .{ .name = "biscuit-parser", .module = parser.module("biscuit-parser") },
             .{ .name = "biscuit-datalog", .module = datalog.module("biscuit-datalog") },
         },
     });
