@@ -18,3 +18,12 @@ pub fn bytesToUrlSafeBase64(allocator: std.mem.Allocator, bytes: []const u8) ![]
 
     return std.base64.url_safe.Encoder.encode(encoded, bytes);
 }
+
+pub fn bytesToBase64(allocator: std.mem.Allocator, bytes: []const u8) ![]const u8 {
+    const size = std.base64.standard.Encoder.calcSize(bytes.len);
+
+    const encoded = try allocator.alloc(u8, size);
+    errdefer allocator.free(bytes);
+
+    return std.base64.standard.Encoder.encode(encoded, bytes);
+}

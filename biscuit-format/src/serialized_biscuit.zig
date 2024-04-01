@@ -206,41 +206,62 @@ pub const SerializedBiscuit = struct {
 
     pub fn serialize(serialized_biscuit: *SerializedBiscuit, allocator: mem.Allocator) ![]const u8 {
         const authority: schema.SignedBlock = .{
-            .block = schema.ManagedString.managed(serialized_biscuit.authority.block),
+            .block = try schema.ManagedString.copy(serialized_biscuit.authority.block, allocator),
             .nextKey = .{
                 .algorithm = schema.PublicKey.Algorithm.Ed25519,
-                .key = schema.ManagedString.managed(&serialized_biscuit.authority.next_key.bytes),
+                .key = try schema.ManagedString.copy(&serialized_biscuit.authority.next_key.bytes, allocator),
             },
-            .signature = schema.ManagedString.managed(&serialized_biscuit.authority.signature.toBytes()),
+            .signature = try schema.ManagedString.copy(&serialized_biscuit.authority.signature.toBytes(), allocator),
             .externalSignature = null,
         };
+        defer {
+            authority.block.deinit();
+            if (authority.nextKey) |nextKey| nextKey.key.deinit();
+            authority.signature.deinit();
+        }
 
         var blocks = std.ArrayList(schema.SignedBlock).init(serialized_biscuit.allocator);
-        defer blocks.deinit();
+        defer {
+            for (blocks.items) |b| {
+                b.block.deinit();
+                if (b.nextKey) |nextKey| nextKey.key.deinit();
+                b.signature.deinit();
+            }
+            blocks.deinit();
+        }
 
         for (serialized_biscuit.blocks.items) |b| {
             const block: schema.SignedBlock = .{
-                .block = schema.ManagedString.managed(b.block),
+                .block = try schema.ManagedString.copy(b.block, allocator),
                 .nextKey = .{
                     .algorithm = schema.PublicKey.Algorithm.Ed25519,
-                    .key = schema.ManagedString.managed(&b.next_key.bytes),
+                    .key = try schema.ManagedString.copy(&b.next_key.bytes, allocator),
                 },
-                .signature = schema.ManagedString.managed(&b.signature.toBytes()),
+                .signature = try schema.ManagedString.copy(&b.signature.toBytes(), allocator),
             };
 
             try blocks.append(block);
         }
 
-        return try schema.Biscuit.encode(.{
+        const biscuit: schema.Biscuit = .{
             .authority = authority,
             .blocks = blocks,
             .proof = .{
                 .Content = switch (serialized_biscuit.proof) {
-                    .next_secret => .{ .nextSecret = schema.ManagedString.managed(&serialized_biscuit.proof.next_secret.bytes) },
-                    .final_signature => .{ .finalSignature = schema.ManagedString.managed(&serialized_biscuit.proof.final_signature.toBytes()) },
+                    .next_secret => .{ .nextSecret = try schema.ManagedString.copy(&serialized_biscuit.proof.next_secret.bytes, allocator) },
+                    .final_signature => .{ .finalSignature = try schema.ManagedString.copy(&serialized_biscuit.proof.final_signature.toBytes(), allocator) },
                 },
             },
-        }, allocator);
+        };
+
+        defer {
+            switch (biscuit.proof.?.Content.?) {
+                .nextSecret => |next_secret| next_secret.deinit(),
+                .finalSignature => |final_signature| final_signature.deinit(),
+            }
+        }
+
+        return try schema.Biscuit.encode(biscuit, allocator);
     }
 };
 

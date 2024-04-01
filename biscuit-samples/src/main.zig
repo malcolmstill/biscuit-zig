@@ -190,6 +190,14 @@ test "Basic token can be sealed" {
     const token = try std.fs.cwd().readFileAlloc(testing.allocator, "src/samples/test001_basic.bc", 0xFFFFFFF);
     defer testing.allocator.free(token);
 
+    {
+        // const encoded = try decode.bytesToUrlSafeBase64(testing.allocator, token);
+        const encoded = try decode.bytesToBase64(testing.allocator, token);
+        defer testing.allocator.free(encoded);
+
+        std.debug.print("before parsing(byte len = {}) = {s}\n", .{ token.len, encoded });
+    }
+
     var b = try Biscuit.fromBytes(testing.allocator, token, public_key);
     defer b.deinit();
 
@@ -197,10 +205,11 @@ test "Basic token can be sealed" {
         const encoded_token = try b.serialized.serialize(testing.allocator);
         defer testing.allocator.free(encoded_token);
 
-        const encoded = try decode.bytesToUrlSafeBase64(testing.allocator, encoded_token);
+        // const encoded = try decode.bytesToUrlSafeBase64(testing.allocator, encoded_token);
+        const encoded = try decode.bytesToBase64(testing.allocator, encoded_token);
         defer testing.allocator.free(encoded);
 
-        std.debug.print("before sealing = {s}\n", .{encoded});
+        std.debug.print("before sealing(byte len = {}) = {s}\n", .{ encoded_token.len, encoded });
     }
 
     var sealed = try b.seal();
@@ -209,9 +218,10 @@ test "Basic token can be sealed" {
         const encoded_token = try sealed.serialized.serialize(testing.allocator);
         defer testing.allocator.free(encoded_token);
 
-        const encoded = try decode.bytesToUrlSafeBase64(testing.allocator, encoded_token);
+        // const encoded = try decode.bytesToUrlSafeBase64(testing.allocator, encoded_token);
+        const encoded = try decode.bytesToBase64(testing.allocator, encoded_token);
         defer testing.allocator.free(encoded);
 
-        std.debug.print("after sealing = {s}\n", .{encoded});
+        std.debug.print("after sealing(byte len = {}) = {s}\n", .{ encoded_token.len, encoded });
     }
 }
