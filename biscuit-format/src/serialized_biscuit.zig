@@ -248,18 +248,11 @@ pub const SerializedBiscuit = struct {
             .blocks = blocks,
             .proof = .{
                 .Content = switch (serialized_biscuit.proof) {
-                    .next_secret => .{ .nextSecret = try schema.ManagedString.copy(&serialized_biscuit.proof.next_secret.bytes, allocator) },
-                    .final_signature => .{ .finalSignature = try schema.ManagedString.copy(&serialized_biscuit.proof.final_signature.toBytes(), allocator) },
+                    .next_secret => .{ .nextSecret = schema.ManagedString.managed(&serialized_biscuit.proof.next_secret.publicKeyBytes()) },
+                    .final_signature => .{ .finalSignature = schema.ManagedString.managed(&serialized_biscuit.proof.final_signature.toBytes()) },
                 },
             },
         };
-
-        defer {
-            switch (biscuit.proof.?.Content.?) {
-                .nextSecret => |next_secret| next_secret.deinit(),
-                .finalSignature => |final_signature| final_signature.deinit(),
-            }
-        }
 
         return try schema.Biscuit.encode(biscuit, allocator);
     }
