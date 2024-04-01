@@ -206,38 +206,25 @@ pub const SerializedBiscuit = struct {
 
     pub fn serialize(serialized_biscuit: *SerializedBiscuit, allocator: mem.Allocator) ![]const u8 {
         const authority: schema.SignedBlock = .{
-            .block = try schema.ManagedString.copy(serialized_biscuit.authority.block, allocator),
+            .block = schema.ManagedString.managed(serialized_biscuit.authority.block),
             .nextKey = .{
                 .algorithm = schema.PublicKey.Algorithm.Ed25519,
-                .key = try schema.ManagedString.copy(&serialized_biscuit.authority.next_key.bytes, allocator),
+                .key = schema.ManagedString.managed(&serialized_biscuit.authority.next_key.bytes),
             },
-            .signature = try schema.ManagedString.copy(&serialized_biscuit.authority.signature.toBytes(), allocator),
+            .signature = schema.ManagedString.managed(&serialized_biscuit.authority.signature.toBytes()),
             .externalSignature = null,
         };
-        defer {
-            authority.block.deinit();
-            if (authority.nextKey) |nextKey| nextKey.key.deinit();
-            authority.signature.deinit();
-        }
-
         var blocks = std.ArrayList(schema.SignedBlock).init(serialized_biscuit.allocator);
-        defer {
-            for (blocks.items) |b| {
-                b.block.deinit();
-                if (b.nextKey) |nextKey| nextKey.key.deinit();
-                b.signature.deinit();
-            }
-            blocks.deinit();
-        }
+        defer blocks.deinit();
 
         for (serialized_biscuit.blocks.items) |b| {
             const block: schema.SignedBlock = .{
-                .block = try schema.ManagedString.copy(b.block, allocator),
+                .block = schema.ManagedString.managed(b.block),
                 .nextKey = .{
                     .algorithm = schema.PublicKey.Algorithm.Ed25519,
-                    .key = try schema.ManagedString.copy(&b.next_key.bytes, allocator),
+                    .key = schema.ManagedString.managed(&b.next_key.bytes),
                 },
-                .signature = try schema.ManagedString.copy(&b.signature.toBytes(), allocator),
+                .signature = schema.ManagedString.managed(&b.signature.toBytes()),
             };
 
             try blocks.append(block);
