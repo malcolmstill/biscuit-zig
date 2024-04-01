@@ -193,5 +193,25 @@ test "Basic token can be sealed" {
     var b = try Biscuit.fromBytes(testing.allocator, token, public_key);
     defer b.deinit();
 
-    _ = try b.seal();
+    {
+        const encoded_token = try b.serialized.serialize(testing.allocator);
+        defer testing.allocator.free(encoded_token);
+
+        const encoded = try decode.bytesToUrlSafeBase64(testing.allocator, encoded_token);
+        defer testing.allocator.free(encoded);
+
+        std.debug.print("before sealing = {s}\n", .{encoded});
+    }
+
+    var sealed = try b.seal();
+
+    {
+        const encoded_token = try sealed.serialized.serialize(testing.allocator);
+        defer testing.allocator.free(encoded_token);
+
+        const encoded = try decode.bytesToUrlSafeBase64(testing.allocator, encoded_token);
+        defer testing.allocator.free(encoded);
+
+        std.debug.print("after sealing = {s}\n", .{encoded});
+    }
 }

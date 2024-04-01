@@ -43,7 +43,7 @@ pub const Block = struct {
     pub fn fromBytes(arena: std.mem.Allocator, signed_block: SignedBlock, token_symbols: *SymbolTable) !Block {
         const data = signed_block.block;
 
-        const decoded_block = try schema.decodeBlock(arena, data);
+        const decoded_block = try schema.Block.decode(data, arena);
         defer decoded_block.deinit();
 
         var block = Block.init(arena);

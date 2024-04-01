@@ -6,7 +6,7 @@ pub const SignedBlock = struct {
     block: []const u8,
     algorithm: schema.PublicKey.Algorithm,
     signature: Ed25519.Signature,
-    public_key: Ed25519.PublicKey,
+    next_key: Ed25519.PublicKey,
     external_signature: ?ExternalSignature,
 
     /// Convert schema block representation to SignedBlock
@@ -60,7 +60,7 @@ pub const SignedBlock = struct {
             .block = try arena.dupe(u8, schema_signed_block.block.getSlice()),
             .algorithm = algorithm,
             .signature = signature,
-            .public_key = public_key,
+            .next_key = public_key,
             .external_signature = external_signature,
         };
     }

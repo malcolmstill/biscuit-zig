@@ -24,7 +24,7 @@ pub const SerializedBiscuit = struct {
     ///
     /// This decodes the toplevel-level biscuit format from protobuf and verifies the token.
     pub fn deserialize(allocator: mem.Allocator, bytes: []const u8, public_key: Ed25519.PublicKey) !SerializedBiscuit {
-        const b = try schema.decodeBiscuit(allocator, bytes);
+        const b = try schema.Biscuit.decode(bytes, allocator);
         defer b.deinit();
 
         var arena_state = try allocator.create(ArenaAllocator);
@@ -102,11 +102,11 @@ pub const SerializedBiscuit = struct {
 
             verifier.update(serialized_biscuit.authority.block);
             verifier.update(&serialized_biscuit.authority.algorithmBuf());
-            verifier.update(&serialized_biscuit.authority.public_key.bytes);
+            verifier.update(&serialized_biscuit.authority.next_key.bytes);
 
             try verifier.verify();
 
-            pk = serialized_biscuit.authority.public_key;
+            pk = serialized_biscuit.authority.next_key;
         }
 
         // Verify the other blocks' signatures
@@ -123,7 +123,7 @@ pub const SerializedBiscuit = struct {
                     verifier.update(&external_signature.signature.toBytes());
                 }
                 verifier.update(&block.algorithmBuf());
-                verifier.update(&block.public_key.bytes);
+                verifier.update(&block.next_key.bytes);
 
                 try verifier.verify();
             }
@@ -140,7 +140,7 @@ pub const SerializedBiscuit = struct {
                 try external_verifier.verify();
             }
 
-            pk = block.public_key;
+            pk = block.next_key;
         }
 
         // Check the proof
@@ -161,7 +161,7 @@ pub const SerializedBiscuit = struct {
 
                 verifier.update(last_block.block);
                 verifier.update(&last_block.algorithmBuf());
-                verifier.update(&last_block.public_key.bytes);
+                verifier.update(&last_block.next_key.bytes);
                 verifier.update(&last_block.signature.toBytes());
 
                 try verifier.verify();
@@ -190,7 +190,7 @@ pub const SerializedBiscuit = struct {
 
         signer.update(final_block.block);
         signer.update(&algorithm());
-        signer.update(&final_block.public_key.bytes);
+        signer.update(&final_block.next_key.bytes);
         signer.update(&final_block.signature.toBytes());
 
         const signature = signer.finalize();
@@ -202,6 +202,45 @@ pub const SerializedBiscuit = struct {
             .blocks = serialized_biscuit.blocks,
             .proof = .{ .final_signature = signature },
         };
+    }
+
+    pub fn serialize(serialized_biscuit: *SerializedBiscuit, allocator: mem.Allocator) ![]const u8 {
+        const authority: schema.SignedBlock = .{
+            .block = schema.ManagedString.managed(serialized_biscuit.authority.block),
+            .nextKey = .{
+                .algorithm = schema.PublicKey.Algorithm.Ed25519,
+                .key = schema.ManagedString.managed(&serialized_biscuit.authority.next_key.bytes),
+            },
+            .signature = schema.ManagedString.managed(&serialized_biscuit.authority.signature.toBytes()),
+            .externalSignature = null,
+        };
+
+        var blocks = std.ArrayList(schema.SignedBlock).init(serialized_biscuit.allocator);
+        defer blocks.deinit();
+
+        for (serialized_biscuit.blocks.items) |b| {
+            const block: schema.SignedBlock = .{
+                .block = schema.ManagedString.managed(b.block),
+                .nextKey = .{
+                    .algorithm = schema.PublicKey.Algorithm.Ed25519,
+                    .key = schema.ManagedString.managed(&b.next_key.bytes),
+                },
+                .signature = schema.ManagedString.managed(&b.signature.toBytes()),
+            };
+
+            try blocks.append(block);
+        }
+
+        return try schema.Biscuit.encode(.{
+            .authority = authority,
+            .blocks = blocks,
+            .proof = .{
+                .Content = switch (serialized_biscuit.proof) {
+                    .next_secret => .{ .nextSecret = schema.ManagedString.managed(&serialized_biscuit.proof.next_secret.bytes) },
+                    .final_signature => .{ .finalSignature = schema.ManagedString.managed(&serialized_biscuit.proof.final_signature.toBytes()) },
+                },
+            },
+        }, allocator);
     }
 };
 
@@ -239,8 +278,27 @@ test {
         var b = try SerializedBiscuit.deserialize(testing.allocator, bytes, public_key);
         defer b.deinit();
 
+        {
+            const encoded_token = try b.serialize(testing.allocator);
+            defer testing.allocator.free(encoded_token);
+
+            const encoded = try decode.bytesToUrlSafeBase64(testing.allocator, encoded_token);
+            defer testing.allocator.free(encoded);
+
+            std.debug.print("before sealing = {s}\n", .{encoded});
+        }
+
         // We should be able to seal the tokens
         var sealed = try b.seal();
+        {
+            const encoded_token = try sealed.serialize(testing.allocator);
+            defer testing.allocator.free(encoded_token);
+
+            const encoded = try decode.bytesToUrlSafeBase64(testing.allocator, encoded_token);
+            defer testing.allocator.free(encoded);
+
+            std.debug.print("after sealing = {s}\n", .{encoded});
+        }
 
         // Trying to seal again should fail
         _ = sealed.seal() catch |err| switch (err) {
@@ -258,8 +316,16 @@ test {
 
         // The tokens are already sealed so should fail
         _ = b.seal() catch |err| switch (err) {
-            error.AlreadySealed => continue,
+            error.AlreadySealed => {},
             else => return err,
         };
+
+        const encoded_token = try b.serialize(testing.allocator);
+        defer testing.allocator.free(encoded_token);
+
+        const encoded = try decode.bytesToUrlSafeBase64(testing.allocator, encoded_token);
+        defer testing.allocator.free(encoded);
+
+        std.debug.print("was already sealed = {s}", .{encoded});
     }
 }
