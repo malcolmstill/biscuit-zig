@@ -33,12 +33,13 @@ pub fn build(b: *std.Build) void {
     // Creates a step for unit testing. This only builds the test executable
     // but does not run it.
     const lib_unit_tests = b.addTest(.{
-        .root_source_file = .{ .path = "src/main.zig" },
+        .root_source_file = .{ .path = "src/root.zig" },
         .target = target,
         .optimize = optimize,
     });
     lib_unit_tests.root_module.addImport("biscuit-schema", schema.module("biscuit-schema"));
     lib_unit_tests.root_module.addImport("biscuit-format", format.module("biscuit-format"));
+    lib_unit_tests.root_module.addImport("biscuit-datalog", datalog.module("biscuit-datalog"));
     lib_unit_tests.root_module.addImport("ziglyph", ziglyph.module("ziglyph"));
 
     const run_lib_unit_tests = b.addRunArtifact(lib_unit_tests);
