@@ -23,15 +23,6 @@ pub const Parser = struct {
         return .{ .input = input, .allocator = allocator };
     }
 
-    /// Return a new temporary parser with the current state of parent parser
-    /// for attempting to parse one of choice of things.
-    ///
-    /// E.g. when we parse a term we try parse each subtype of term with a temporary
-    /// parser.
-    pub fn temporary(parser: *Parser) Parser {
-        return Parser.init(parser.allocator, parser.rest());
-    }
-
     /// Try to parse fact
     ///
     /// E.g. read(1, "hello") will parse successfully, but read($foo, "hello")
@@ -41,6 +32,9 @@ pub const Parser = struct {
     }
 
     pub fn predicate(parser: *Parser, kind: enum { fact, rule }) !Predicate {
+        const start = parser.offset;
+        errdefer parser.offset = start;
+
         var terms = std.ArrayList(Term).init(parser.allocator);
 
         const predicate_name = try parser.name();
@@ -69,84 +63,29 @@ pub const Parser = struct {
     ///
     /// Does not consume `parser` input on failure.
     fn term(parser: *Parser, variables: AllowVariables) ParserError!Term {
+        const start = parser.offset;
+        errdefer parser.offset = start;
+
         if (variables == .disallow) {
             try parser.reject("$"); // Variables are disallowed in a fact term
         } else {
-            blk: {
-                var tmp = parser.temporary();
-
-                const value = tmp.variable() catch break :blk;
-
-                parser.offset += tmp.offset;
-
-                return .{ .variable = value };
-            }
+            if (parser.variable()) |value| return .{ .variable = value } else |_| {}
         }
 
-        blk: {
-            var tmp = parser.temporary();
-
-            const value = tmp.string() catch break :blk;
-
-            parser.offset += tmp.offset;
-
-            return .{ .string = value };
-        }
-
-        blk: {
-            var tmp = parser.temporary();
-
-            const value = tmp.date() catch break :blk;
-
-            parser.offset += tmp.offset;
-
-            return .{ .date = value };
-        }
-
-        blk: {
-            var tmp = parser.temporary();
-
-            const value = tmp.number(i64) catch break :blk;
-
-            parser.offset += tmp.offset;
-
-            return .{ .integer = value };
-        }
-
-        blk: {
-            var tmp = parser.temporary();
-
-            const value = tmp.boolean() catch break :blk;
-
-            parser.offset += tmp.offset;
-
-            return .{ .bool = value };
-        }
-
-        blk: {
-            var tmp = parser.temporary();
-
-            const value = tmp.bytes() catch break :blk;
-
-            parser.offset += tmp.offset;
-
-            return .{ .bytes = value };
-        }
-
-        blk: {
-            var tmp = parser.temporary();
-
-            const value = tmp.set(variables) catch break :blk;
-
-            parser.offset += tmp.offset;
-
-            return .{ .set = value };
-        }
+        if (parser.string()) |value| return .{ .string = value } else |_| {}
+        if (parser.date()) |value| return .{ .date = value } else |_| {}
+        if (parser.number(i64)) |value| return .{ .integer = value } else |_| {}
+        if (parser.boolean()) |value| return .{ .bool = value } else |_| {}
+        if (parser.bytes()) |value| return .{ .bytes = value } else |_| {}
+        if (parser.set(variables)) |value| return .{ .set = value } else |_| {}
 
         return error.NoFactTermFound;
     }
 
     pub fn policy(parser: *Parser) !Policy {
+        const start = parser.offset;
+        errdefer parser.offset = start;
+
         const kind: Policy.Kind = if (parser.startsWithConsuming("allow if"))
             .allow
         else if (parser.startsWithConsuming("deny if"))
@@ -248,15 +187,7 @@ pub const Parser = struct {
             if (!parser.startsWithConsuming(",")) break;
         }
 
-        blk: {
-            var tmp = parser.temporary();
-
-            const s = tmp.scopes(parser.allocator) catch break :blk;
-
-            parser.offset += tmp.offset;
-
-            scps = s;
-        }
+        if (parser.scopes()) |value| scps = value else |_| {}
 
         return .{ .predicates = predicates, .expressions = expressions, .scopes = scps };
     }
@@ -270,26 +201,8 @@ pub const Parser = struct {
     ///
     /// Does not consume `parser` input on failure.
     fn ruleBodyElement(parser: *Parser) !union(BodyElementTag) { predicate: Predicate, expression: Expression } {
-        blk: {
-            var tmp = parser.temporary();
-
-            const p = tmp.predicate(.rule) catch break :blk;
-
-            parser.offset += tmp.offset;
-
-            return .{ .predicate = p };
-        }
-
-        // Otherwise try parsing an expression
-        blk: {
-            var tmp = parser.temporary();
-
-            const e = tmp.expression() catch break :blk;
-
-            parser.offset += tmp.offset;
-
-            return .{ .expression = e };
-        }
+        if (parser.predicate(.rule)) |p| return .{ .predicate = p } else |_| {}
+        if (parser.expression()) |p| return .{ .expression = p } else |_| {}
 
         return error.ExpectedPredicateOrExpression;
     }
@@ -317,6 +230,9 @@ pub const Parser = struct {
     }
 
     fn date(parser: *Parser) !u64 {
+        const start = parser.offset;
+        errdefer parser.offset = start;
+
         const year = try parser.number(i32);
 
         try parser.consume("-");
@@ -362,6 +278,7 @@ pub const Parser = struct {
 
     fn number(parser: *Parser, comptime T: type) !T {
         const start = parser.offset;
+        errdefer parser.offset = start;
 
         if (parser.rest().len == 0) return error.ParsingNumberExpectsAtLeastOneCharacter;
         const first_char = parser.rest()[0];
@@ -391,6 +308,9 @@ pub const Parser = struct {
     }
 
     fn bytes(parser: *Parser) ![]const u8 {
+        const start = parser.offset;
+        errdefer parser.offset = start;
+
         try parser.consume("hex:");
 
         const hex_string = try parser.hex();
@@ -403,6 +323,9 @@ pub const Parser = struct {
     }
 
     fn set(parser: *Parser, variables: AllowVariables) !Set(Term) {
+        const start = parser.offset;
+        errdefer parser.offset = start;
+
         var new_set = Set(Term).init(parser.allocator);
 
         try parser.consume("[");
@@ -432,6 +355,9 @@ pub const Parser = struct {
     ///
     /// The code uses the "precedence climbing" approach.
     fn expression(parser: *Parser) ParserError!Expression {
+        const start = parser.offset;
+        errdefer parser.offset = start;
+
         var e = try parser.expr1();
 
         while (true) {
@@ -450,6 +376,9 @@ pub const Parser = struct {
     }
 
     fn expr1(parser: *Parser) ParserError!Expression {
+        const start = parser.offset;
+        errdefer parser.offset = start;
+
         var e = try parser.expr2();
 
         while (true) {
@@ -468,6 +397,9 @@ pub const Parser = struct {
     }
 
     fn expr2(parser: *Parser) ParserError!Expression {
+        const start = parser.offset;
+        errdefer parser.offset = start;
+
         var e = try parser.expr3();
 
         while (true) {
@@ -486,6 +418,9 @@ pub const Parser = struct {
     }
 
     fn expr3(parser: *Parser) ParserError!Expression {
+        const start = parser.offset;
+        errdefer parser.offset = start;
+
         var e = try parser.expr4();
 
         while (true) {
@@ -504,6 +439,9 @@ pub const Parser = struct {
     }
 
     fn expr4(parser: *Parser) ParserError!Expression {
+        const start = parser.offset;
+        errdefer parser.offset = start;
+
         var e = try parser.expr5();
 
         while (true) {
@@ -522,6 +460,9 @@ pub const Parser = struct {
     }
 
     fn expr5(parser: *Parser) ParserError!Expression {
+        const start = parser.offset;
+        errdefer parser.offset = start;
+
         var e = try parser.expr6();
 
         while (true) {
@@ -540,6 +481,9 @@ pub const Parser = struct {
     }
 
     fn expr6(parser: *Parser) ParserError!Expression {
+        const start = parser.offset;
+        errdefer parser.offset = start;
+
         var e = try parser.expr7();
 
         while (true) {
@@ -558,6 +502,9 @@ pub const Parser = struct {
     }
 
     fn expr7(parser: *Parser) ParserError!Expression {
+        const start = parser.offset;
+        errdefer parser.offset = start;
+
         var e = try parser.expr8();
 
         while (true) {
@@ -576,31 +523,17 @@ pub const Parser = struct {
     }
 
     fn expr8(parser: *Parser) ParserError!Expression {
-        blk: {
-            var tmp = parser.temporary();
-
-            const e = tmp.unaryNegate() catch break :blk;
-
-            parser.offset += tmp.offset;
-
-            return e;
-        }
-
-        blk: {
-            var tmp = parser.temporary();
-
-            const e = tmp.expr9() catch break :blk;
-
-            parser.offset += tmp.offset;
-
-            return e;
-        }
+        if (parser.unaryNegate()) |value| return value else |_| {}
+        if (parser.expr9()) |value| return value else |_| {}
 
         return error.ExpectedUnaryNegateOrMethod;
     }
 
     /// Parse a unary or binary method
     fn expr9(parser: *Parser) ParserError!Expression {
+        const start = parser.offset;
+        errdefer parser.offset = start;
+
         var e1 = try parser.exprTerm();
 
         parser.skipWhiteSpace();
@@ -608,25 +541,15 @@ pub const Parser = struct {
         if (!parser.startsWithConsuming(".")) return e1;
 
         while (true) {
-            blk: {
-                var tmp = parser.temporary();
-
-                e1 = tmp.binaryMethod(e1) catch break :blk;
-
-                parser.offset += tmp.offset;
-
+            if (parser.binaryMethod(e1)) |value| {
+                e1 = value;
                 if (parser.startsWithConsuming(".")) continue;
-            }
+            } else |_| {}
 
-            blk: {
-                var tmp = parser.temporary();
-
-                e1 = tmp.unaryMethod(e1) catch break :blk;
-
-                parser.offset += tmp.offset;
-
+            if (parser.unaryMethod(e1)) |value| {
+                e1 = value;
                 if (parser.startsWithConsuming(".")) continue;
-            }
+            } else |_| {}
 
             break;
         }
@@ -635,15 +558,10 @@ pub const Parser = struct {
     }
 
     fn exprTerm(parser: *Parser) ParserError!Expression {
-        blk: {
-            var tmp = parser.temporary();
+        const start = parser.offset;
+        errdefer parser.offset = start;
 
-            const p = tmp.unaryParens() catch break :blk;
-
-            parser.offset += tmp.offset;
-
-            return p;
-        }
+        if (parser.unaryParens()) |value| return value else |_| {}
 
         // Otherwise we expect term
         const term1 = try parser.term(.allow);
@@ -688,6 +606,9 @@ pub const Parser = struct {
     }
 
     fn unaryParens(parser: *Parser) ParserError!Expression {
+        const start = parser.offset;
+        errdefer parser.offset = start;
+
         try parser.consume("(");
 
         parser.skipWhiteSpace();
@@ -773,17 +694,20 @@ pub const Parser = struct {
         return error.UnexpectedOp;
     }
 
-    fn scopes(parser: *Parser, allocator: std.mem.Allocator) !std.ArrayList(Scope) {
+    fn scopes(parser: *Parser) !std.ArrayList(Scope) {
+        const start = parser.offset;
+        errdefer parser.offset = start;
+
         try parser.consume("trusting");
 
         parser.skipWhiteSpace();
 
-        var scps = std.ArrayList(Scope).init(allocator);
+        var scps = std.ArrayList(Scope).init(parser.allocator);
 
         while (true) {
             parser.skipWhiteSpace();
 
-            const scp = try parser.scope(allocator);
+            const scp = try parser.scope(parser.allocator);
 
             try scps.append(scp);
 
@@ -812,6 +736,9 @@ pub const Parser = struct {
 
     /// Parser a public key. Currently only supports ed25519.
     fn publicKey(parser: *Parser) !Ed25519.PublicKey {
+        const start = parser.offset;
+        errdefer parser.offset = start;
+
         try parser.consume("ed25519/");
 
         const h = try parser.hex();
@@ -870,6 +797,7 @@ pub const Parser = struct {
 
     fn name(parser: *Parser) ![]const u8 {
         const start = parser.offset;
+        errdefer parser.offset = start;
 
         if (parser.rest().len == 0) return error.ParsingNameExpectsAtLeastOneCharacter;
 
