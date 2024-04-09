@@ -9,7 +9,6 @@ pub const Date = @import("date.zig").Date;
 pub const Policy = @import("policy.zig").Policy;
 pub const Parser = @import("parser.zig").Parser;
 pub const Block = @import("block.zig").Block;
-pub const Set = @import("biscuit-datalog").Set;
 
 test {
     _ = @import("parser.zig");

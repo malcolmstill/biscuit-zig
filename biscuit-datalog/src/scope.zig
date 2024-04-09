@@ -1,5 +1,6 @@
 const std = @import("std");
 const schema = @import("biscuit-schema");
+const builder = @import("biscuit-builder");
 const SymbolTable = @import("symbol_table.zig").SymbolTable;
 
 pub const Scope = union(ScopeTag) {
@@ -25,6 +26,16 @@ pub const Scope = union(ScopeTag) {
             .authority => .authority,
             .previous => .previous,
             .public_key => |index| .{ .public_key = try new_symbols.insertPublicKey(try old_symbols.getPublicKey(index)) },
+        };
+    }
+
+    /// convert to datalog fact
+    pub fn from(scope: builder.Scope, _: std.mem.Allocator, symbols: *SymbolTable) !Scope {
+        return switch (scope) {
+            .authority => .{ .authority = {} },
+            .previous => .{ .previous = {} },
+            .public_key => |pk| .{ .public_key = try symbols.insertPublicKey(pk) },
+            .parameter => unreachable,
         };
     }
 

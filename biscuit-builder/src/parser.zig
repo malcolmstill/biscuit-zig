@@ -9,7 +9,7 @@ const Expression = @import("expression.zig").Expression;
 const Scope = @import("scope.zig").Scope;
 const Date = @import("date.zig").Date;
 const Policy = @import("policy.zig").Policy;
-const Set = @import("biscuit-datalog").Set;
+const Set = @import("biscuit-set").Set;
 const Ed25519 = std.crypto.sign.Ed25519;
 
 const log = std.log.scoped(.parser);

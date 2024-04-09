@@ -2,6 +2,7 @@ const std = @import("std");
 const mem = std.mem;
 const meta = std.meta;
 const schema = @import("biscuit-schema");
+const builder = @import("biscuit-builder");
 const Set = @import("set.zig").Set;
 const Fact = @import("fact.zig").Fact;
 const FactSet = @import("fact_set.zig").FactSet;
@@ -310,6 +311,34 @@ pub const Rule = struct {
 
         return .{
             .head = try rule.head.remap(old_symbols, new_symbols),
+            .body = body,
+            .expressions = expressions,
+            .scopes = scopes,
+        };
+    }
+
+    /// convert to datalog predicate from builder
+    pub fn from(rule: builder.Rule, allocator: std.mem.Allocator, symbols: *SymbolTable) !Rule {
+        const head = try Predicate.from(rule.head, allocator, symbols);
+
+        var body = std.ArrayList(Predicate).init(allocator);
+        var expressions = std.ArrayList(Expression).init(allocator);
+        var scopes = std.ArrayList(Scope).init(allocator);
+
+        for (rule.body.items) |predicate| {
+            try body.append(try Predicate.from(predicate, allocator, symbols));
+        }
+
+        for (rule.expressions.items) |expression| {
+            try expressions.append(try Expression.from(expression, allocator, symbols));
+        }
+
+        for (rule.scopes.items) |scope| {
+            try scopes.append(try Scope.from(scope, allocator, symbols));
+        }
+
+        return .{
+            .head = head,
             .body = body,
             .expressions = expressions,
             .scopes = scopes,

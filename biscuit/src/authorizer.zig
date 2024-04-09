@@ -4,6 +4,8 @@ const Biscuit = @import("biscuit.zig").Biscuit;
 const World = @import("biscuit-datalog").world.World;
 const Origin = @import("biscuit-datalog").Origin;
 const TrustedOrigins = @import("biscuit-datalog").TrustedOrigins;
+const Fact = @import("biscuit-datalog").Fact;
+const Rule = @import("biscuit-datalog").Rule;
 const Check = @import("biscuit-datalog").check.Check;
 const SymbolTable = @import("biscuit-datalog").symbol_table.SymbolTable;
 const Scope = @import("biscuit-datalog").Scope;
@@ -205,7 +207,7 @@ pub const Authorizer = struct {
 
         for (authorizer.checks.items) |c| {
             log.debug("authorizer check = {any}", .{c});
-            const check = try c.toDatalog(authorizer.arena, &authorizer.symbols);
+            const check = try Check.from(c, authorizer.arena, &authorizer.symbols);
 
             for (check.queries.items, 0..) |*query, check_id| {
                 const rule_trusted_origins = try TrustedOrigins.fromScopes(
@@ -277,7 +279,7 @@ pub const Authorizer = struct {
             log.debug("testing policy {any}", .{policy});
 
             for (policy.queries.items, 0..) |*q, policy_id| {
-                var query = try q.toDatalog(authorizer.arena, &authorizer.symbols);
+                var query = try Rule.from(q.*, authorizer.arena, &authorizer.symbols);
 
                 const rule_trusted_origins = try TrustedOrigins.fromScopes(
                     authorizer.arena,
@@ -370,7 +372,7 @@ pub const Authorizer = struct {
 
         const origin = try Origin.initWithId(authorizer.arena, Origin.AUTHORIZER_ID);
 
-        try authorizer.world.addFact(origin, try fact.toDatalog(authorizer.arena, &authorizer.symbols));
+        try authorizer.world.addFact(origin, try Fact.from(fact, authorizer.arena, &authorizer.symbols));
     }
 
     /// Add check from string to authorizer

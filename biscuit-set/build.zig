@@ -15,32 +15,17 @@ pub fn build(b: *std.Build) void {
     // set a preferred release mode, allowing the user to decide how to optimize.
     const optimize = b.standardOptimizeOption(.{});
 
-    const schema = b.dependency("biscuit_schema", .{ .target = target, .optimize = optimize });
-    const format = b.dependency("biscuit_format", .{ .target = target, .optimize = optimize });
-    const builder = b.dependency("biscuit-builder", .{ .target = target, .optimize = optimize });
-    const regex = b.dependency("regex", .{ .target = target, .optimize = optimize });
-
-    _ = b.addModule("biscuit-datalog", .{
-        .root_source_file = .{ .path = "src/main.zig" },
-        .imports = &.{
-            .{ .name = "biscuit-schema", .module = schema.module("biscuit-schema") },
-            .{ .name = "biscuit-format", .module = format.module("biscuit-format") },
-            .{ .name = "biscuit-builder", .module = builder.module("biscuit-builder") },
-            .{ .name = "regex", .module = regex.module("regex") },
-        },
+    _ = b.addModule("biscuit-set", .{
+        .root_source_file = .{ .path = "src/set.zig" },
     });
 
     // Creates a step for unit testing. This only builds the test executable
     // but does not run it.
     const lib_unit_tests = b.addTest(.{
-        .root_source_file = .{ .path = "src/main.zig" },
+        .root_source_file = .{ .path = "src/set.zig" },
         .target = target,
         .optimize = optimize,
     });
-    lib_unit_tests.root_module.addImport("biscuit-schema", schema.module("biscuit-schema"));
-    lib_unit_tests.root_module.addImport("biscuit-format", format.module("biscuit-format"));
-    lib_unit_tests.root_module.addImport("biscuit-builder", builder.module("biscuit-builder"));
-    lib_unit_tests.root_module.addImport("regex", regex.module("regex"));
 
     const run_lib_unit_tests = b.addRunArtifact(lib_unit_tests);
 
