@@ -1,5 +1,4 @@
 const std = @import("std");
-const datalog = @import("biscuit-datalog");
 const Term = @import("term.zig").Term;
 
 pub const Predicate = struct {
@@ -12,19 +11,6 @@ pub const Predicate = struct {
         // }
 
         // predicate.terms.deinit();
-    }
-
-    /// convert to datalog predicate
-    pub fn toDatalog(predicate: Predicate, allocator: std.mem.Allocator, symbols: *datalog.SymbolTable) !datalog.Predicate {
-        const name = try symbols.insert(predicate.name);
-
-        var terms = std.ArrayList(datalog.Term).init(allocator);
-
-        for (predicate.terms.items) |term| {
-            try terms.append(try term.toDatalog(allocator, symbols));
-        }
-
-        return .{ .name = name, .terms = terms };
     }
 
     pub fn format(predicate: Predicate, comptime _: []const u8, _: std.fmt.FormatOptions, writer: anytype) !void {

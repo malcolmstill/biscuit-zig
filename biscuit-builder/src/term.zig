@@ -1,6 +1,6 @@
 const std = @import("std");
-const datalog = @import("biscuit-datalog");
 const Date = @import("date.zig").Date;
+const Set = @import("biscuit-set").Set;
 
 const TermTag = enum(u8) {
     variable,
@@ -19,30 +19,9 @@ pub const Term = union(TermTag) {
     bool: bool,
     date: u64,
     bytes: []const u8,
-    set: datalog.Set(Term),
+    set: Set(Term),
 
     pub fn deinit(_: Term) void {}
-
-    pub fn toDatalog(term: Term, arena: std.mem.Allocator, symbols: *datalog.SymbolTable) !datalog.Term {
-        switch (term) {
-            .variable => |s| return .{ .variable = std.math.cast(u32, try symbols.insert(s)) orelse return error.FailedToCastInt },
-            .string => |s| return .{ .string = try symbols.insert(s) },
-            .integer => |n| return .{ .integer = n },
-            .bool => |b| return .{ .bool = b },
-            .date => |d| return .{ .date = d },
-            .bytes => |b| return .{ .bytes = b },
-            .set => |s| {
-                var datalog_set = datalog.Set(datalog.Term).init(arena);
-
-                var it = s.iterator();
-                while (it.next()) |t| {
-                    try datalog_set.add(try t.toDatalog(arena, symbols));
-                }
-
-                return .{ .set = datalog_set };
-            },
-        }
-    }
 
     pub fn format(term: Term, comptime _: []const u8, _: std.fmt.FormatOptions, writer: anytype) !void {
         switch (term) {

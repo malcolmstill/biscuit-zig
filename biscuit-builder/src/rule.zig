@@ -1,5 +1,4 @@
 const std = @import("std");
-const datalog = @import("biscuit-datalog");
 const Predicate = @import("predicate.zig").Predicate;
 const Term = @import("term.zig").Term;
 const Expression = @import("expression.zig").Expression;
@@ -26,34 +25,6 @@ pub const Rule = struct {
         // rule.body.deinit();
         // rule.expressions.deinit();
         // rule.scopes.deinit();
-    }
-
-    /// convert to datalog predicate
-    pub fn toDatalog(rule: Rule, allocator: std.mem.Allocator, symbols: *datalog.SymbolTable) !datalog.Rule {
-        const head = try rule.head.toDatalog(allocator, symbols);
-
-        var body = std.ArrayList(datalog.Predicate).init(allocator);
-        var expressions = std.ArrayList(datalog.Expression).init(allocator);
-        var scopes = std.ArrayList(datalog.Scope).init(allocator);
-
-        for (rule.body.items) |predicate| {
-            try body.append(try predicate.toDatalog(allocator, symbols));
-        }
-
-        for (rule.expressions.items) |expression| {
-            try expressions.append(try expression.toDatalog(allocator, symbols));
-        }
-
-        for (rule.scopes.items) |scope| {
-            try scopes.append(try scope.toDatalog(allocator, symbols));
-        }
-
-        return .{
-            .head = head,
-            .body = body,
-            .expressions = expressions,
-            .scopes = scopes,
-        };
     }
 
     pub fn format(rule: Rule, comptime _: []const u8, _: std.fmt.FormatOptions, writer: anytype) !void {

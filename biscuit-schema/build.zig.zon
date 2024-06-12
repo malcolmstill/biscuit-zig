@@ -39,8 +39,8 @@
         //    .path = "foo",
         //},
         .zig_protobuf = .{
-            .url = "https://github.com/Arwalk/zig-protobuf/archive/207ac787fe453ba3f55b4b2313a099800bf28e87.tar.gz",
-            .hash = "12205d26faf459d53ad9788df7b03fafa49c2c944528f4b1ae9f3dc64393189a683c",
+            .url = "https://github.com/Arwalk/zig-protobuf/archive/3e55a9a9a9eff6ef8183bcb6dfdf361fdf876449.tar.gz",
+            .hash = "1220bdfa6a89127fb8469aaa50f7ca5cdb808415f95dd24fa9ee9df5ed99f598cf63",
         },
     },
 

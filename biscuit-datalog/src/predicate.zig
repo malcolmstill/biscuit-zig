@@ -1,6 +1,7 @@
 const std = @import("std");
 const mem = std.mem;
 const schema = @import("biscuit-schema");
+const builder = @import("biscuit-builder");
 const Term = @import("term.zig").Term;
 const SymbolTable = @import("symbol_table.zig").SymbolTable;
 
@@ -79,6 +80,19 @@ pub const Predicate = struct {
             .name = try new_symbols.insert(name),
             .terms = terms,
         };
+    }
+
+    /// convert to datalog predicate from builder
+    pub fn from(predicate: builder.Predicate, allocator: std.mem.Allocator, symbols: *SymbolTable) !Predicate {
+        const name = try symbols.insert(predicate.name);
+
+        var terms = std.ArrayList(Term).init(allocator);
+
+        for (predicate.terms.items) |term| {
+            try terms.append(try Term.from(term, allocator, symbols));
+        }
+
+        return .{ .name = name, .terms = terms };
     }
 
     /// Clone the predicate

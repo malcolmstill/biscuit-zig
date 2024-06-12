@@ -1,6 +1,7 @@
 const std = @import("std");
 const mem = std.mem;
 const schema = @import("biscuit-schema");
+const builder = @import("biscuit-builder");
 const Predicate = @import("predicate.zig").Predicate;
 const SymbolTable = @import("symbol_table.zig").SymbolTable;
 
@@ -24,6 +25,11 @@ pub const Fact = struct {
     /// Convert fact to new symbol space
     pub fn remap(fact: Fact, old_symbols: *const SymbolTable, new_symbols: *SymbolTable) !Fact {
         return .{ .predicate = try fact.predicate.remap(old_symbols, new_symbols) };
+    }
+
+    /// convert to datalog fact from builder
+    pub fn from(fact: builder.Fact, allocator: std.mem.Allocator, symbols: *SymbolTable) !Fact {
+        return .{ .predicate = try Predicate.from(fact.predicate, allocator, symbols) };
     }
 
     pub fn clone(fact: Fact) !Fact {

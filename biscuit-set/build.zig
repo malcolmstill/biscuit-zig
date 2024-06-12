@@ -15,26 +15,17 @@ pub fn build(b: *std.Build) void {
     // set a preferred release mode, allowing the user to decide how to optimize.
     const optimize = b.standardOptimizeOption(.{});
 
-    const ziglyph = b.dependency("ziglyph", .{ .optimize = optimize, .target = target });
-    const builder = b.dependency("biscuit-builder", .{ .target = target, .optimize = optimize });
-
-    _ = b.addModule("biscuit-parser", .{
-        .root_source_file = .{ .path = "src/parser.zig" },
-        .imports = &.{
-            .{ .name = "biscuit-builder", .module = builder.module("biscuit-builder") },
-            .{ .name = "ziglyph", .module = ziglyph.module("ziglyph") },
-        },
+    _ = b.addModule("biscuit-set", .{
+        .root_source_file = .{ .path = "src/set.zig" },
     });
 
     // Creates a step for unit testing. This only builds the test executable
     // but does not run it.
     const lib_unit_tests = b.addTest(.{
-        .root_source_file = .{ .path = "src/parser.zig" },
+        .root_source_file = .{ .path = "src/set.zig" },
         .target = target,
         .optimize = optimize,
     });
-    lib_unit_tests.root_module.addImport("biscuit-builder", builder.module("biscuit-builder"));
-    lib_unit_tests.root_module.addImport("ziglyph", ziglyph.module("ziglyph"));
 
     const run_lib_unit_tests = b.addRunArtifact(lib_unit_tests);
 

@@ -1,5 +1,4 @@
 const std = @import("std");
-const datalog = @import("biscuit-datalog");
 const Predicate = @import("predicate.zig").Predicate;
 const Term = @import("term.zig").Term;
 
@@ -17,14 +16,4 @@ pub const Scope = union(ScopeKind) {
     previous: void,
     public_key: Ed25519.PublicKey,
     parameter: []const u8,
-
-    /// convert to datalog fact
-    pub fn toDatalog(scope: Scope, _: std.mem.Allocator, symbols: *datalog.SymbolTable) !datalog.Scope {
-        return switch (scope) {
-            .authority => .{ .authority = {} },
-            .previous => .{ .previous = {} },
-            .public_key => |pk| .{ .public_key = try symbols.insertPublicKey(pk) },
-            .parameter => unreachable,
-        };
-    }
 };

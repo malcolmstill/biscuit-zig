@@ -1,5 +1,6 @@
 const std = @import("std");
 const schema = @import("biscuit-schema");
+const builder = @import("biscuit-builder");
 const Rule = @import("rule.zig").Rule;
 const SymbolTable = @import("symbol_table.zig").SymbolTable;
 
@@ -52,5 +53,21 @@ pub const Check = struct {
             .queries = queries,
             .kind = check.kind,
         };
+    }
+
+    /// Convert from builder to datalog
+    pub fn from(check: builder.Check, allocator: std.mem.Allocator, symbols: *SymbolTable) !Check {
+        var queries = std.ArrayList(Rule).init(allocator);
+
+        for (check.queries.items) |query| {
+            try queries.append(try Rule.from(query, allocator, symbols));
+        }
+
+        const kind: Check.Kind = switch (check.kind) {
+            .one => .one,
+            .all => .all,
+        };
+
+        return .{ .kind = kind, .queries = queries };
     }
 };

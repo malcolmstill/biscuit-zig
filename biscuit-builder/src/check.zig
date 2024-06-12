@@ -1,5 +1,4 @@
 const std = @import("std");
-const datalog = @import("biscuit-datalog");
 const Predicate = @import("predicate.zig").Predicate;
 const Term = @import("term.zig").Term;
 const Rule = @import("rule.zig").Rule;
@@ -19,21 +18,6 @@ pub const Check = struct {
         // }
 
         // check.queries.deinit();
-    }
-
-    pub fn toDatalog(check: Check, allocator: std.mem.Allocator, symbols: *datalog.SymbolTable) !datalog.Check {
-        var queries = std.ArrayList(datalog.Rule).init(allocator);
-
-        for (check.queries.items) |query| {
-            try queries.append(try query.toDatalog(allocator, symbols));
-        }
-
-        const kind: datalog.Check.Kind = switch (check.kind) {
-            .one => .one,
-            .all => .all,
-        };
-
-        return .{ .kind = kind, .queries = queries };
     }
 
     pub fn format(check: Check, comptime _: []const u8, _: std.fmt.FormatOptions, writer: anytype) !void {

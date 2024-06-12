@@ -1,6 +1,7 @@
 const std = @import("std");
 const mem = std.mem;
 const schema = @import("biscuit-schema");
+const builder = @import("biscuit-builder");
 const Predicate = @import("predicate.zig").Predicate;
 const SymbolTable = @import("symbol_table.zig").SymbolTable;
 const Set = @import("set.zig").Set;
@@ -60,6 +61,27 @@ pub const Term = union(TermKind) {
                 break :blk .{ .set = set };
             },
         };
+    }
+
+    pub fn from(term: builder.Term, arena: std.mem.Allocator, symbols: *SymbolTable) !Term {
+        switch (term) {
+            .variable => |s| return .{ .variable = std.math.cast(u32, try symbols.insert(s)) orelse return error.FailedToCastInt },
+            .string => |s| return .{ .string = try symbols.insert(s) },
+            .integer => |n| return .{ .integer = n },
+            .bool => |b| return .{ .bool = b },
+            .date => |d| return .{ .date = d },
+            .bytes => |b| return .{ .bytes = b },
+            .set => |s| {
+                var set = Set(Term).init(arena);
+
+                var it = s.iterator();
+                while (it.next()) |t| {
+                    try set.add(try Term.from(t.*, arena, symbols));
+                }
+
+                return .{ .set = set };
+            },
+        }
     }
 
     pub fn eql(term: Term, other_term: Term) bool {

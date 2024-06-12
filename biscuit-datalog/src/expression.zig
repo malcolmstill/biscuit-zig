@@ -1,6 +1,7 @@
 const std = @import("std");
 const mem = std.mem;
 const schema = @import("biscuit-schema");
+const builder = @import("biscuit-builder");
 const Regex = @import("regex").Regex;
 const Term = @import("term.zig").Term;
 const SymbolTable = @import("symbol_table.zig").SymbolTable;
@@ -112,6 +113,62 @@ pub const Expression = struct {
         }
 
         return .{ .ops = ops };
+    }
+
+    /// convert to datalog fact
+    pub fn from(expression: builder.Expression, allocator: std.mem.Allocator, symbols: *SymbolTable) !Expression {
+        var ops = std.ArrayList(Op).init(allocator);
+
+        try Expression.toOpcodes(expression, allocator, &ops, symbols);
+
+        return .{ .ops = ops };
+    }
+
+    pub fn toOpcodes(expression: builder.Expression, allocator: std.mem.Allocator, ops: *std.ArrayList(Op), symbols: *SymbolTable) !void {
+        switch (expression) {
+            .value => |v| try ops.append(.{ .value = try Term.from(v, allocator, symbols) }),
+            .unary => |u| {
+                try Expression.toOpcodes(u.expression.*, allocator, ops, symbols);
+
+                try ops.append(.{
+                    .unary = switch (u.op) {
+                        .negate => .negate,
+                        .parens => .parens,
+                        .length => .length,
+                    },
+                });
+            },
+            .binary => |b| {
+                try Expression.toOpcodes(b.left.*, allocator, ops, symbols);
+                try Expression.toOpcodes(b.right.*, allocator, ops, symbols);
+
+                try ops.append(.{
+                    .binary = switch (b.op) {
+                        .less_than => .less_than,
+                        .greater_than => .greater_than,
+                        .less_or_equal => .less_or_equal,
+                        .greater_or_equal => .greater_or_equal,
+                        .equal => .equal,
+                        .contains => .contains,
+                        .prefix => .prefix,
+                        .suffix => .suffix,
+                        .regex => .regex,
+                        .add => .add,
+                        .sub => .sub,
+                        .mul => .mul,
+                        .div => .div,
+                        .@"and" => .@"and",
+                        .@"or" => .@"or",
+                        .intersection => .intersection,
+                        .@"union" => .@"union",
+                        .bitwise_and => .bitwise_and,
+                        .bitwise_or => .bitwise_or,
+                        .bitwise_xor => .bitwise_xor,
+                        .not_equal => .not_equal,
+                    },
+                });
+            },
+        }
     }
 
     pub fn format(expression: Expression, comptime _: []const u8, _: std.fmt.FormatOptions, writer: anytype) !void {

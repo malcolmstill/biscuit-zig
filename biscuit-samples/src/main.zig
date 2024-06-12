@@ -8,17 +8,19 @@ const Result = @import("sample.zig").Result;
 
 const log = std.log.scoped(.samples);
 
-var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+var gpa_state = std.heap.GeneralPurposeAllocator(.{}){};
 
 pub fn main() anyerror!void {
-    defer _ = gpa.deinit();
+    defer _ = gpa_state.deinit();
 
-    var arena = std.heap.ArenaAllocator.init(gpa.allocator());
-    defer arena.deinit();
+    const gpa = gpa_state.allocator();
 
-    const alloc = arena.allocator();
+    var arena_state = std.heap.ArenaAllocator.init(gpa);
+    defer arena_state.deinit();
 
-    var args = try std.process.argsWithAllocator(alloc);
+    const arena = arena_state.allocator();
+
+    var args = try std.process.argsWithAllocator(arena);
     defer args.deinit();
     _ = args.skip();
 
@@ -27,8 +29,8 @@ pub fn main() anyerror!void {
     // 2. Parse json
     const json_string = @embedFile("samples/samples.json");
 
-    const dynamic_tree = try std.json.parseFromSliceLeaky(std.json.Value, alloc, json_string, .{});
-    const r = try std.json.parseFromValueLeaky(Samples, alloc, dynamic_tree, .{});
+    const dynamic_tree = try std.json.parseFromSliceLeaky(std.json.Value, arena, json_string, .{});
+    const r = try std.json.parseFromValueLeaky(Samples, arena, dynamic_tree, .{});
 
     var public_key_mem: [32]u8 = undefined;
     _ = try std.fmt.hexToBytes(&public_key_mem, r.root_public_key);
@@ -40,30 +42,30 @@ pub fn main() anyerror!void {
             if (!mem.eql(u8, name, testcase.filename)) continue;
         }
 
-        const token = try std.fs.cwd().readFileAlloc(alloc, testcase.filename, 0xFFFFFFF);
+        const token = try std.fs.cwd().readFileAlloc(arena, testcase.filename, 0xFFFFFFF);
 
         for (testcase.validations.map.values(), 0..) |validation, i| {
             errdefer log.err("Error on validation {} of {s}\n", .{ i, testcase.filename });
-            try validate(alloc, token, public_key, validation.result, validation.authorizer_code);
+            try validate(gpa, token, public_key, validation.result, validation.authorizer_code);
         }
     }
 }
 
-pub fn validate(alloc: mem.Allocator, token: []const u8, public_key: std.crypto.sign.Ed25519.PublicKey, result: Result, authorizer_code: []const u8) !void {
-    var errors = std.ArrayList(AuthorizerError).init(alloc);
+pub fn validate(allocator: mem.Allocator, token: []const u8, public_key: std.crypto.sign.Ed25519.PublicKey, result: Result, authorizer_code: []const u8) !void {
+    var errors = std.ArrayList(AuthorizerError).init(allocator);
     defer errors.deinit();
 
     switch (result) {
-        .Ok => try runValidation(alloc, token, public_key, authorizer_code, &errors),
+        .Ok => try runValidation(allocator, token, public_key, authorizer_code, &errors),
         .Err => |e| {
             switch (e) {
                 .Format => |f| switch (f) {
-                    .InvalidSignatureSize => runValidation(alloc, token, public_key, authorizer_code, &errors) catch |err| switch (err) {
+                    .InvalidSignatureSize => runValidation(allocator, token, public_key, authorizer_code, &errors) catch |err| switch (err) {
                         error.IncorrectBlockSignatureLength => return,
                         else => return err,
                     },
                     .Signature => |s| switch (s) {
-                        .InvalidSignature => runValidation(alloc, token, public_key, authorizer_code, &errors) catch |err| switch (err) {
+                        .InvalidSignature => runValidation(allocator, token, public_key, authorizer_code, &errors) catch |err| switch (err) {
                             error.SignatureVerificationFailed,
                             error.InvalidEncoding,
                             => return,
@@ -72,7 +74,7 @@ pub fn validate(alloc: mem.Allocator, token: []const u8, public_key: std.crypto.
                     },
                 },
                 .FailedLogic => |f| switch (f) {
-                    .Unauthorized => |u| runValidation(alloc, token, public_key, authorizer_code, &errors) catch |err| switch (err) {
+                    .Unauthorized => |u| runValidation(allocator, token, public_key, authorizer_code, &errors) catch |err| switch (err) {
                         error.AuthorizationFailed => {
 
                             // Check that we have expected check failures
@@ -121,7 +123,7 @@ pub fn validate(alloc: mem.Allocator, token: []const u8, public_key: std.crypto.
                         },
                         else => return err,
                     },
-                    .InvalidBlockRule => |_| runValidation(alloc, token, public_key, authorizer_code, &errors) catch |err| switch (err) {
+                    .InvalidBlockRule => |_| runValidation(allocator, token, public_key, authorizer_code, &errors) catch |err| switch (err) {
                         error.AuthorizationFailed => {
                             for (errors.items) |found_failed_check| {
                                 switch (found_failed_check) {
@@ -136,7 +138,7 @@ pub fn validate(alloc: mem.Allocator, token: []const u8, public_key: std.crypto.
                         else => return err,
                     },
                 },
-                .Execution => runValidation(alloc, token, public_key, authorizer_code, &errors) catch |err| switch (err) {
+                .Execution => runValidation(allocator, token, public_key, authorizer_code, &errors) catch |err| switch (err) {
                     error.Overflow => return,
                     else => return err,
                 },
@@ -147,11 +149,11 @@ pub fn validate(alloc: mem.Allocator, token: []const u8, public_key: std.crypto.
     }
 }
 
-pub fn runValidation(alloc: mem.Allocator, token: []const u8, public_key: std.crypto.sign.Ed25519.PublicKey, authorizer_code: []const u8, errors: *std.ArrayList(AuthorizerError)) !void {
-    var b = try Biscuit.fromBytes(alloc, token, public_key);
+pub fn runValidation(allocator: mem.Allocator, token: []const u8, public_key: std.crypto.sign.Ed25519.PublicKey, authorizer_code: []const u8, errors: *std.ArrayList(AuthorizerError)) !void {
+    var b = try Biscuit.fromBytes(allocator, token, public_key);
     defer b.deinit();
 
-    var a = try b.authorizer(alloc);
+    var a = try b.authorizer();
     defer a.deinit();
 
     var it = std.mem.split(u8, authorizer_code, ";");
@@ -174,4 +176,90 @@ pub fn runValidation(alloc: mem.Allocator, token: []const u8, public_key: std.cr
         log.debug("authorize() returned with errors: {any}\n", .{errors.items});
         return err;
     };
+}
+
+test "Basic token can be sealed" {
+    const testing = std.testing;
+
+    const hex_root_public_key = "1055c750b1a1505937af1537c626ba3263995c33a64758aaafb1275b0312e284";
+
+    var public_key_mem: [32]u8 = undefined;
+    _ = try std.fmt.hexToBytes(&public_key_mem, hex_root_public_key);
+    const public_key = try std.crypto.sign.Ed25519.PublicKey.fromBytes(public_key_mem);
+
+    const token = try std.fs.cwd().readFileAlloc(testing.allocator, "src/samples/test001_basic.bc", 0xFFFFFFF);
+    defer testing.allocator.free(token);
+
+    {
+        {
+            std.debug.print("\n[hex] before parsing(byte len = {}):, ", .{token.len});
+            for (token) |byte| std.debug.print("{x:0>2}", .{byte});
+            std.debug.print("\n", .{});
+        }
+
+        {
+            const encoded = try decode.bytesToBase64(testing.allocator, token);
+            defer testing.allocator.free(encoded);
+
+            std.debug.print("\n[base64] ORIGINAL (byte len = {}) = {s}\n", .{ token.len, encoded });
+        }
+
+        {
+            const encoded = try decode.bytesToUrlSafeBase64(testing.allocator, token);
+            defer testing.allocator.free(encoded);
+
+            std.debug.print("\n[url_base64] ORIGINAL (byte len = {}) = {s}\n", .{ token.len, encoded });
+        }
+    }
+
+    var b = try Biscuit.fromBytes(testing.allocator, token, public_key);
+    defer b.deinit();
+
+    {
+        const encoded_token = try b.serialized.serialize(testing.allocator);
+        defer testing.allocator.free(encoded_token);
+
+        {
+            std.debug.print("\n[hex] RESERIALIZE (byte len = {}):, ", .{token.len});
+            for (encoded_token) |byte| std.debug.print("{x:0>2}", .{byte});
+            std.debug.print("\n", .{});
+        }
+
+        {
+            const encoded = try decode.bytesToBase64(testing.allocator, encoded_token);
+            defer testing.allocator.free(encoded);
+            std.debug.print("\n[base64] RESERIALIZE (byte len = {}) = {s}\n", .{ encoded_token.len, encoded });
+        }
+
+        {
+            const encoded = try decode.bytesToUrlSafeBase64(testing.allocator, encoded_token);
+            defer testing.allocator.free(encoded);
+            std.debug.print("\n[url_base64] RESERIALIZE (byte len = {}) = {s}\n", .{ encoded_token.len, encoded });
+        }
+    }
+
+    var sealed = try b.seal();
+
+    {
+        const encoded_token = try sealed.serialized.serialize(testing.allocator);
+        defer testing.allocator.free(encoded_token);
+
+        {
+            std.debug.print("\n[hex] SEALED (byte len = {}):, ", .{token.len});
+            for (encoded_token) |byte| std.debug.print("{x:0>2}", .{byte});
+            std.debug.print("\n", .{});
+        }
+
+        {
+            const encoded = try decode.bytesToBase64(testing.allocator, encoded_token);
+            defer testing.allocator.free(encoded);
+            std.debug.print("\n[base64] SEALED (byte len = {}) = {s}\n", .{ encoded_token.len, encoded });
+        }
+
+        {
+            const encoded = try decode.bytesToUrlSafeBase64(testing.allocator, encoded_token);
+            defer testing.allocator.free(encoded);
+            std.debug.print("\n[url_base64] SEALED (byte len = {}) = {s}\n", .{ encoded_token.len, encoded });
+        }
+    }
 }

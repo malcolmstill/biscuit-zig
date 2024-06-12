@@ -1,5 +1,4 @@
 const std = @import("std");
-const datalog = @import("biscuit-datalog");
 const Predicate = @import("predicate.zig").Predicate;
 const Term = @import("term.zig").Term;
 
@@ -56,62 +55,6 @@ pub const Expression = union(ExpressionType) {
         bitwise_xor,
         not_equal,
     };
-
-    /// convert to datalog fact
-    pub fn toDatalog(expression: Expression, allocator: std.mem.Allocator, symbols: *datalog.SymbolTable) !datalog.Expression {
-        var ops = std.ArrayList(datalog.Op).init(allocator);
-
-        try expression.toOpcodes(allocator, &ops, symbols);
-
-        return .{ .ops = ops };
-    }
-
-    pub fn toOpcodes(expression: Expression, allocator: std.mem.Allocator, ops: *std.ArrayList(datalog.Op), symbols: *datalog.SymbolTable) !void {
-        switch (expression) {
-            .value => |v| try ops.append(.{ .value = try v.toDatalog(allocator, symbols) }),
-            .unary => |u| {
-                try u.expression.toOpcodes(allocator, ops, symbols);
-
-                try ops.append(.{
-                    .unary = switch (u.op) {
-                        .negate => .negate,
-                        .parens => .parens,
-                        .length => .length,
-                    },
-                });
-            },
-            .binary => |b| {
-                try b.left.toOpcodes(allocator, ops, symbols);
-                try b.right.toOpcodes(allocator, ops, symbols);
-
-                try ops.append(.{
-                    .binary = switch (b.op) {
-                        .less_than => .less_than,
-                        .greater_than => .greater_than,
-                        .less_or_equal => .less_or_equal,
-                        .greater_or_equal => .greater_or_equal,
-                        .equal => .equal,
-                        .contains => .contains,
-                        .prefix => .prefix,
-                        .suffix => .suffix,
-                        .regex => .regex,
-                        .add => .add,
-                        .sub => .sub,
-                        .mul => .mul,
-                        .div => .div,
-                        .@"and" => .@"and",
-                        .@"or" => .@"or",
-                        .intersection => .intersection,
-                        .@"union" => .@"union",
-                        .bitwise_and => .bitwise_and,
-                        .bitwise_or => .bitwise_or,
-                        .bitwise_xor => .bitwise_xor,
-                        .not_equal => .not_equal,
-                    },
-                });
-            },
-        }
-    }
 
     pub fn deinit(_: *Expression) void {
         // switch (expression.*) {

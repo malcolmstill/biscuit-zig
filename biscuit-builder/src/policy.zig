@@ -1,5 +1,4 @@
 const std = @import("std");
-const datalog = @import("biscuit-datalog");
 const Rule = @import("rule.zig").Rule;
 
 pub const Policy = struct {

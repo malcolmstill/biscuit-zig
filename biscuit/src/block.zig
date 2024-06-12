@@ -22,40 +22,31 @@ pub const Block = struct {
     scopes: std.ArrayList(Scope),
     public_keys: std.ArrayList(Ed25519.PublicKey),
 
-    pub fn init(allocator: std.mem.Allocator) Block {
+    pub fn init(arena: std.mem.Allocator) Block {
         return .{
             .version = 0,
             .context = "",
-            .symbols = SymbolTable.init("block", allocator),
-            .facts = std.ArrayList(Fact).init(allocator),
-            .rules = std.ArrayList(Rule).init(allocator),
-            .checks = std.ArrayList(Check).init(allocator),
-            .scopes = std.ArrayList(Scope).init(allocator),
-            .public_keys = std.ArrayList(Ed25519.PublicKey).init(allocator),
+            .symbols = SymbolTable.init("block", arena), // FIXME: maybe we separately allocate this not in the arena
+            .facts = std.ArrayList(Fact).init(arena),
+            .rules = std.ArrayList(Rule).init(arena),
+            .checks = std.ArrayList(Check).init(arena),
+            .scopes = std.ArrayList(Scope).init(arena),
+            .public_keys = std.ArrayList(Ed25519.PublicKey).init(arena),
         };
     }
 
     pub fn deinit(block: *Block) void {
-        // for (block.checks.items) |*check| check.deinit();
-        // for (block.rules.items) |*rule| rule.deinit();
-        // for (block.facts.items) |*fact| fact.deinit();
-
-        block.checks.deinit();
-        block.rules.deinit();
-        block.facts.deinit();
-        block.scopes.deinit();
-        block.public_keys.deinit();
-        block.symbols.deinit();
+        _ = block;
     }
 
     /// Given a blocks contents as bytes, derserialize into runtime block
-    pub fn fromBytes(allocator: std.mem.Allocator, signed_block: SignedBlock, token_symbols: *SymbolTable) !Block {
+    pub fn fromBytes(arena: std.mem.Allocator, signed_block: SignedBlock, token_symbols: *SymbolTable) !Block {
         const data = signed_block.block;
 
-        const decoded_block = try schema.decodeBlock(allocator, data);
+        const decoded_block = try schema.Block.decode(data, arena);
         defer decoded_block.deinit();
 
-        var block = Block.init(allocator);
+        var block = Block.init(arena);
         errdefer block.deinit();
 
         const version = decoded_block.version orelse return error.ExpectedVersion;
@@ -79,15 +70,15 @@ pub const Block = struct {
         }
 
         for (decoded_block.facts_v2.items) |fact| {
-            try block.facts.append(try Fact.fromSchema(allocator, fact));
+            try block.facts.append(try Fact.fromSchema(arena, fact));
         }
 
         for (decoded_block.rules_v2.items) |rule| {
-            try block.rules.append(try Rule.fromSchema(allocator, rule));
+            try block.rules.append(try Rule.fromSchema(arena, rule));
         }
 
         for (decoded_block.checks_v2.items) |check| {
-            try block.checks.append(try Check.fromSchema(allocator, check));
+            try block.checks.append(try Check.fromSchema(arena, check));
         }
 
         for (decoded_block.publicKeys.items) |public_key| {
