@@ -1,5 +1,8 @@
 # biscuit-zig
 
+> [!WARNING]
+> The implementation is WIP and should not be used in production
+
 Zig implementation of https://www.biscuitsec.org/
 
 ## Usage
